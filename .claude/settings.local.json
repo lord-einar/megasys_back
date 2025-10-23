@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Read(//tmp/**)",
+      "Bash(PGPASSWORD=\"Italia0454!\" psql:*)",
+      "Bash(timeout 3 npm run dev:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

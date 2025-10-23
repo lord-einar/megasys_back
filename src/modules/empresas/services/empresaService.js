@@ -1,0 +1,162 @@
+// src/modules/empresas/services/empresaService.js
+const { Empresa } = require('../../../models');
+const logger = require('../../../shared/utils/logger');
+
+class EmpresaService {
+  /**
+   * Obtener todas las empresas activas
+   */
+  async getEmpresasActivas(filtros = {}) {
+    try {
+      const where = { activo: true };
+
+      if (filtros.nombre) {
+        where.nombre = {
+          [require('sequelize').Op.iLike]: `%${filtros.nombre}%`
+        };
+      }
+
+      const empresas = await Empresa.findAll({
+        where,
+        order: [['nombre', 'ASC']]
+      });
+
+      logger.info('Empresas activas obtenidas', { cantidad: empresas.length });
+      return empresas;
+    } catch (error) {
+      logger.error('Error obteniendo empresas activas:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener todas las empresas (incluyendo inactivas)
+   */
+  async getTodasLasEmpresas(filtros = {}) {
+    try {
+      const where = {};
+
+      if (filtros.nombre) {
+        where.nombre = {
+          [require('sequelize').Op.iLike]: `%${filtros.nombre}%`
+        };
+      }
+
+      if (filtros.activo !== undefined) {
+        where.activo = filtros.activo;
+      }
+
+      const empresas = await Empresa.findAll({
+        where,
+        order: [['nombre', 'ASC']]
+      });
+
+      logger.info('Todas las empresas obtenidas', { cantidad: empresas.length });
+      return empresas;
+    } catch (error) {
+      logger.error('Error obteniendo empresas:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener empresa por ID
+   */
+  async getEmpresaById(empresaId) {
+    try {
+      const empresa = await Empresa.findByPk(empresaId, {
+        include: [{
+          association: 'sedes',
+          attributes: ['id', 'nombre_sede']
+        }]
+      });
+
+      if (!empresa) {
+        throw new Error('Empresa no encontrada');
+      }
+
+      logger.info('Empresa obtenida', { empresaId });
+      return empresa;
+    } catch (error) {
+      logger.error('Error obteniendo empresa:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Crear nueva empresa
+   */
+  async crearEmpresa(datosEmpresa) {
+    try {
+      const empresa = await Empresa.create({
+        nombre: datosEmpresa.nombre,
+        razon_social: datosEmpresa.razonSocial,
+        rfc: datosEmpresa.rfc,
+        direccion: datosEmpresa.direccion,
+        telefono: datosEmpresa.telefono,
+        email: datosEmpresa.email,
+        sitio_web: datosEmpresa.sitioWeb,
+        activo: datosEmpresa.activo !== false
+      });
+
+      logger.info('Nueva empresa creada', { empresaId: empresa.id, nombre: empresa.nombre });
+      return empresa;
+    } catch (error) {
+      logger.error('Error creando empresa:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualizar empresa
+   */
+  async actualizarEmpresa(empresaId, datosEmpresa) {
+    try {
+      const empresa = await Empresa.findByPk(empresaId);
+
+      if (!empresa) {
+        throw new Error('Empresa no encontrada');
+      }
+
+      await empresa.update({
+        nombre: datosEmpresa.nombre || empresa.nombre,
+        razon_social: datosEmpresa.razonSocial || empresa.razon_social,
+        rfc: datosEmpresa.rfc || empresa.rfc,
+        direccion: datosEmpresa.direccion || empresa.direccion,
+        telefono: datosEmpresa.telefono || empresa.telefono,
+        email: datosEmpresa.email || empresa.email,
+        sitio_web: datosEmpresa.sitioWeb || empresa.sitio_web,
+        activo: datosEmpresa.activo !== undefined ? datosEmpresa.activo : empresa.activo
+      });
+
+      logger.info('Empresa actualizada', { empresaId });
+      return empresa;
+    } catch (error) {
+      logger.error('Error actualizando empresa:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Eliminar empresa
+   */
+  async eliminarEmpresa(empresaId) {
+    try {
+      const empresa = await Empresa.findByPk(empresaId);
+
+      if (!empresa) {
+        throw new Error('Empresa no encontrada');
+      }
+
+      await empresa.destroy();
+
+      logger.info('Empresa eliminada', { empresaId });
+      return { success: true, message: 'Empresa eliminada correctamente' };
+    } catch (error) {
+      logger.error('Error eliminando empresa:', error);
+      throw error;
+    }
+  }
+}
+
+module.exports = new EmpresaService();

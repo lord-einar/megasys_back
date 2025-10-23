@@ -1,0 +1,12 @@
+ode_modules/
+.env
+*.log
+logs/
+coverage/
+dist/
+build/
+.DS_Store
+.vscode/
+*.tmp
+*.temp
+package-lock.json
