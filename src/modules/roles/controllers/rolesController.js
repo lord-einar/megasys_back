@@ -4,6 +4,7 @@ const { success, paginated, error } = require('../../../shared/utils/response');
 const asyncHandler = require('../../../shared/utils/asyncHandler');
 const logger = require('../../../shared/utils/logger');
 const { Op } = require('sequelize');
+const TransactionWrapper = require('../../../shared/utils/transactionWrapper');
 
 class RolesController {
   /**
@@ -80,19 +81,34 @@ class RolesController {
       return error(res, 'Este rol ya existe', 409);
     }
 
-    const nuevoRol = await Rol.create({
-      nombre: nombre.trim(),
-      descripcion: descripcion?.trim() || null,
-      activo: true
+    const resultado = await TransactionWrapper.execute({
+      operation: async (transaction) => {
+        return await Rol.create({
+          nombre: nombre.trim(),
+          descripcion: descripcion?.trim() || null,
+          activo: true
+        }, { transaction });
+      },
+      usuarioEmail: req.user?.email || 'sistema@aplicacion.com',
+      usuarioId: req.user?.id,
+      modulo: 'roles',
+      accion: 'create',
+      recurso: 'Rol',
+      recursoId: null,
+      descripcion: `Creación de rol: ${nombre}`,
+      valoresAnteriores: null,
+      valoresNuevos: req.body,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
     });
 
     logger.info('Nuevo rol creado:', {
-      rolId: nuevoRol.id,
-      nombre: nuevoRol.nombre,
+      rolId: resultado.data.id,
+      nombre: resultado.data.nombre,
       creadoPor: req.user?.email || 'sistema'
     });
 
-    success(res, nuevoRol, 'Rol creado correctamente', 201);
+    success(res, resultado.data, 'Rol creado correctamente', 201);
   });
 
   /**
@@ -108,6 +124,9 @@ class RolesController {
       return error(res, 'Rol no encontrado', 404);
     }
 
+    // Get previous values for audit
+    const previousData = rol.toJSON();
+
     const cambios = {};
 
     if (nombre) {
@@ -122,7 +141,23 @@ class RolesController {
       cambios.activo = activo;
     }
 
-    await rol.update(cambios);
+    const resultado = await TransactionWrapper.execute({
+      operation: async (transaction) => {
+        await rol.update(cambios, { transaction });
+        return rol;
+      },
+      usuarioEmail: req.user?.email || 'sistema@aplicacion.com',
+      usuarioId: req.user?.id,
+      modulo: 'roles',
+      accion: 'update',
+      recurso: 'Rol',
+      recursoId: id,
+      descripcion: `Actualización de rol: ${rol.nombre}`,
+      valoresAnteriores: previousData,
+      valoresNuevos: cambios,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
+    });
 
     logger.info('Rol actualizado:', {
       rolId: rol.id,
@@ -130,7 +165,7 @@ class RolesController {
       actualizadoPor: req.user?.email || 'sistema'
     });
 
-    success(res, rol, 'Rol actualizado correctamente');
+    success(res, resultado.data, 'Rol actualizado correctamente');
   });
 
   /**
@@ -145,7 +180,26 @@ class RolesController {
       return error(res, 'Rol no encontrado', 404);
     }
 
-    await rol.update({ activo: false });
+    // Get previous values for audit
+    const previousData = rol.toJSON();
+
+    const resultado = await TransactionWrapper.execute({
+      operation: async (transaction) => {
+        await rol.update({ activo: false }, { transaction });
+        return rol;
+      },
+      usuarioEmail: req.user?.email || 'sistema@aplicacion.com',
+      usuarioId: req.user?.id,
+      modulo: 'roles',
+      accion: 'delete',
+      recurso: 'Rol',
+      recursoId: id,
+      descripcion: `Eliminación de rol: ${rol.nombre}`,
+      valoresAnteriores: previousData,
+      valoresNuevos: null,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
+    });
 
     logger.info('Rol eliminado:', {
       rolId: rol.id,

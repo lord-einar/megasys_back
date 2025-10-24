@@ -3,6 +3,7 @@ const empresaService = require('../services/empresaService');
 const { success, error } = require('../../../shared/utils/response');
 const asyncHandler = require('../../../shared/utils/asyncHandler');
 const logger = require('../../../shared/utils/logger');
+const TransactionWrapper = require('../../../shared/utils/transactionWrapper');
 
 class EmpresaController {
   /**
@@ -66,7 +67,7 @@ class EmpresaController {
         return error(res, 'El nombre de la empresa es requerido', 400);
       }
 
-      const empresa = await empresaService.crearEmpresa({
+      const datosEmpresa = {
         nombre: nombre.trim(),
         razonSocial: razonSocial?.trim(),
         rfc: rfc?.trim(),
@@ -74,10 +75,26 @@ class EmpresaController {
         telefono: telefono?.trim(),
         email: email?.trim(),
         sitioWeb: sitioWeb?.trim()
+      };
+
+      // Ejecutar con transacción y auditoría
+      const resultado = await TransactionWrapper.execute({
+        operation: async (transaction) => {
+          return await empresaService.crearEmpresa(datosEmpresa, { transaction });
+        },
+        usuarioEmail: req.user?.email || 'sistema@aplicacion.com',
+        usuarioId: req.user?.id,
+        modulo: 'empresas',
+        accion: 'crear',
+        recurso: 'Empresa',
+        descripcion: `Creación de nueva empresa: ${datosEmpresa.nombre}`,
+        valoresNuevos: datosEmpresa,
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent')
       });
 
-      logger.info('Empresa creada por usuario', { empresaId: empresa.id });
-      success(res, empresa, 'Empresa creada correctamente', 201);
+      logger.info('Empresa creada correctamente', { empresaId: resultado.data.id });
+      success(res, resultado.data, 'Empresa creada correctamente', 201);
     } catch (err) {
       logger.error('Error creando empresa:', err);
       error(res, err.message || 'Error al crear empresa', 500);
@@ -92,7 +109,10 @@ class EmpresaController {
       const { id } = req.params;
       const { nombre, razonSocial, rfc, direccion, telefono, email, sitioWeb, activo } = req.body;
 
-      const empresa = await empresaService.actualizarEmpresa(id, {
+      // Obtener valores anteriores para auditoría
+      const empresaAnterior = await empresaService.getEmpresaById(id);
+
+      const datosActualizacion = {
         nombre: nombre?.trim(),
         razonSocial: razonSocial?.trim(),
         rfc: rfc?.trim(),
@@ -101,10 +121,37 @@ class EmpresaController {
         email: email?.trim(),
         sitioWeb: sitioWeb?.trim(),
         activo
+      };
+
+      // Ejecutar con transacción y auditoría
+      const resultado = await TransactionWrapper.execute({
+        operation: async (transaction) => {
+          return await empresaService.actualizarEmpresa(id, datosActualizacion, { transaction });
+        },
+        usuarioEmail: req.user?.email || 'sistema@aplicacion.com',
+        usuarioId: req.user?.id,
+        modulo: 'empresas',
+        accion: 'actualizar',
+        recurso: 'Empresa',
+        recursoId: id,
+        descripcion: `Actualización de empresa: ${empresaAnterior.nombre}`,
+        valoresAnteriores: {
+          nombre: empresaAnterior.nombre,
+          razonSocial: empresaAnterior.razonSocial,
+          rfc: empresaAnterior.rfc,
+          direccion: empresaAnterior.direccion,
+          telefono: empresaAnterior.telefono,
+          email: empresaAnterior.email,
+          sitioWeb: empresaAnterior.sitioWeb,
+          activo: empresaAnterior.activo
+        },
+        valoresNuevos: datosActualizacion,
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent')
       });
 
-      logger.info('Empresa actualizada por usuario', { empresaId: id });
-      success(res, empresa, 'Empresa actualizada correctamente');
+      logger.info('Empresa actualizada correctamente', { empresaId: id });
+      success(res, resultado.data, 'Empresa actualizada correctamente');
     } catch (err) {
       logger.error('Error actualizando empresa:', err);
       if (err.message === 'Empresa no encontrada') {
@@ -121,10 +168,34 @@ class EmpresaController {
   eliminar = asyncHandler(async (req, res) => {
     try {
       const { id } = req.params;
-      const resultado = await empresaService.eliminarEmpresa(id);
 
-      logger.info('Empresa eliminada por usuario', { empresaId: id });
-      success(res, resultado, 'Empresa eliminada correctamente');
+      // Obtener datos anteriores para auditoría
+      const empresaAnterior = await empresaService.getEmpresaById(id);
+
+      // Ejecutar con transacción y auditoría
+      const resultado = await TransactionWrapper.execute({
+        operation: async (transaction) => {
+          return await empresaService.eliminarEmpresa(id, { transaction });
+        },
+        usuarioEmail: req.user?.email || 'sistema@aplicacion.com',
+        usuarioId: req.user?.id,
+        modulo: 'empresas',
+        accion: 'eliminar',
+        recurso: 'Empresa',
+        recursoId: id,
+        descripcion: `Eliminación de empresa: ${empresaAnterior.nombre}`,
+        valoresAnteriores: {
+          nombre: empresaAnterior.nombre,
+          razonSocial: empresaAnterior.razonSocial,
+          rfc: empresaAnterior.rfc,
+          activo: empresaAnterior.activo
+        },
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent')
+      });
+
+      logger.info('Empresa eliminada correctamente', { empresaId: id });
+      success(res, resultado.data, 'Empresa eliminada correctamente');
     } catch (err) {
       logger.error('Error eliminando empresa:', err);
       if (err.message === 'Empresa no encontrada') {

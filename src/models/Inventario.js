@@ -85,13 +85,13 @@ const Inventario = sequelize.define('Inventario', {
     }
   },
   estado: {
-    type: DataTypes.ENUM('disponible', 'en_uso', 'mantenimiento', 'dado_de_baja'),
+    type: DataTypes.ENUM('disponible', 'en_uso', 'en_prestamo', 'mantenimiento', 'dado_de_baja'),
     allowNull: false,
     defaultValue: 'disponible',
     validate: {
       isIn: {
-        args: [['disponible', 'en_uso', 'mantenimiento', 'dado_de_baja']],
-        msg: 'El estado debe ser: disponible, en_uso, mantenimiento o dado_de_baja'
+        args: [['disponible', 'en_uso', 'en_prestamo', 'mantenimiento', 'dado_de_baja']],
+        msg: 'El estado debe ser: disponible, en_uso, en_prestamo, mantenimiento o dado_de_baja'
       }
     }
   },

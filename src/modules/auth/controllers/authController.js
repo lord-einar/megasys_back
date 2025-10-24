@@ -1,21 +1,11 @@
-// src/modules/auth/controllers/authController.js - CORREGIDO
+// src/modules/auth/controllers/authController.js - REFACTORIZADO PARA SOLID
 const authService = require('../services/authService');
+const tokenCacheService = require('../services/tokenCacheService');
+const authResponseFormatter = require('../services/authResponseFormatter');
+const roleService = require('../services/roleService');
 const { success, error } = require('../../../shared/utils/response');
 const asyncHandler = require('../../../shared/utils/asyncHandler');
 const logger = require('../../../shared/utils/logger');
-
-// Almacenamiento temporal de access tokens (en memoria, se limpian con el tiempo)
-const accessTokenCache = new Map();
-
-// Limpiar tokens expirados cada 5 minutos
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, data] of accessTokenCache.entries()) {
-    if (now > data.expiresAt) {
-      accessTokenCache.delete(key);
-    }
-  }
-}, 5 * 60 * 1000);
 
 class AuthController {
   /**
@@ -53,128 +43,44 @@ class AuthController {
           description: error_description
         });
 
-        // Enviar error con HTML meta refresh (respeta CSP)
-        const errorMsg = encodeURIComponent(error_description || authError);
-        const html = `
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>Error de autenticación</title>
-              <meta http-equiv="refresh" content="0; url=http://localhost:5173/login?error=${authError}&error_description=${errorMsg}">
-            </head>
-            <body>
-              <p>Error de autenticación. Si no se redirige automáticamente, <a href="http://localhost:5173/login?error=${authError}&error_description=${errorMsg}">haz clic aquí</a>.</p>
-            </body>
-          </html>
-        `;
+        const html = authResponseFormatter.formatAuthErrorRedirect(authError, error_description);
         return res.send(html);
       }
 
       if (!code) {
-        const html = `
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>Error de autenticación</title>
-              <meta http-equiv="refresh" content="0; url=http://localhost:5173/login?error=missing_code">
-            </head>
-            <body>
-              <p>Código faltante. Si no se redirige automáticamente, <a href="http://localhost:5173/login?error=missing_code">haz clic aquí</a>.</p>
-            </body>
-          </html>
-        `;
+        const html = authResponseFormatter.formatMissingCodeRedirect();
         return res.send(html);
       }
 
       const result = await authService.processAuthCallback(code);
 
       // Guardar el access token en cache para obtener la foto después
-      // El token se almacena por 30 minutos
-      accessTokenCache.set(result.user.id, {
-        accessToken: result.accessToken,
-        expiresAt: Date.now() + (30 * 60 * 1000)
-      });
+      tokenCacheService.set(result.user.id, result.accessToken);
 
       // Obtener rol y permisos basados en grupos
-      const roleService = require('../services/roleService');
-      const { role, permissions, groupAnalysis } = roleService.getRoleAndPermissions(result.user.groups);
-
-      // Extraer nombre y apellido del campo name (formato: "FirstName LastName")
-      const nameParts = (result.user.name || '').split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
-
-      // NO obtener la foto aquí - solo devolver URL del endpoint
-      // Esto evita que la foto en Base64 haga la URL de redirección demasiado grande
-      const profilePhotoUrl = `/api/auth/photo/${result.user.id}`;
+      const roleInfo = roleService.getRoleAndPermissions(result.user.groups);
 
       logger.info('Usuario autenticado exitosamente:', {
         userId: result.user.id,
         email: result.user.email,
         name: result.user.name,
-        role: role,
+        role: roleInfo.role,
         grupos: result.user.groups.length
       });
 
-      // Codificar los datos del usuario como JSON en Base64 para pasarlos por URL
-      const authData = {
-        user: {
-          id: result.user.id,
-          email: result.user.email,
-          firstName: firstName,
-          lastName: lastName,
-          fullName: result.user.name,
-          role: role,
-          permissions: permissions,
-          groups: result.user.groups,
-          groupAnalysis: groupAnalysis
-        },
-        token: result.token,
-        profilePhotoUrl: profilePhotoUrl || `/api/auth/photo/${result.user.id}`,
-        expiresIn: process.env.JWT_EXPIRES_IN
-      };
-
-      // Codificar los datos en Base64
-      const encodedData = Buffer.from(JSON.stringify(authData)).toString('base64');
+      // Formatear datos de autenticación
+      const authData = authResponseFormatter.formatAuthData(result, roleInfo);
 
       logger.info('Enviando HTML de redirección al frontend...');
 
-      // Enviar HTML que redirige al frontend con meta refresh
-      // meta refresh respeta el Content Security Policy
-      const html = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Autenticación en progreso...</title>
-            <meta http-equiv="refresh" content="0; url=http://localhost:5173/login?auth_data=${encodedData}">
-          </head>
-          <body>
-            <p>Redirigiendo...</p>
-            <p>Si no se redirige automáticamente, <a href="http://localhost:5173/login?auth_data=${encodedData}">haz clic aquí</a>.</p>
-          </body>
-        </html>
-      `;
-
+      // Generar HTML con redirección
+      const html = authResponseFormatter.formatSuccessRedirect(authData);
       res.send(html);
 
     } catch (err) {
       logger.error('Error en callback:', err);
 
-      // Enviar error con HTML meta refresh (respeta CSP)
-      const errorMsg = encodeURIComponent(err.message);
-      const html = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Error de autenticación</title>
-            <meta http-equiv="refresh" content="0; url=http://localhost:5173/login?error=auth_error&error_description=${errorMsg}">
-          </head>
-          <body>
-            <p>Error de autenticación. Si no se redirige automáticamente, <a href="http://localhost:5173/login?error=auth_error&error_description=${errorMsg}">haz clic aquí</a>.</p>
-          </body>
-        </html>
-      `;
-
+      const html = authResponseFormatter.formatAuthErrorRedirect('auth_error', err.message);
       res.send(html);
     }
   });
@@ -288,9 +194,9 @@ class AuthController {
       }
 
       // Obtener el access token del cache
-      const tokenData = accessTokenCache.get(userId);
+      const accessToken = tokenCacheService.get(userId);
 
-      if (!tokenData || !tokenData.accessToken) {
+      if (!accessToken) {
         // Si no hay token en cache, devolver una imagen por defecto
         const defaultImageUrl = 'https://via.placeholder.com/150x150/4A90E2/FFFFFF?text=Usuario';
         return res.redirect(defaultImageUrl);
@@ -298,7 +204,7 @@ class AuthController {
 
       try {
         // Intentar obtener la foto de Azure
-        const photoData = await authService.getUserPhoto(tokenData.accessToken);
+        const photoData = await authService.getUserPhoto(accessToken);
 
         if (photoData && photoData.data) {
           // Devolver la foto en base64
@@ -336,6 +242,54 @@ class AuthController {
       });
     } catch (err) {
       error(res, 'Error procesando solicitud', 500);
+    }
+  });
+
+  /**
+   * Obtener permisos del usuario actual
+   */
+  getPermissions = asyncHandler(async (req, res) => {
+    try {
+      const permissionsData = {
+        user: {
+          name: req.user?.name || 'Usuario',
+          email: req.user?.email || 'email@test.com',
+          role: req.user?.role || 'user',
+          roleInfo: req.user?.roleInfo || {}
+        },
+        permissions: req.user?.permissions || {}
+      };
+
+      success(res, permissionsData, 'Permisos del usuario obtenidos correctamente');
+    } catch (err) {
+      logger.error('Error obteniendo permisos:', err);
+      error(res, 'Error al obtener permisos del usuario', 500);
+    }
+  });
+
+  /**
+   * Análisis de grupos del usuario (debug)
+   */
+  debugGroups = asyncHandler(async (req, res) => {
+    try {
+      const analysis = roleService.analyzeUserGroups(req.user.groups || []);
+
+      success(res, {
+        user: {
+          name: req.user.name,
+          email: req.user.email
+        },
+        groupAnalysis: analysis,
+        rawGroups: req.user.groups,
+        guidMapping: {
+          'edc49d22-9ee8-4d90-a8b2-41cf64db1eed': 'Infraestructura',
+          '2a16d910-c440-41a3-a896-eb6287185fef': 'Soporte',
+          '88c0f708-14a1-4081-bcc6-4b3ab33a7ca6': 'Mesa de ayuda'
+        }
+      }, 'Análisis de grupos del usuario');
+    } catch (err) {
+      logger.error('Error en debugGroups:', err);
+      error(res, 'Error al analizar grupos', 500);
     }
   });
 }

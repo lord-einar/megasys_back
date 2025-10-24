@@ -1,4 +1,4 @@
-// src/modules/auth/routes/index.js - CORREGIDO
+// src/modules/auth/routes/index.js - REFACTORIZADO PARA SOLID
 const express = require('express');
 const authController = require('../controllers/authController');
 const { authenticate } = require('../middleware/authMiddleware');
@@ -74,51 +74,16 @@ router.get('/photo-base64', authenticate, authController.getPhotoBase64);
  * @desc    Obtener permisos del usuario actual
  * @access  Private
  */
-router.get('/permissions', authenticate, enrichUserWithRole, (req, res) => {
-  res.json({
-    success: true,
-    data: {
-      user: {
-        name: req.user?.name || 'Usuario',
-        email: req.user?.email || 'email@test.com',
-        role: req.user?.role || 'user',
-        roleInfo: req.user?.roleInfo || {}
-      },
-      permissions: req.user?.permissions || {}
-    },
-    timestamp: new Date().toISOString()
-  });
-});
+router.get('/permissions', authenticate, enrichUserWithRole, authController.getPermissions);
 
 /**
  * @route   GET /api/auth/debug-groups
- * @desc    Analizar grupos del usuario para debugging
+ * @desc    Analizar grupos del usuario para debugging (solo en desarrollo)
  * @access  Private
  */
-router.get('/debug-groups', authenticate, (req, res) => {
-  const roleService = require('../services/roleService');
-  
-  const analysis = roleService.analyzeUserGroups(req.user.groups || []);
-  
-  res.json({
-    success: true,
-    message: 'Análisis de grupos del usuario',
-    data: {
-      user: {
-        name: req.user.name,
-        email: req.user.email
-      },
-      groupAnalysis: analysis,
-      rawGroups: req.user.groups,
-      guidMapping: {
-        'edc49d22-9ee8-4d90-a8b2-41cf64db1eed': 'Infraestructura',
-        '2a16d910-c440-41a3-a896-eb6287185fef': 'Soporte',
-        '88c0f708-14a1-4081-bcc6-4b3ab33a7ca6': 'Mesa de ayuda'
-      }
-    },
-    timestamp: new Date().toISOString()
-  });
-});
+if (process.env.NODE_ENV === 'development') {
+  router.get('/debug-groups', authenticate, authController.debugGroups);
+}
 
 /**
  * @route   GET /api/auth/test

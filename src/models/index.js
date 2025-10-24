@@ -18,6 +18,7 @@ const SoporteNivel = require('./SoporteNivel');
 const Remito = require('./Remito');
 const RemitoDetalle = require('./RemitoDetalle');
 const HistorialMovimiento = require('./HistorialMovimiento');
+const Auditoria = require('./Auditoria');
 
 // =====================================================
 // DEFINICIÓN DE RELACIONES
@@ -385,6 +386,9 @@ const models = {
   Remito,
   RemitoDetalle,
   HistorialMovimiento,
+
+  // Auditoría
+  Auditoria,
 
   // Tablas intermedias
   SedeServicio

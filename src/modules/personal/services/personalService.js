@@ -1,0 +1,531 @@
+// src/modules/personal/services/personalService.js
+const { Personal, Sede, Rol, PersonalSede, Remito, sequelize } = require('../../../models');
+const logger = require('../../../shared/utils/logger');
+const { Op } = require('sequelize');
+
+class PersonalService {
+  /**
+   * Validar que el email sea único
+   */
+  async validarEmailUnico(email, personalIdExcluir = null) {
+    const whereClause = { email: email.toLowerCase() };
+    if (personalIdExcluir) {
+      whereClause.id = { [Op.ne]: personalIdExcluir };
+    }
+
+    const personalExistente = await Personal.findOne({ where: whereClause });
+    if (personalExistente) {
+      throw new Error(`El email "${email}" ya está registrado en el sistema. Intenta con otro email.`);
+    }
+  }
+
+  /**
+   * Validar que todas las sedes existan y estén activas
+   */
+  async validarSedesActivas(sedesIds) {
+    if (!Array.isArray(sedesIds) || sedesIds.length === 0) {
+      throw new Error('Debes seleccionar al menos una sede para asignar el personal');
+    }
+
+    const sedesValidas = await Sede.count({
+      where: {
+        id: sedesIds,
+        activo: true
+      }
+    });
+
+    if (sedesValidas !== sedesIds.length) {
+      throw new Error(`${sedesIds.length - sedesValidas} de las sedes seleccionadas no existen o están inactivas. Por favor verifica tu selección.`);
+    }
+  }
+
+  /**
+   * Validar que el rol exista y esté activo
+   */
+  async validarRolActivo(rolId) {
+    const rol = await Rol.findOne({
+      where: {
+        id: rolId,
+        activo: true
+      }
+    });
+
+    if (!rol) {
+      throw new Error('El rol seleccionado no existe o no está disponible. Por favor selecciona un rol válido.');
+    }
+
+    return rol;
+  }
+
+  /**
+   * Listar personal con paginación y filtros
+   */
+  async listar(filters = {}) {
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      activo = null,
+      sede_id = null,
+      rol_id = null
+    } = filters;
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const whereClause = {};
+
+    if (search) {
+      whereClause[Op.or] = [
+        { nombre: { [Op.iLike]: `%${search}%` } },
+        { apellido: { [Op.iLike]: `%${search}%` } },
+        { email: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
+    // Por defecto, mostrar solo personal activo (activo = true)
+    if (activo !== null && activo !== undefined) {
+      whereClause.activo = activo === 'true' || activo === true;
+    } else {
+      whereClause.activo = true;
+    }
+
+    let include = [
+      {
+        model: Rol,
+        as: 'rol',
+        attributes: ['id', 'nombre']
+      },
+      {
+        model: Sede,
+        as: 'sede',
+        attributes: ['id', 'nombre_sede', 'localidad', 'provincia']
+      }
+    ];
+
+    if (sede_id) {
+      include.push({
+        model: PersonalSede,
+        as: 'sedesAsignadas',
+        where: { sede_id, activo: true },
+        attributes: ['id', 'sede_id', 'fecha_inicio'],
+        required: true
+      });
+    } else {
+      include.push({
+        model: PersonalSede,
+        as: 'sedesAsignadas',
+        where: { activo: true },
+        attributes: ['id', 'sede_id'],
+        required: false
+      });
+    }
+
+    if (rol_id) {
+      whereClause.rol_id = rol_id;
+    }
+
+    const { count, rows } = await Personal.findAndCountAll({
+      where: whereClause,
+      include,
+      limit: parseInt(limit),
+      offset,
+      order: [['apellido', 'ASC'], ['nombre', 'ASC']],
+      distinct: true
+    });
+
+    return {
+      rows,
+      count,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: count
+      }
+    };
+  }
+
+  /**
+   * Obtener personal con detalles completos
+   */
+  async obtenerConDetalles(personalId) {
+    const persona = await Personal.findByPk(personalId, {
+      include: [
+        {
+          model: Rol,
+          as: 'rol',
+          attributes: ['id', 'nombre', 'descripcion']
+        },
+        {
+          model: Sede,
+          as: 'sede',
+          attributes: ['id', 'nombre_sede', 'localidad', 'provincia']
+        },
+        {
+          model: PersonalSede,
+          as: 'sedesAsignadas',
+          where: { activo: true },
+          required: false,
+          include: [
+            {
+              model: Sede,
+              as: 'sede',
+              attributes: ['id', 'nombre_sede', 'localidad', 'provincia']
+            },
+            {
+              model: Rol,
+              as: 'rol',
+              attributes: ['id', 'nombre']
+            }
+          ]
+        }
+      ]
+    });
+
+    return persona;
+  }
+
+  /**
+   * Calcular estadísticas de remitos para una persona
+   */
+  async calcularEstadisticasRemitos(persona) {
+    const remitosSolicitados = await Remito.count({
+      where: {
+        solicitante_id: persona.id,
+        activo: true
+      }
+    });
+
+    const remitosAsignados = await Remito.count({
+      where: {
+        asignado_a_id: persona.id,
+        activo: true
+      }
+    });
+
+    return {
+      remitosSolicitados,
+      remitosAsignados,
+      total: remitosSolicitados + remitosAsignados
+    };
+  }
+
+  /**
+   * Obtener remitos de una persona
+   */
+  async obtenerRemitos(personalId, filters = {}) {
+    const {
+      tipo = 'todos', // 'solicitados', 'asignados' o 'todos'
+      estado = null,
+      limit = 10,
+      page = 1
+    } = filters;
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const whereClause = { activo: true };
+
+    if (estado) {
+      whereClause.estado = estado;
+    }
+
+    let query = {};
+
+    if (tipo === 'solicitados') {
+      query.where = { ...whereClause, solicitante_id: personalId };
+    } else if (tipo === 'asignados') {
+      query.where = { ...whereClause, asignado_a_id: personalId };
+    } else {
+      query.where = {
+        [Op.or]: [
+          { solicitante_id: personalId, ...whereClause },
+          { asignado_a_id: personalId, ...whereClause }
+        ]
+      };
+    }
+
+    query.limit = parseInt(limit);
+    query.offset = offset;
+    query.order = [['fecha_creacion', 'DESC']];
+
+    const { count, rows } = await Remito.findAndCountAll(query);
+
+    return {
+      rows,
+      count,
+      pagination: { page: parseInt(page), limit: parseInt(limit), total: count }
+    };
+  }
+
+  /**
+   * Crear nueva persona
+   */
+  async crear(datosNueva, usuarioEmail) {
+    const {
+      nombre,
+      apellido,
+      email,
+      telefono,
+      sedes,
+      rol_id
+    } = datosNueva;
+
+    // Validaciones
+    await this.validarEmailUnico(email);
+    await this.validarSedesActivas(sedes);
+    await this.validarRolActivo(rol_id);
+
+    // Crear persona
+    const persona = await Personal.create({
+      nombre: nombre.trim(),
+      apellido: apellido.trim(),
+      email: email.toLowerCase().trim(),
+      telefono: telefono?.trim(),
+      rol_id,
+      sede_id: sedes[0], // Primera sede como principal
+      activo: true
+    });
+
+    // Crear asignaciones a sedes
+    for (const sedeId of sedes) {
+      await PersonalSede.create({
+        personal_id: persona.id,
+        sede_id: sedeId,
+        rol_id,
+        fecha_inicio: new Date(),
+        activo: true
+      });
+    }
+
+    logger.info('Nuevo personal creado:', {
+      personalId: persona.id,
+      email: persona.email,
+      sedes: sedes.length,
+      creadoPor: usuarioEmail
+    });
+
+    return persona;
+  }
+
+  /**
+   * Actualizar persona
+   */
+  async actualizar(personalId, datosActualizacion, usuarioEmail) {
+    const persona = await Personal.findByPk(personalId);
+
+    if (!persona) {
+      throw new Error('Personal no encontrado');
+    }
+
+    // Validar email si se actualiza
+    if (datosActualizacion.email && datosActualizacion.email !== persona.email) {
+      await this.validarEmailUnico(datosActualizacion.email, personalId);
+    }
+
+    // Validar rol si se actualiza
+    if (datosActualizacion.rol_id && datosActualizacion.rol_id !== persona.rol_id) {
+      await this.validarRolActivo(datosActualizacion.rol_id);
+    }
+
+    // Validar sedes si se actualizan
+    const sedesParaActualizar = datosActualizacion.sedes;
+    if (sedesParaActualizar && Array.isArray(sedesParaActualizar)) {
+      await this.validarSedesActivas(sedesParaActualizar);
+    }
+
+    // Preparar datos (excluir 'sedes' de la actualización de Personal)
+    const datosLimpios = {};
+    Object.keys(datosActualizacion).forEach(key => {
+      if (key === 'sedes') {
+        // No actualizar sedes aquí, se maneja aparte
+        return;
+      }
+      if (key === 'email') {
+        datosLimpios[key] = datosActualizacion[key].toLowerCase().trim();
+      } else if (typeof datosActualizacion[key] === 'string') {
+        datosLimpios[key] = datosActualizacion[key].trim();
+      } else {
+        datosLimpios[key] = datosActualizacion[key];
+      }
+    });
+
+    // Actualizar datos básicos de personal
+    await persona.update(datosLimpios);
+
+    // Actualizar sedes si se proporcionan
+    if (sedesParaActualizar && Array.isArray(sedesParaActualizar) && sedesParaActualizar.length > 0) {
+      // Desactivar asignaciones previas
+      await PersonalSede.update(
+        { activo: false, fecha_fin: new Date() },
+        { where: { personal_id: personalId, activo: true } }
+      );
+
+      // Crear nuevas asignaciones
+      for (const sedeId of sedesParaActualizar) {
+        await PersonalSede.create({
+          personal_id: personalId,
+          sede_id: sedeId,
+          rol_id: datosLimpios.rol_id || persona.rol_id,
+          fecha_inicio: new Date(),
+          activo: true
+        });
+      }
+
+      // Actualizar sede_id principal (primera sede de la lista)
+      await persona.update({ sede_id: sedesParaActualizar[0] });
+    }
+
+    logger.info('Personal actualizado:', {
+      personalId: persona.id,
+      cambios: Object.keys(datosLimpios),
+      sedesActualizadas: sedesParaActualizar?.length || 0,
+      actualizadoPor: usuarioEmail
+    });
+
+    return await this.obtenerConDetalles(personalId);
+  }
+
+  /**
+   * Verificar si tiene remitos pendientes antes de eliminar
+   */
+  async verificarRemitosPendientes(personalId) {
+    const remitosPendientes = await Remito.count({
+      where: {
+        [Op.or]: [
+          { solicitante_id: personalId, estado: { [Op.ne]: 'completado' }, activo: true },
+          { asignado_a_id: personalId, estado: { [Op.ne]: 'completado' }, activo: true }
+        ]
+      }
+    });
+
+    if (remitosPendientes > 0) {
+      throw new Error(`No se puede eliminar el personal. Existen ${remitosPendientes} remito(s) pendiente(s) asociado(s) a esta persona. Por favor completa o reasigna todos los remitos pendientes.`);
+    }
+  }
+
+  /**
+   * Eliminar persona (soft delete)
+   */
+  async eliminar(personalId, usuarioEmail) {
+    const persona = await Personal.findByPk(personalId);
+
+    if (!persona) {
+      throw new Error('Personal no encontrado');
+    }
+
+    // Verificar remitos pendientes
+    await this.verificarRemitosPendientes(personalId);
+
+    // Soft delete
+    await persona.update({ activo: false });
+
+    // Desactivar asignaciones
+    await PersonalSede.update(
+      { activo: false, fecha_fin: new Date() },
+      { where: { personal_id: personalId } }
+    );
+
+    logger.info('Personal eliminado (soft delete):', {
+      personalId: persona.id,
+      email: persona.email,
+      eliminadoPor: usuarioEmail
+    });
+
+    return true;
+  }
+
+  /**
+   * Buscar personal rápidamente
+   */
+  async buscar(termino, filtros = {}) {
+    const { limite = 20, sede_id = null, rol_id = null } = filtros;
+
+    const whereClause = {
+      activo: true,
+      [Op.or]: [
+        { nombre: { [Op.iLike]: `%${termino}%` } },
+        { apellido: { [Op.iLike]: `%${termino}%` } },
+        { email: { [Op.iLike]: `%${termino}%` } }
+      ]
+    };
+
+    if (rol_id) {
+      whereClause.rol_id = rol_id;
+    }
+
+    let include = [{ model: Rol, as: 'rol', attributes: ['id', 'nombre'] }];
+
+    if (sede_id) {
+      include.push({
+        model: PersonalSede,
+        as: 'sedesAsignadas',
+        where: { sede_id, activo: true },
+        required: true
+      });
+    }
+
+    const resultados = await Personal.findAll({
+      where: whereClause,
+      include,
+      limit: parseInt(limite),
+      order: [['apellido', 'ASC'], ['nombre', 'ASC']]
+    });
+
+    return resultados;
+  }
+
+  /**
+   * Obtener estadísticas por sede
+   */
+  async obtenerEstadisticasPorSede() {
+    const estadisticas = await sequelize.query(`
+      SELECT
+        s.id,
+        s.nombre_sede,
+        s.localidad,
+        s.provincia,
+        COUNT(p.id) as total_personal
+      FROM sedes s
+      LEFT JOIN personal p ON s.id = p.sede_id AND p.activo = true
+      WHERE s.activo = true
+      GROUP BY s.id, s.nombre_sede, s.localidad, s.provincia
+      ORDER BY total_personal DESC
+    `, { type: sequelize.QueryTypes.SELECT });
+
+    return estadisticas;
+  }
+
+  /**
+   * Obtener estadísticas generales
+   */
+  async obtenerEstadisticasGenerales() {
+    // Contar personal total
+    const totalPersonal = await Personal.count({ where: { activo: true } });
+
+    // Contar total de sedes activas en el sistema
+    const totalSedes = await Sede.count({ where: { activo: true } });
+
+    // Contar roles únicos
+    const rolesUnicos = await sequelize.query(`
+      SELECT COUNT(DISTINCT rol_id) as total_roles
+      FROM personal
+      WHERE activo = true AND rol_id IS NOT NULL
+    `, { type: sequelize.QueryTypes.SELECT });
+
+    const estadisticas = {
+      totalPersonal,
+      totalSedesUnicas: totalSedes,
+      totalRolesUnicos: rolesUnicos[0]?.total_roles || 0,
+      personal: {
+        total: totalPersonal
+      },
+      resumen: {
+        totalPersonal,
+        totalSedes: totalSedes,
+        totalRoles: rolesUnicos[0]?.total_roles || 0
+      },
+      sedesConMasPersonal: await this.obtenerEstadisticasPorSede()
+    };
+
+    return estadisticas;
+  }
+}
+
+module.exports = new PersonalService();

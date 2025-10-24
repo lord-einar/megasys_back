@@ -94,14 +94,17 @@ loadRoutes('./modules/empresas/routes', '/api/empresas');
 // Rutas de roles
 loadRoutes('./modules/roles/routes', '/api/roles');
 
-// Rutas de sedes
-loadRoutes('./modules/sedes/routes', '/api/sedes');
-
 // Rutas de personal
 loadRoutes('./modules/personal/routes', '/api/personal');
 
-// Rutas de inventario
+// Rutas de inventario (ANTES que sedes para que /:id/estado no colisione)
 loadRoutes('./modules/inventario/routes', '/api/inventario');
+
+// Rutas de sedes
+loadRoutes('./modules/sedes/routes', '/api/sedes');
+
+// Rutas de tipos de artículos
+loadRoutes('./modules/inventario/routes/tipoArticuloRoutes', '/api/tipo-articulo');
 
 // Rutas de remitos
 loadRoutes('./modules/remitos/routes', '/api/remitos');

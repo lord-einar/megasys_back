@@ -32,13 +32,17 @@ const connectDatabase = async () => {
   try {
     await sequelize.authenticate();
     logger.info('✅ Conexión a la base de datos establecida correctamente');
-    
-    // Importar y sincronizar modelos
+
+    // Importar modelos
     require('../../models');
-    
-    if (process.env.NODE_ENV === 'development') {
+
+    // Sync deshabilitado temporalmente - hay conflictos de esquema entre modelos y migraciones
+    // TODO: Crear migraciones para actualizar el esquema de INTEGER a UUID
+    if (process.env.NODE_ENV === 'development' && process.env.FORCE_SYNC === 'true') {
       await sequelize.sync({ alter: true });
       logger.info('✅ Modelos sincronizados con la base de datos');
+    } else if (process.env.NODE_ENV === 'development') {
+      logger.info('⚠️  Sync deshabilitado. Use FORCE_SYNC=true para sincronizar forzadamente.');
     }
   } catch (error) {
     logger.error('❌ Error al conectar con la base de datos:', error);

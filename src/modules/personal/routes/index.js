@@ -216,12 +216,12 @@ router.get('/buscar',
 
 /**
  * @route   GET /api/personal/estadisticas
- * @desc    Obtener estadísticas del personal por sede y rol
+ * @desc    Obtener estadísticas generales del personal
  * @access  Private (Read permission - Todos)
  */
 router.get('/estadisticas',
   requirePermission('personal', 'read'),
-  personalController.obtenerEstadisticasPorSede
+  personalController.obtenerEstadisticasGenerales
 );
 
 /**
