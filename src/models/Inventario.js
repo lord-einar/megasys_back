@@ -2,6 +2,7 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../shared/utils/database');
 const { v4: uuidv4 } = require('uuid');
+const { VALID_STATES } = require('../shared/constants/inventoryStates');
 
 const Inventario = sequelize.define('Inventario', {
   id: {
@@ -85,13 +86,13 @@ const Inventario = sequelize.define('Inventario', {
     }
   },
   estado: {
-    type: DataTypes.ENUM('disponible', 'en_uso', 'en_prestamo', 'mantenimiento', 'dado_de_baja'),
+    type: DataTypes.ENUM(...VALID_STATES),
     allowNull: false,
     defaultValue: 'disponible',
     validate: {
       isIn: {
-        args: [['disponible', 'en_uso', 'en_prestamo', 'mantenimiento', 'dado_de_baja']],
-        msg: 'El estado debe ser: disponible, en_uso, en_prestamo, mantenimiento o dado_de_baja'
+        args: [VALID_STATES],
+        msg: `El estado debe ser uno de: ${VALID_STATES.join(', ')}`
       }
     }
   },

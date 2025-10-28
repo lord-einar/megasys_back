@@ -5,6 +5,7 @@ const { requirePermission } = require('../../auth/middleware/roleMiddleware');
 const validate = require('../../../shared/middleware/validation');
 const { body, param, query } = require('express-validator');
 const inventarioController = require('../controllers/inventarioController');
+const { VALID_STATES } = require('../../../shared/constants/inventoryStates');
 
 const router = express.Router();
 
@@ -52,8 +53,8 @@ const validarInventarioCreate = [
 
   body('estado')
     .optional({ checkFalsy: true })
-    .isIn(['disponible', 'en_uso', 'mantenimiento', 'dado_de_baja', 'en_prestamo'])
-    .withMessage('Estado debe ser: disponible, en_uso, mantenimiento, dado_de_baja o en_prestamo'),
+    .isIn(VALID_STATES)
+    .withMessage(`Estado debe ser uno de: ${VALID_STATES.join(', ')}`),
 
   body('fecha_adquisicion')
     .optional({ checkFalsy: true })
@@ -115,8 +116,8 @@ const validarInventarioUpdate = [
 
   body('estado')
     .optional({ checkFalsy: true })
-    .isIn(['disponible', 'en_uso', 'mantenimiento', 'dado_de_baja', 'en_prestamo'])
-    .withMessage('Estado debe ser: disponible, en_uso, mantenimiento, dado_de_baja o en_prestamo'),
+    .isIn(VALID_STATES)
+    .withMessage(`Estado debe ser uno de: ${VALID_STATES.join(', ')}`),
 
   body('fecha_adquisicion')
     .optional({ checkFalsy: true })
@@ -142,8 +143,8 @@ const validarInventarioUpdate = [
 
 const validarCambioEstado2025 = [
   body('estado')
-    .isIn(['disponible', 'en_uso', 'mantenimiento', 'dado_de_baja', 'en_prestamo'])
-    .withMessage('Estado debe ser: disponible, en_uso, mantenimiento, dado_de_baja o en_prestamo'),
+    .isIn(VALID_STATES)
+    .withMessage(`Estado debe ser uno de: ${VALID_STATES.join(', ')}`),
 
   body('observaciones')
     .optional({ checkFalsy: true })
@@ -181,8 +182,8 @@ const validarPaginacion = [
   
   query('estado')
     .optional()
-    .isIn(['disponible', 'en_uso', 'mantenimiento', 'dado_de_baja', 'en_prestamo'])
-    .withMessage('Estado debe ser: disponible, en_uso, mantenimiento, dado_de_baja o en_prestamo'),
+    .isIn(VALID_STATES)
+    .withMessage(`Estado debe ser uno de: ${VALID_STATES.join(', ')}`),
   
   query('disponible_solo')
     .optional()

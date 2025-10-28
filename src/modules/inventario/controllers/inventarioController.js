@@ -9,8 +9,13 @@ class InventarioController {
    * Listar inventario con paginación y filtros
    */
   listar = asyncHandler(async (req, res) => {
-    const resultado = await inventarioService.listar(req.query);
-    success(res, resultado, 'Inventario obtenido correctamente');
+    try {
+      const resultado = await inventarioService.listar(req.query);
+      success(res, resultado, 'Inventario obtenido correctamente');
+    } catch (err) {
+      logger.error('Error listando inventario:', { error: err.message, stack: err.stack });
+      return error(res, err.message || 'Error al listar inventario', 500);
+    }
   });
 
   /**
@@ -35,7 +40,17 @@ class InventarioController {
       const item = await inventarioService.crear(req.body, req.user.email);
       success(res, item, 'Item de inventario creado correctamente', 201);
     } catch (err) {
-      return error(res, err.message, 400);
+      logger.error('Error creando item de inventario:', { error: err.message, data: req.body });
+
+      // Mapear tipos de error a códigos HTTP apropiados
+      if (err.message.includes('ya existe')) {
+        return error(res, err.message, 409); // Conflict
+      }
+      if (err.message.includes('no existe') || err.message.includes('no encontrado')) {
+        return error(res, err.message, 404); // Not Found
+      }
+
+      return error(res, err.message || 'Error al crear item de inventario', 400);
     }
   });
 
@@ -48,7 +63,16 @@ class InventarioController {
       const item = await inventarioService.actualizar(id, req.body, req.user.email);
       success(res, item, 'Item de inventario actualizado correctamente');
     } catch (err) {
-      return error(res, err.message, 400);
+      logger.error('Error actualizando item de inventario:', { error: err.message, id });
+
+      if (err.message.includes('no encontrado') || err.message.includes('no existe')) {
+        return error(res, err.message, 404); // Not Found
+      }
+      if (err.message.includes('ya existe')) {
+        return error(res, err.message, 409); // Conflict
+      }
+
+      return error(res, err.message || 'Error al actualizar item de inventario', 400);
     }
   });
 
@@ -61,7 +85,13 @@ class InventarioController {
       await inventarioService.eliminar(id, req.user.email);
       success(res, null, 'Item de inventario eliminado correctamente');
     } catch (err) {
-      return error(res, err.message, 400);
+      logger.error('Error eliminando item de inventario:', { error: err.message, id });
+
+      if (err.message.includes('no encontrado') || err.message.includes('no existe')) {
+        return error(res, err.message, 404); // Not Found
+      }
+
+      return error(res, err.message || 'Error al eliminar item de inventario', 400);
     }
   });
 
@@ -76,7 +106,16 @@ class InventarioController {
       const resultado = await inventarioService.cambiarEstado(id, estado, observaciones, userEmail);
       success(res, resultado, 'Estado del item cambiado correctamente');
     } catch (err) {
-      return error(res, err.message, 400);
+      logger.error('Error cambiando estado del item:', { error: err.message, id, estado });
+
+      if (err.message.includes('no encontrado') || err.message.includes('no existe')) {
+        return error(res, err.message, 404); // Not Found
+      }
+      if (err.message.includes('estado inválido')) {
+        return error(res, err.message, 400); // Bad Request
+      }
+
+      return error(res, err.message || 'Error al cambiar estado del item', 400);
     }
   });
 
@@ -90,7 +129,13 @@ class InventarioController {
       const resultado = await inventarioService.obtenerHistorial(id, limite);
       success(res, resultado, 'Historial de movimientos obtenido correctamente');
     } catch (err) {
-      return error(res, err.message, 404);
+      logger.error('Error obteniendo historial del item:', { error: err.message, id });
+
+      if (err.message.includes('no encontrado') || err.message.includes('no existe')) {
+        return error(res, err.message, 404); // Not Found
+      }
+
+      return error(res, err.message || 'Error al obtener historial', 500);
     }
   });
 
@@ -103,7 +148,13 @@ class InventarioController {
       const estadisticas = await inventarioService.obtenerEstadisticasGenerales(sede_id);
       success(res, estadisticas, 'Estadísticas de inventario obtenidas correctamente');
     } catch (err) {
-      return error(res, err.message, 400);
+      logger.error('Error obteniendo estadísticas del inventario:', { error: err.message, sedeId: sede_id });
+
+      if (err.message.includes('no encontrado') || err.message.includes('no existe')) {
+        return error(res, err.message, 404); // Not Found
+      }
+
+      return error(res, err.message || 'Error al obtener estadísticas', 500);
     }
   });
 
@@ -125,7 +176,8 @@ class InventarioController {
         total: resultados.length
       }, 'Búsqueda de inventario completada');
     } catch (err) {
-      return error(res, err.message, 400);
+      logger.error('Error buscando inventario:', { error: err.message, termino });
+      return error(res, err.message || 'Error en la búsqueda', 400);
     }
   });
 }
