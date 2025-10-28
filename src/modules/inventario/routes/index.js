@@ -278,6 +278,7 @@ router.get('/:id',
  * @access  Private (Create permission - Infraestructura y Soporte)
  */
 router.post('/',
+  authenticate,
   requirePermission('inventario', 'create'),
   validarInventarioCreate,
   validate,
@@ -290,6 +291,7 @@ router.post('/',
  * @access  Private (Update permission - Infraestructura y Soporte)
  */
 router.put('/:id',
+  authenticate,
   requirePermission('inventario', 'update'),
   validarId,
   validarInventarioUpdate,
@@ -303,6 +305,7 @@ router.put('/:id',
  * @access  Private (Delete permission - Infraestructura y Soporte)
  */
 router.delete('/:id',
+  authenticate,
   requirePermission('inventario', 'delete'),
   validarId,
   validate,
@@ -315,6 +318,7 @@ router.delete('/:id',
  * @access  Private (Update permission - Infraestructura y Soporte)
  */
 router.patch('/:id/estado',
+  authenticate,
   validarId,
   validarCambioEstado2025,
   validate,
