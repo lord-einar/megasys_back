@@ -256,8 +256,12 @@ class PersonalService {
 
   /**
    * Crear nueva persona
+   * @param {Object} datosNueva - Datos de la nueva persona
+   * @param {string} usuarioEmail - Email del usuario que crea
+   * @param {Object} options - Opciones incluyendo transaction
    */
-  async crear(datosNueva, usuarioEmail) {
+  async crear(datosNueva, usuarioEmail, options = {}) {
+    const { transaction } = options;
     const {
       nombre,
       apellido,
@@ -267,47 +271,82 @@ class PersonalService {
       rol_id
     } = datosNueva;
 
-    // Validaciones
+    // Validaciones (fuera de la transacción - son operaciones de lectura)
     await this.validarEmailUnico(email);
     await this.validarSedesActivas(sedes);
     await this.validarRolActivo(rol_id);
 
-    // Crear persona
-    const persona = await Personal.create({
-      nombre: nombre.trim(),
-      apellido: apellido.trim(),
-      email: email.toLowerCase().trim(),
-      telefono: telefono?.trim(),
-      rol_id,
-      sede_id: sedes[0], // Primera sede como principal
-      activo: true
-    });
+    // TODO: Envolver esto en transacción en el controlador mediante TransactionWrapper
+    // CRITICAL: Si se pasa transaction, usarla. Si no, crear una nueva
+    let t = transaction;
+    let shouldCommit = false;
 
-    // Crear asignaciones a sedes
-    for (const sedeId of sedes) {
-      await PersonalSede.create({
-        personal_id: persona.id,
-        sede_id: sedeId,
-        rol_id,
-        fecha_inicio: new Date(),
-        activo: true
-      });
+    if (!t) {
+      t = await sequelize.transaction();
+      shouldCommit = true;
     }
 
-    logger.info('Nuevo personal creado:', {
-      personalId: persona.id,
-      email: persona.email,
-      sedes: sedes.length,
-      creadoPor: usuarioEmail
-    });
+    try {
+      // Crear persona dentro de la transacción
+      const persona = await Personal.create({
+        nombre: nombre.trim(),
+        apellido: apellido.trim(),
+        email: email.toLowerCase().trim(),
+        telefono: telefono?.trim(),
+        rol_id,
+        sede_id: sedes[0], // Primera sede como principal
+        activo: true
+      }, { transaction: t });
 
-    return persona;
+      // Crear asignaciones a sedes dentro de la MISMA transacción
+      for (const sedeId of sedes) {
+        await PersonalSede.create({
+          personal_id: persona.id,
+          sede_id: sedeId,
+          rol_id,
+          fecha_inicio: new Date(),
+          activo: true
+        }, { transaction: t });
+      }
+
+      // Solo commit si creamos la transacción localmente
+      if (shouldCommit) {
+        await t.commit();
+      }
+
+      logger.info('Nuevo personal creado correctamente:', {
+        personalId: persona.id,
+        email: persona.email,
+        sedes: sedes.length,
+        creadoPor: usuarioEmail
+      });
+
+      return persona;
+    } catch (error) {
+      // Rollback si creamos la transacción localmente
+      if (shouldCommit && t) {
+        await t.rollback();
+      }
+      logger.error('Error creando personal:', {
+        error: error.message,
+        email,
+        stack: error.stack
+      });
+      throw error;
+    }
   }
 
   /**
    * Actualizar persona
+   * @param {string} personalId - ID de la persona
+   * @param {Object} datosActualizacion - Datos a actualizar
+   * @param {string} usuarioEmail - Email del usuario que actualiza
+   * @param {Object} options - Opciones incluyendo transaction
    */
-  async actualizar(personalId, datosActualizacion, usuarioEmail) {
+  async actualizar(personalId, datosActualizacion, usuarioEmail, options = {}) {
+    const { transaction } = options;
+
+    // Validaciones (fuera de la transacción - son operaciones de lectura)
     const persona = await Personal.findByPk(personalId);
 
     if (!persona) {
@@ -330,56 +369,86 @@ class PersonalService {
       await this.validarSedesActivas(sedesParaActualizar);
     }
 
-    // Preparar datos (excluir 'sedes' de la actualización de Personal)
-    const datosLimpios = {};
-    Object.keys(datosActualizacion).forEach(key => {
-      if (key === 'sedes') {
-        // No actualizar sedes aquí, se maneja aparte
-        return;
-      }
-      if (key === 'email') {
-        datosLimpios[key] = datosActualizacion[key].toLowerCase().trim();
-      } else if (typeof datosActualizacion[key] === 'string') {
-        datosLimpios[key] = datosActualizacion[key].trim();
-      } else {
-        datosLimpios[key] = datosActualizacion[key];
-      }
-    });
+    // CRITICAL: Si se pasa transaction, usarla. Si no, crear una nueva
+    let t = transaction;
+    let shouldCommit = false;
 
-    // Actualizar datos básicos de personal
-    await persona.update(datosLimpios);
-
-    // Actualizar sedes si se proporcionan
-    if (sedesParaActualizar && Array.isArray(sedesParaActualizar) && sedesParaActualizar.length > 0) {
-      // Desactivar asignaciones previas
-      await PersonalSede.update(
-        { activo: false, fecha_fin: new Date() },
-        { where: { personal_id: personalId, activo: true } }
-      );
-
-      // Crear nuevas asignaciones
-      for (const sedeId of sedesParaActualizar) {
-        await PersonalSede.create({
-          personal_id: personalId,
-          sede_id: sedeId,
-          rol_id: datosLimpios.rol_id || persona.rol_id,
-          fecha_inicio: new Date(),
-          activo: true
-        });
-      }
-
-      // Actualizar sede_id principal (primera sede de la lista)
-      await persona.update({ sede_id: sedesParaActualizar[0] });
+    if (!t) {
+      t = await sequelize.transaction();
+      shouldCommit = true;
     }
 
-    logger.info('Personal actualizado:', {
-      personalId: persona.id,
-      cambios: Object.keys(datosLimpios),
-      sedesActualizadas: sedesParaActualizar?.length || 0,
-      actualizadoPor: usuarioEmail
-    });
+    try {
+      // Preparar datos (excluir 'sedes' de la actualización de Personal)
+      const datosLimpios = {};
+      Object.keys(datosActualizacion).forEach(key => {
+        if (key === 'sedes') {
+          // No actualizar sedes aquí, se maneja aparte
+          return;
+        }
+        if (key === 'email') {
+          datosLimpios[key] = datosActualizacion[key].toLowerCase().trim();
+        } else if (typeof datosActualizacion[key] === 'string') {
+          datosLimpios[key] = datosActualizacion[key].trim();
+        } else {
+          datosLimpios[key] = datosActualizacion[key];
+        }
+      });
 
-    return await this.obtenerConDetalles(personalId);
+      // Actualizar datos básicos de personal DENTRO DE LA TRANSACCIÓN
+      await persona.update(datosLimpios, { transaction: t });
+
+      // Actualizar sedes si se proporcionan - DENTRO DE LA MISMA TRANSACCIÓN
+      if (sedesParaActualizar && Array.isArray(sedesParaActualizar) && sedesParaActualizar.length > 0) {
+        // Desactivar asignaciones previas
+        await PersonalSede.update(
+          { activo: false, fecha_fin: new Date() },
+          {
+            where: { personal_id: personalId, activo: true },
+            transaction: t
+          }
+        );
+
+        // Crear nuevas asignaciones
+        for (const sedeId of sedesParaActualizar) {
+          await PersonalSede.create({
+            personal_id: personalId,
+            sede_id: sedeId,
+            rol_id: datosLimpios.rol_id || persona.rol_id,
+            fecha_inicio: new Date(),
+            activo: true
+          }, { transaction: t });
+        }
+
+        // Actualizar sede_id principal (primera sede de la lista)
+        await persona.update({ sede_id: sedesParaActualizar[0] }, { transaction: t });
+      }
+
+      // Solo commit si creamos la transacción localmente
+      if (shouldCommit) {
+        await t.commit();
+      }
+
+      logger.info('Personal actualizado correctamente:', {
+        personalId: persona.id,
+        cambios: Object.keys(datosLimpios),
+        sedesActualizadas: sedesParaActualizar?.length || 0,
+        actualizadoPor: usuarioEmail
+      });
+
+      return await this.obtenerConDetalles(personalId);
+    } catch (error) {
+      // Rollback si creamos la transacción localmente
+      if (shouldCommit && t) {
+        await t.rollback();
+      }
+      logger.error('Error actualizando personal:', {
+        error: error.message,
+        personalId,
+        stack: error.stack
+      });
+      throw error;
+    }
   }
 
   /**
@@ -402,8 +471,14 @@ class PersonalService {
 
   /**
    * Eliminar persona (soft delete)
+   * @param {string} personalId - ID de la persona
+   * @param {string} usuarioEmail - Email del usuario que elimina
+   * @param {Object} options - Opciones incluyendo transaction
    */
-  async eliminar(personalId, usuarioEmail) {
+  async eliminar(personalId, usuarioEmail, options = {}) {
+    const { transaction } = options;
+
+    // Validaciones (fuera de la transacción - son operaciones de lectura)
     const persona = await Personal.findByPk(personalId);
 
     if (!persona) {
@@ -413,22 +488,52 @@ class PersonalService {
     // Verificar remitos pendientes
     await this.verificarRemitosPendientes(personalId);
 
-    // Soft delete
-    await persona.update({ activo: false });
+    // CRITICAL: Si se pasa transaction, usarla. Si no, crear una nueva
+    let t = transaction;
+    let shouldCommit = false;
 
-    // Desactivar asignaciones
-    await PersonalSede.update(
-      { activo: false, fecha_fin: new Date() },
-      { where: { personal_id: personalId } }
-    );
+    if (!t) {
+      t = await sequelize.transaction();
+      shouldCommit = true;
+    }
 
-    logger.info('Personal eliminado (soft delete):', {
-      personalId: persona.id,
-      email: persona.email,
-      eliminadoPor: usuarioEmail
-    });
+    try {
+      // Soft delete - DENTRO DE LA TRANSACCIÓN
+      await persona.update({ activo: false }, { transaction: t });
 
-    return true;
+      // Desactivar asignaciones - DENTRO DE LA MISMA TRANSACCIÓN
+      await PersonalSede.update(
+        { activo: false, fecha_fin: new Date() },
+        {
+          where: { personal_id: personalId },
+          transaction: t
+        }
+      );
+
+      // Solo commit si creamos la transacción localmente
+      if (shouldCommit) {
+        await t.commit();
+      }
+
+      logger.info('Personal eliminado correctamente (soft delete):', {
+        personalId: persona.id,
+        email: persona.email,
+        eliminadoPor: usuarioEmail
+      });
+
+      return true;
+    } catch (error) {
+      // Rollback si creamos la transacción localmente
+      if (shouldCommit && t) {
+        await t.rollback();
+      }
+      logger.error('Error eliminando personal:', {
+        error: error.message,
+        personalId,
+        stack: error.stack
+      });
+      throw error;
+    }
   }
 
   /**
