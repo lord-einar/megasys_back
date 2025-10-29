@@ -232,7 +232,7 @@ class RemitoController {
 
       const { count, rows } = await Inventario.findAndCountAll({
         where: whereClause,
-        attributes: ['id', 'codigo', 'marca', 'modelo', 'numero_serie', 'estado', 'tipo_articulo_id'],
+        attributes: ['id', 'marca', 'modelo', 'numero_serie', 'service_tag', 'estado', 'tipo_articulo_id'],
         include: [{
           model: TipoArticulo,
           as: 'tipoArticulo',
