@@ -1,7 +1,7 @@
 // src/modules/remitos/controllers/remitoController.js
 const remitoService = require('../services/remitoService');
 const logger = require('../../../shared/utils/logger');
-const { success, error } = require('../../../shared/utils/response');
+const { success, error, paginated } = require('../../../shared/utils/response');
 const { sequelize } = require('../../../models');
 
 class RemitoController {
@@ -67,11 +67,7 @@ class RemitoController {
 
       const resultado = await remitoService.listar(filters);
 
-      return success(res, {
-        data: resultado.rows,
-        pagination: resultado.pagination,
-        message: 'Remitos obtenidos correctamente'
-      });
+      return paginated(res, resultado.rows, resultado.pagination, 'Remitos obtenidos correctamente');
     } catch (err) {
       logger.error('Error listando remitos:', err);
       return error(res, 'Error al obtener remitos', 500);
