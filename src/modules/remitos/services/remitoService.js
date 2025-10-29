@@ -471,9 +471,8 @@ class RemitoService {
       whereClause.estado = estado;
     }
 
-    if (es_prestamo !== null && es_prestamo !== undefined) {
-      whereClause.es_prestamo = es_prestamo === 'true' || es_prestamo === true;
-    }
+    // Nota: es_prestamo NO se filtra en BD porque no existe como columna
+    // Se calcula dinámicamente basándose en los artículos y se filtra después
 
     if (solicitante_id) {
       whereClause.solicitante_id = solicitante_id;
@@ -532,7 +531,7 @@ class RemitoService {
     });
 
     // Calcular es_prestamo para cada remito basándose en sus artículos
-    const rowsConTipo = rows.map(remito => {
+    let rowsConTipo = rows.map(remito => {
       const tieneArticulosEnPrestamo = remito.detalles && remito.detalles.some(detalle => detalle.es_prestamo);
       return {
         ...remito.toJSON(),
@@ -540,14 +539,20 @@ class RemitoService {
       };
     });
 
+    // Aplicar filtro de es_prestamo si se especificó
+    if (es_prestamo !== null && es_prestamo !== undefined) {
+      const esPrestamoBool = es_prestamo === 'true' || es_prestamo === true;
+      rowsConTipo = rowsConTipo.filter(remito => remito.es_prestamo === esPrestamoBool);
+    }
+
     return {
       rows: rowsConTipo,
-      count,
+      count: rowsConTipo.length, // Usar el conteo de filas filtradas
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total: count,
-        pages: Math.ceil(count / parseInt(limit)),
+        total: rowsConTipo.length,
+        pages: Math.ceil(rowsConTipo.length / parseInt(limit)),
         currentPage: parseInt(page)
       }
     };
