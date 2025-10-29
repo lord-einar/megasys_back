@@ -773,29 +773,7 @@ class RemitoService {
           {
             model: Remito,
             as: 'remito',
-            attributes: ['id', 'numero_remito', 'fecha', 'solicitante_id', 'tecnico_asignado_id', 'sede_origen_id', 'sede_destino_id'],
-            include: [
-              {
-                model: Personal,
-                as: 'solicitante',
-                attributes: ['id', 'nombre', 'apellido', 'email']
-              },
-              {
-                model: Personal,
-                as: 'tecnicoAsignado',
-                attributes: ['id', 'nombre', 'apellido', 'email']
-              },
-              {
-                model: Sede,
-                as: 'sedeOrigen',
-                attributes: ['id', 'nombre']
-              },
-              {
-                model: Sede,
-                as: 'sedeDestino',
-                attributes: ['id', 'nombre']
-              }
-            ]
+            attributes: ['id', 'numero_remito', 'fecha', 'solicitante_id', 'tecnico_asignado_id', 'sede_origen_id', 'sede_destino_id']
           },
           {
             model: Inventario,
@@ -838,29 +816,7 @@ class RemitoService {
           {
             model: Remito,
             as: 'remito',
-            attributes: ['id', 'numero_remito', 'fecha', 'solicitante_id', 'tecnico_asignado_id', 'sede_origen_id', 'sede_destino_id'],
-            include: [
-              {
-                model: Personal,
-                as: 'solicitante',
-                attributes: ['id', 'nombre', 'apellido', 'email']
-              },
-              {
-                model: Personal,
-                as: 'tecnicoAsignado',
-                attributes: ['id', 'nombre', 'apellido', 'email']
-              },
-              {
-                model: Sede,
-                as: 'sedeOrigen',
-                attributes: ['id', 'nombre']
-              },
-              {
-                model: Sede,
-                as: 'sedeDestino',
-                attributes: ['id', 'nombre']
-              }
-            ]
+            attributes: ['id', 'numero_remito', 'fecha', 'solicitante_id', 'tecnico_asignado_id', 'sede_origen_id', 'sede_destino_id']
           },
           {
             model: Inventario,
