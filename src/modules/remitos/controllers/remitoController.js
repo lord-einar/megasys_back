@@ -259,6 +259,70 @@ class RemitoController {
       return error(res, 'Error al obtener artículos', 500);
     }
   }
+
+  /**
+   * PATCH /remitos/:id/detalles/:detalleId/fecha-devolucion
+   * Actualizar fecha de devolución esperada para un artículo préstamo
+   */
+  async actualizarFechaDevolucion(req, res) {
+    try {
+      const { id: remitoId, detalleId } = req.params;
+      const { fecha_devolucion_esperada } = req.body;
+
+      if (!fecha_devolucion_esperada) {
+        return error(res, 'La fecha de devolución esperada es requerida', 400);
+      }
+
+      // Validar que la fecha sea válida
+      const fechaParsed = new Date(fecha_devolucion_esperada);
+      if (isNaN(fechaParsed.getTime())) {
+        return error(res, 'La fecha de devolución proporcionada no es válida', 400);
+      }
+
+      logger.info('Actualizando fecha de devolución:', {
+        remitoId,
+        detalleId,
+        fechaDevolucion: fecha_devolucion_esperada,
+        usuario: req.user?.email
+      });
+
+      const { RemitoDetalle, Remito } = require('../../../models');
+
+      // Verificar que el detalle existe y pertenece al remito
+      const detalle = await RemitoDetalle.findOne({
+        where: { id: detalleId, remito_id: remitoId }
+      });
+
+      if (!detalle) {
+        return error(res, 'El detalle del remito no existe', 404);
+      }
+
+      // Verificar que es un préstamo
+      if (!detalle.es_prestamo) {
+        return error(res, 'Solo se puede actualizar la fecha en préstamos', 400);
+      }
+
+      // Actualizar la fecha
+      await detalle.update({
+        fecha_devolucion_esperada: fechaParsed
+      });
+
+      // Obtener el remito actualizado con sus detalles
+      const remitoActualizado = await Remito.findByPk(remitoId, {
+        include: ['detalles']
+      });
+
+      return success(res, remitoActualizado, 'Fecha de devolución actualizada correctamente');
+    } catch (err) {
+      logger.error('Error actualizando fecha de devolución:', err);
+
+      if (err.message.includes('El detalle del remito no existe')) {
+        return error(res, err.message, 404);
+      }
+
+      return error(res, 'Error al actualizar fecha de devolución', 500);
+    }
+  }
 }
 
 module.exports = new RemitoController();

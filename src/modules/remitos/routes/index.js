@@ -57,6 +57,16 @@ router.patch(
 );
 
 /**
+ * PATCH /remitos/:id/detalles/:detalleId/fecha-devolucion
+ * Actualizar fecha de devolución esperada para un artículo préstamo
+ * Requiere: Autenticación (usuario que creó el remito o rol Infraestructura)
+ */
+router.patch(
+  '/:id/detalles/:detalleId/fecha-devolucion',
+  remitoController.actualizarFechaDevolucion.bind(remitoController)
+);
+
+/**
  * POST /remitos/:id/devolver
  * Generar remito de devolución automático
  * Requiere: Rol "Infraestructura"
