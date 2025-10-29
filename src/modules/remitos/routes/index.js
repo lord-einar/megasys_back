@@ -30,12 +30,11 @@ router.get('/:id/disponibles', remitoController.obtenerArticulosDisponibles.bind
 /**
  * POST /remitos
  * Crear nuevo remito
- * Requiere: Rol "Sistemas"
- * Usa transacciones automáticas en el controlador
+ * Requiere: Autenticación (cualquier usuario autenticado puede crear remitos)
+ * La validación de rol se hace a nivel de datos (solicitante y técnico deben existir)
  */
 router.post(
   '/',
-  requireDatabaseRole('Sistemas'),
   remitoController.crear.bind(remitoController)
 );
 

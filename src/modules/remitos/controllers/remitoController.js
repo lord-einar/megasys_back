@@ -13,14 +13,16 @@ class RemitoController {
   async crear(req, res) {
     try {
       const datosNueva = req.body;
-      const usuarioEmail = req.user.email;
+      const usuarioEmail = req.user?.email || 'usuario-desconocido@sistema.com';
+      const usuarioId = req.user?.id || null;
 
       logger.info('Iniciando creación de remito:', {
         usuario: usuarioEmail,
+        usuarioId,
         articulos: datosNueva.articulos?.length || 0
       });
 
-      const remito = await remitoService.crear(datosNueva, usuarioEmail);
+      const remito = await remitoService.crear(datosNueva, usuarioEmail, { usuarioId });
 
       return success(res, {
         data: remito,
@@ -30,7 +32,7 @@ class RemitoController {
     } catch (err) {
       logger.error('Error creando remito:', {
         error: err.message,
-        usuario: req.user.email,
+        usuario: req.user?.email || 'desconocido',
         body: req.body
       });
 
