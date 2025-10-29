@@ -3,7 +3,6 @@ const express = require('express');
 const { authenticate } = require('../../auth/middleware/authMiddleware');
 const { requireDatabaseRole } = require('../../auth/middleware/roleMiddleware');
 const remitoController = require('../controllers/remitoController');
-const TransactionWrapper = require('../../../shared/utils/transactionWrapper');
 
 const router = express.Router();
 
@@ -32,12 +31,12 @@ router.get('/:id/disponibles', remitoController.obtenerArticulosDisponibles.bind
  * POST /remitos
  * Crear nuevo remito
  * Requiere: Rol "Sistemas"
- * Usa TransactionWrapper para asegurar atomicidad
+ * Usa transacciones automáticas en el controlador
  */
 router.post(
   '/',
   requireDatabaseRole('Sistemas'),
-  TransactionWrapper(remitoController.crear.bind(remitoController))
+  remitoController.crear.bind(remitoController)
 );
 
 /**
