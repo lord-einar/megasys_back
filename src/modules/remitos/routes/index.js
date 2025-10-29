@@ -29,6 +29,29 @@ router.get('/', remitoController.listar.bind(remitoController));
 router.get('/articulos-disponibles', remitoController.obtenerArticulosDisponibles.bind(remitoController));
 
 /**
+ * GET /remitos/prestamos/resumen
+ * Obtener resumen de estado de préstamos
+ * Retorna: proximosAVencer, vencidos, totalActivos, alerta
+ * Acceso: Todos los usuarios autenticados
+ */
+router.get('/prestamos/resumen', remitoController.obtenerResumenPrestamos.bind(remitoController));
+
+/**
+ * GET /remitos/prestamos/proximos-a-vencer
+ * Obtener préstamos próximos a vencer
+ * Query params: dias (default: 7)
+ * Acceso: Todos los usuarios autenticados
+ */
+router.get('/prestamos/proximos-a-vencer', remitoController.obtenerPrestamosProximosAVencer.bind(remitoController));
+
+/**
+ * GET /remitos/prestamos/vencidos
+ * Obtener préstamos vencidos (pasada la fecha de devolución)
+ * Acceso: Todos los usuarios autenticados
+ */
+router.get('/prestamos/vencidos', remitoController.obtenerPrestamosVencidos.bind(remitoController));
+
+/**
  * POST /remitos
  * Crear nuevo remito
  * Requiere: Autenticación (cualquier usuario autenticado puede crear remitos)

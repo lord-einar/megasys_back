@@ -316,6 +316,59 @@ class RemitoController {
       return error(res, 'Error al actualizar fecha de devolución', 500);
     }
   }
+
+  /**
+   * GET /remitos/prestamos/proximos-a-vencer
+   * Obtener préstamos próximos a vencer
+   */
+  async obtenerPrestamosProximosAVencer(req, res) {
+    try {
+      const { dias = 7 } = req.query;
+
+      logger.info('Obteniendo préstamos próximos a vencer:', { dias });
+
+      const prestamos = await remitoService.obtenerPrestamosProximosAVencer(parseInt(dias));
+
+      return success(res, prestamos, 'Préstamos próximos a vencer obtenidos correctamente');
+    } catch (err) {
+      logger.error('Error obteniendo préstamos próximos a vencer:', err);
+      return error(res, 'Error al obtener préstamos próximos a vencer', 500);
+    }
+  }
+
+  /**
+   * GET /remitos/prestamos/vencidos
+   * Obtener préstamos vencidos (pasada la fecha de devolución)
+   */
+  async obtenerPrestamosVencidos(req, res) {
+    try {
+      logger.info('Obteniendo préstamos vencidos');
+
+      const prestamos = await remitoService.obtenerPrestamosVencidos();
+
+      return success(res, prestamos, 'Préstamos vencidos obtenidos correctamente');
+    } catch (err) {
+      logger.error('Error obteniendo préstamos vencidos:', err);
+      return error(res, 'Error al obtener préstamos vencidos', 500);
+    }
+  }
+
+  /**
+   * GET /remitos/prestamos/resumen
+   * Obtener resumen de estado de préstamos
+   */
+  async obtenerResumenPrestamos(req, res) {
+    try {
+      logger.info('Obteniendo resumen de préstamos');
+
+      const resumen = await remitoService.obtenerResumenPrestamos();
+
+      return success(res, resumen, 'Resumen de préstamos obtenido correctamente');
+    } catch (err) {
+      logger.error('Error obteniendo resumen de préstamos:', err);
+      return error(res, 'Error al obtener resumen de préstamos', 500);
+    }
+  }
 }
 
 module.exports = new RemitoController();

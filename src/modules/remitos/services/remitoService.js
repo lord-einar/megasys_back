@@ -748,6 +748,194 @@ class RemitoService {
       throw error;
     }
   }
+
+  /**
+   * Obtener préstamos a vencer (próximos N días)
+   * Retorna préstamos activos con fecha de devolución próxima
+   */
+  async obtenerPrestamosProximosAVencer(dias = 7) {
+    try {
+      logger.info('Obteniendo préstamos próximos a vencer:', { dias });
+
+      const hoy = new Date();
+      const fechaLimite = new Date(hoy.getTime() + dias * 24 * 60 * 60 * 1000);
+
+      const prestamos = await RemitoDetalle.findAll({
+        where: {
+          es_prestamo: true,
+          devuelto: false,
+          fecha_devolucion_esperada: {
+            [Op.lte]: fechaLimite,
+            [Op.gte]: Sequelize.literal('CURRENT_DATE')
+          }
+        },
+        include: [
+          {
+            model: Remito,
+            as: 'remito',
+            attributes: ['id', 'numero_remito', 'fecha', 'solicitante_id', 'tecnico_asignado_id', 'sede_origen_id', 'sede_destino_id'],
+            include: [
+              {
+                model: Personal,
+                as: 'solicitante',
+                attributes: ['id', 'nombre', 'apellido', 'email']
+              },
+              {
+                model: Personal,
+                as: 'tecnicoAsignado',
+                attributes: ['id', 'nombre', 'apellido', 'email']
+              },
+              {
+                model: Sede,
+                as: 'sedeOrigen',
+                attributes: ['id', 'nombre']
+              },
+              {
+                model: Sede,
+                as: 'sedeDestino',
+                attributes: ['id', 'nombre']
+              }
+            ]
+          },
+          {
+            model: Inventario,
+            as: 'inventario',
+            attributes: ['id', 'marca', 'modelo', 'numero_serie', 'service_tag', 'estado']
+          }
+        ],
+        order: [['fecha_devolucion_esperada', 'ASC']],
+        subQuery: false
+      });
+
+      logger.info('Préstamos próximos a vencer encontrados:', {
+        cantidad: prestamos.length,
+        dias
+      });
+
+      return prestamos;
+    } catch (error) {
+      logger.error('Error obteniendo préstamos próximos a vencer:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener préstamos vencidos (ya pasó la fecha de devolución)
+   */
+  async obtenerPrestamosVencidos() {
+    try {
+      logger.info('Obteniendo préstamos vencidos');
+
+      const prestamos = await RemitoDetalle.findAll({
+        where: {
+          es_prestamo: true,
+          devuelto: false,
+          fecha_devolucion_esperada: {
+            [Op.lt]: Sequelize.literal('CURRENT_DATE')
+          }
+        },
+        include: [
+          {
+            model: Remito,
+            as: 'remito',
+            attributes: ['id', 'numero_remito', 'fecha', 'solicitante_id', 'tecnico_asignado_id', 'sede_origen_id', 'sede_destino_id'],
+            include: [
+              {
+                model: Personal,
+                as: 'solicitante',
+                attributes: ['id', 'nombre', 'apellido', 'email']
+              },
+              {
+                model: Personal,
+                as: 'tecnicoAsignado',
+                attributes: ['id', 'nombre', 'apellido', 'email']
+              },
+              {
+                model: Sede,
+                as: 'sedeOrigen',
+                attributes: ['id', 'nombre']
+              },
+              {
+                model: Sede,
+                as: 'sedeDestino',
+                attributes: ['id', 'nombre']
+              }
+            ]
+          },
+          {
+            model: Inventario,
+            as: 'inventario',
+            attributes: ['id', 'marca', 'modelo', 'numero_serie', 'service_tag', 'estado']
+          }
+        ],
+        order: [['fecha_devolucion_esperada', 'ASC']],
+        subQuery: false
+      });
+
+      logger.info('Préstamos vencidos encontrados:', {
+        cantidad: prestamos.length
+      });
+
+      return prestamos;
+    } catch (error) {
+      logger.error('Error obteniendo préstamos vencidos:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener resumen de estado de préstamos
+   */
+  async obtenerResumenPrestamos() {
+    try {
+      logger.info('Obteniendo resumen de préstamos');
+
+      const hoy = new Date();
+      const proximos7Dias = new Date(hoy.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      const [proximosAVencer, vencidos, totalActivos] = await Promise.all([
+        RemitoDetalle.count({
+          where: {
+            es_prestamo: true,
+            devuelto: false,
+            fecha_devolucion_esperada: {
+              [Op.lte]: proximos7Dias,
+              [Op.gte]: Sequelize.literal('CURRENT_DATE')
+            }
+          }
+        }),
+        RemitoDetalle.count({
+          where: {
+            es_prestamo: true,
+            devuelto: false,
+            fecha_devolucion_esperada: {
+              [Op.lt]: Sequelize.literal('CURRENT_DATE')
+            }
+          }
+        }),
+        RemitoDetalle.count({
+          where: {
+            es_prestamo: true,
+            devuelto: false
+          }
+        })
+      ]);
+
+      const resumen = {
+        proximosAVencer,
+        vencidos,
+        totalActivos,
+        alerta: vencidos > 0 || proximosAVencer > 0
+      };
+
+      logger.info('Resumen de préstamos:', resumen);
+
+      return resumen;
+    } catch (error) {
+      logger.error('Error obteniendo resumen de préstamos:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new RemitoService();
