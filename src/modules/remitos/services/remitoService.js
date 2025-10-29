@@ -13,36 +13,32 @@ const { Op, Sequelize } = require('sequelize');
 
 class RemitoService {
   /**
-   * Generar número de remito único con formato REM-YYYY-NNNNN
-   * Usa una estrategia de contador en la base de datos
+   * Generar número de remito único con formato REM-YYYY-NNN
+   * Usa secuencia PostgreSQL NEXTVAL para mayor seguridad contra race conditions
    */
   async generarNumeroRemito(transaction) {
     try {
       const year = new Date().getFullYear();
 
-      // Simply query all remitos ordered by id (descending for most recent)
-      const remitos = await Remito.findAll({
-        attributes: ['numero_remito'],
-        order: [['id', 'DESC']],
-        limit: 1000,
-        raw: true
+      // Usar NEXTVAL de PostgreSQL para obtener número secuencial seguro
+      const result = await sequelize.query(
+        `SELECT NEXTVAL('remito_numero_seq') AS numero`,
+        {
+          transaction,
+          type: Sequelize.QueryTypes.SELECT,
+          raw: true
+        }
+      );
+
+      const numeroSecuencia = result[0].numero;
+      const numeroRemito = `REM-${year}-${String(numeroSecuencia).padStart(3, '0')}`;
+
+      logger.info('Número de remito generado:', {
+        numeroSecuencia,
+        numeroRemito,
+        year
       });
 
-      // Filtrar remitos del año actual y encontrar el máximo
-      let nextNumber = 1;
-      const currentYearPattern = new RegExp(`^REM-${year}-(\\d+)$`);
-
-      for (const remito of remitos) {
-        const matches = remito.numero_remito.match(currentYearPattern);
-        if (matches) {
-          const num = parseInt(matches[1]);
-          if (num >= nextNumber) {
-            nextNumber = num + 1;
-          }
-        }
-      }
-
-      const numeroRemito = `REM-${year}-${String(nextNumber).padStart(5, '0')}`;
       return numeroRemito;
     } catch (error) {
       logger.error('Error generando número de remito:', {

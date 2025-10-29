@@ -18,6 +18,7 @@ const SoporteNivel = require('./SoporteNivel');
 const Remito = require('./Remito');
 const RemitoDetalle = require('./RemitoDetalle');
 const HistorialMovimiento = require('./HistorialMovimiento');
+const HistoricoInventario = require('./HistoricoInventario');
 const Auditoria = require('./Auditoria');
 
 // =====================================================
@@ -306,6 +307,47 @@ HistorialMovimiento.belongsTo(Personal, {
   as: 'usuarioMovimiento'
 });
 
+// Relaciones HistoricoInventario
+// Remito -> HistoricoInventario
+Remito.hasMany(HistoricoInventario, {
+  foreignKey: 'remito_id',
+  as: 'historicoInventario'
+});
+HistoricoInventario.belongsTo(Remito, {
+  foreignKey: 'remito_id',
+  as: 'remito'
+});
+
+// Inventario -> HistoricoInventario
+Inventario.hasMany(HistoricoInventario, {
+  foreignKey: 'inventario_id',
+  as: 'historicoInventario'
+});
+HistoricoInventario.belongsTo(Inventario, {
+  foreignKey: 'inventario_id',
+  as: 'inventario'
+});
+
+// Sede origen -> HistoricoInventario
+Sede.hasMany(HistoricoInventario, {
+  foreignKey: 'sede_origen_id',
+  as: 'historicoInventarioOrigen'
+});
+HistoricoInventario.belongsTo(Sede, {
+  foreignKey: 'sede_origen_id',
+  as: 'sedeOrigen'
+});
+
+// Sede destino -> HistoricoInventario
+Sede.hasMany(HistoricoInventario, {
+  foreignKey: 'sede_destino_id',
+  as: 'historicoInventarioDestino'
+});
+HistoricoInventario.belongsTo(Sede, {
+  foreignKey: 'sede_destino_id',
+  as: 'sedeDestino'
+});
+
 // =====================================================
 // HOOKS Y FUNCIONES AUTOMÁTICAS
 // =====================================================
@@ -386,6 +428,7 @@ const models = {
   Remito,
   RemitoDetalle,
   HistorialMovimiento,
+  HistoricoInventario,
 
   // Auditoría
   Auditoria,

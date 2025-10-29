@@ -87,13 +87,13 @@ const Remito = sequelize.define('Remito', {
     }
   },
   estado: {
-    type: DataTypes.ENUM('preparado', 'en_transito', 'entregado', 'confirmado'),
+    type: DataTypes.ENUM('preparado', 'en_transito', 'entregado', 'completado', 'devuelto', 'cancelado'),
     allowNull: false,
     defaultValue: 'preparado',
     validate: {
       isIn: {
-        args: [['preparado', 'en_transito', 'entregado', 'confirmado']],
-        msg: 'El estado debe ser: preparado, en_transito, entregado o confirmado'
+        args: [['preparado', 'en_transito', 'entregado', 'completado', 'devuelto', 'cancelado']],
+        msg: 'El estado debe ser: preparado, en_transito, entregado, completado, devuelto o cancelado'
       }
     }
   },
@@ -173,12 +173,47 @@ Remito.prototype.puedeEnviarse = function() {
   return this.estado === 'preparado';
 };
 
-Remito.prototype.puedeConfirmarse = function() {
+Remito.prototype.puedeCompletarse = function() {
   return this.estado === 'entregado';
+};
+
+Remito.prototype.puedeDevolverse = function() {
+  return this.estado === 'entregado';
+};
+
+Remito.prototype.puedeCancelarse = function() {
+  return ['preparado', 'en_transito', 'entregado'].includes(this.estado);
+};
+
+Remito.prototype.estaCancelado = function() {
+  return this.estado === 'cancelado';
+};
+
+Remito.prototype.estaCompleto = function() {
+  return ['completado', 'devuelto', 'cancelado'].includes(this.estado);
 };
 
 Remito.prototype.getDescripcion = function() {
   return `Remito ${this.numero_remito} - ${this.estado}`;
+};
+
+// Métodos estáticos para obtener estados válidos
+Remito.ESTADOS = {
+  PREPARADO: 'preparado',
+  EN_TRANSITO: 'en_transito',
+  ENTREGADO: 'entregado',
+  COMPLETADO: 'completado',
+  DEVUELTO: 'devuelto',
+  CANCELADO: 'cancelado'
+};
+
+Remito.TRANSICIONES_VALIDAS = {
+  'preparado': ['en_transito', 'cancelado'],
+  'en_transito': ['entregado', 'cancelado'],
+  'entregado': ['completado', 'devuelto', 'cancelado'],
+  'completado': [],
+  'devuelto': [],
+  'cancelado': []
 };
 
 module.exports = Remito;
