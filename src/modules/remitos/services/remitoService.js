@@ -599,7 +599,7 @@ class RemitoService {
   async cambiarEstado(remitoId, nuevoEstado, usuarioId, options = {}) {
     const { transaction, userRoles = [] } = options;
 
-    const estadosValidos = ['preparado', 'en_transito', 'entregado', 'confirmado'];
+    const estadosValidos = ['preparado', 'en_transito', 'entregado', 'completado', 'devuelto', 'cancelado'];
     if (!estadosValidos.includes(nuevoEstado)) {
       throw new Error(`Estado "${nuevoEstado}" no es válido`);
     }
@@ -619,10 +619,12 @@ class RemitoService {
 
     // Validaciones de transiciones de estado
     const transicionesValidas = {
-      'preparado': ['en_transito'],
-      'en_transito': ['entregado'],
-      'entregado': ['confirmado'],
-      'confirmado': []
+      'preparado': ['en_transito', 'cancelado'],
+      'en_transito': ['entregado', 'cancelado'],
+      'entregado': ['completado', 'devuelto', 'cancelado'],
+      'completado': ['devuelto'],
+      'devuelto': [],
+      'cancelado': []
     };
 
     if (!transicionesValidas[remito.estado].includes(nuevoEstado)) {
