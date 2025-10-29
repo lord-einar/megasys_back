@@ -773,7 +773,15 @@ class RemitoService {
           {
             model: Remito,
             as: 'remito',
-            attributes: ['id', 'numero_remito', 'fecha', 'solicitante_id', 'tecnico_asignado_id', 'sede_origen_id', 'sede_destino_id']
+            attributes: ['id', 'numero_remito', 'fecha', 'solicitante_id'],
+            include: [
+              {
+                model: Personal,
+                as: 'solicitante',
+                attributes: ['id', 'nombre', 'apellido'],
+                required: false
+              }
+            ]
           },
           {
             model: Inventario,
@@ -816,7 +824,15 @@ class RemitoService {
           {
             model: Remito,
             as: 'remito',
-            attributes: ['id', 'numero_remito', 'fecha', 'solicitante_id', 'tecnico_asignado_id', 'sede_origen_id', 'sede_destino_id']
+            attributes: ['id', 'numero_remito', 'fecha', 'solicitante_id'],
+            include: [
+              {
+                model: Personal,
+                as: 'solicitante',
+                attributes: ['id', 'nombre', 'apellido'],
+                required: false
+              }
+            ]
           },
           {
             model: Inventario,
