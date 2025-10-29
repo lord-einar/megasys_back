@@ -357,22 +357,29 @@ class RemitoService {
           esPrestamo: articulo.es_prestamo
         });
 
-        // 3b. Actualizar ubicación de inventario (solo si NO es préstamo)
-        // Los préstamos mantienen su ubicación original
-        if (!articulo.es_prestamo) {
-          await Inventario.update(
-            { sede_id: sede_destino_id },
-            {
-              where: { id: articulo.inventario_id },
-              transaction: t
-            }
-          );
+        // 3b. Actualizar ubicación y estado de inventario
+        const nuevoEstado = articulo.es_prestamo ? 'en_prestamo' : 'en_uso';
+        const updateData = { estado: nuevoEstado };
 
-          logger.info('Inventario actualizado - ubicación', {
-            inventarioId: articulo.inventario_id,
-            nuevaSede: sede_destino_id
-          });
+        // Actualizar ubicación solo si NO es préstamo (los préstamos mantienen su ubicación original)
+        if (!articulo.es_prestamo) {
+          updateData.sede_id = sede_destino_id;
         }
+
+        await Inventario.update(
+          updateData,
+          {
+            where: { id: articulo.inventario_id },
+            transaction: t
+          }
+        );
+
+        logger.info('Inventario actualizado - estado y ubicación', {
+          inventarioId: articulo.inventario_id,
+          nuevoEstado,
+          nuevaSede: !articulo.es_prestamo ? sede_destino_id : 'sin-cambios',
+          esPrestamo: articulo.es_prestamo
+        });
 
         // 3c. Crear historial de movimiento
         // El hook de afterCreate en RemitoDetalle también creará un historial,
