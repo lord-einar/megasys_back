@@ -474,7 +474,7 @@ class RemitoService {
       ],
       limit: parseInt(limit),
       offset,
-      order: [['createdAt', 'DESC']],
+      order: [['created_at', 'DESC']],
       distinct: true
     });
 

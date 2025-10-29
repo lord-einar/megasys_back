@@ -223,7 +223,7 @@ class RemitoController {
         attributes: ['id', 'marca', 'modelo', 'numero_serie', 'estado', 'tipo_articulo_id'],
         limit: parseInt(limit),
         offset,
-        order: [['createdAt', 'DESC']]
+        order: [['created_at', 'DESC']]
       });
 
       return success(res, {
