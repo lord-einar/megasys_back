@@ -30,23 +30,12 @@ const RemitoDetalle = sequelize.define('RemitoDetalle', {
     defaultValue: false,
     allowNull: false
   },
-  fecha_devolucion_esperada: {
-    type: DataTypes.DATE,
+  fecha_devolucion: {
+    type: DataTypes.DATEONLY,
     allowNull: true,
     validate: {
       isDate: {
         msg: 'Debe ser una fecha válida'
-      },
-      // Validación personalizada para préstamos
-      requiredForLoan(value) {
-        if (this.es_prestamo && !value) {
-          throw new Error('La fecha de devolución es requerida para préstamos');
-        }
-      },
-      futureDate(value) {
-        if (value && new Date(value) <= new Date()) {
-          throw new Error('La fecha de devolución debe ser futura');
-        }
       }
     }
   },
@@ -54,15 +43,6 @@ const RemitoDetalle = sequelize.define('RemitoDetalle', {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
     allowNull: false
-  },
-  fecha_devolucion_real: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    validate: {
-      isDate: {
-        msg: 'Debe ser una fecha válida'
-      }
-    }
   },
   observaciones: {
     type: DataTypes.TEXT,
@@ -72,8 +52,10 @@ const RemitoDetalle = sequelize.define('RemitoDetalle', {
   tableName: 'remito_detalles',
   indexes: [
     {
-      unique: true,
-      fields: ['remito_id', 'inventario_id']
+      fields: ['remito_id']
+    },
+    {
+      fields: ['inventario_id']
     },
     {
       fields: ['es_prestamo']
@@ -82,7 +64,7 @@ const RemitoDetalle = sequelize.define('RemitoDetalle', {
       fields: ['devuelto']
     },
     {
-      fields: ['fecha_devolucion_esperada']
+      fields: ['fecha_devolucion']
     }
   ],
   scopes: {
@@ -101,32 +83,55 @@ const RemitoDetalle = sequelize.define('RemitoDetalle', {
       where: {
         es_prestamo: true,
         devuelto: false,
-        fecha_devolucion_esperada: {
-          [sequelize.Sequelize.Op.lt]: new Date()
+        fecha_devolucion: {
+          [sequelize.Sequelize.Op.lte]: sequelize.sequelize.literal('CURRENT_DATE')
         }
       }
-    }
+    },
+    proximosAVencer: (dias = 7) => ({
+      where: {
+        es_prestamo: true,
+        devuelto: false,
+        fecha_devolucion: {
+          [sequelize.Sequelize.Op.between]: [
+            sequelize.sequelize.literal('CURRENT_DATE'),
+            sequelize.sequelize.literal(`CURRENT_DATE + INTERVAL '${dias} days'`)
+          ]
+        }
+      }
+    })
   }
 });
 
 // Métodos de instancia
 RemitoDetalle.prototype.estaVencido = function() {
-  return this.es_prestamo && 
-         !this.devuelto && 
-         this.fecha_devolucion_esperada && 
-         new Date(this.fecha_devolucion_esperada) < new Date();
+  return this.es_prestamo &&
+         !this.devuelto &&
+         this.fecha_devolucion &&
+         new Date(this.fecha_devolucion) <= new Date();
+};
+
+RemitoDetalle.prototype.estaProximoAVencer = function(dias = 7) {
+  if (!this.es_prestamo || !this.fecha_devolucion || this.devuelto) {
+    return false;
+  }
+
+  const hoy = new Date();
+  const fechaDevolucion = new Date(this.fecha_devolucion);
+  const diferenciaDias = Math.floor((fechaDevolucion - hoy) / (1000 * 60 * 60 * 24));
+
+  return diferenciaDias >= 0 && diferenciaDias <= dias;
 };
 
 RemitoDetalle.prototype.marcarDevuelto = async function() {
   if (!this.es_prestamo) {
     throw new Error('Solo los préstamos pueden ser marcados como devueltos');
   }
-  
+
   this.devuelto = true;
-  this.fecha_devolucion_real = new Date();
   await this.save();
-  
+
   return this;
 };
 
-module.exports = RemitoDetalle
+module.exports = RemitoDetalle;

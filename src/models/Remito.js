@@ -76,22 +76,50 @@ const Remito = sequelize.define('Remito', {
       }
     }
   },
-  tecnico_asignado_id: {
+  tecnico_id: {
     type: DataTypes.UUID,
-    allowNull: true,
+    allowNull: false,
     references: {
       model: 'personal',
       key: 'id'
+    },
+    validate: {
+      notNull: {
+        msg: 'El técnico es requerido'
+      }
     }
   },
   estado: {
-    type: DataTypes.ENUM('preparado', 'en_transito', 'entregado', 'confirmado'),
+    type: DataTypes.ENUM('borrador', 'en_transito', 'entregado', 'devuelto', 'cancelado'),
     allowNull: false,
-    defaultValue: 'preparado',
+    defaultValue: 'borrador',
     validate: {
       isIn: {
-        args: [['preparado', 'en_transito', 'entregado', 'confirmado']],
-        msg: 'El estado debe ser: preparado, en_transito, entregado o confirmado'
+        args: [['borrador', 'en_transito', 'entregado', 'devuelto', 'cancelado']],
+        msg: 'El estado debe ser: borrador, en_transito, entregado, devuelto o cancelado'
+      }
+    }
+  },
+  es_prestamo: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
+  },
+  fecha_devolucion_estimada: {
+    type: DataTypes.DATEONLY,
+    allowNull: true,
+    validate: {
+      isDate: {
+        msg: 'Debe ser una fecha válida'
+      }
+    }
+  },
+  fecha_devolucion_real: {
+    type: DataTypes.DATEONLY,
+    allowNull: true,
+    validate: {
+      isDate: {
+        msg: 'Debe ser una fecha válida'
       }
     }
   },
@@ -99,23 +127,10 @@ const Remito = sequelize.define('Remito', {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  fecha_entrega: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    validate: {
-      isDate: {
-        msg: 'Debe ser una fecha válida'
-      }
-    }
-  },
-  fecha_confirmacion: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    validate: {
-      isDate: {
-        msg: 'Debe ser una fecha válida'
-      }
-    }
+  activo: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    allowNull: false
   }
 }, {
   tableName: 'remitos',
@@ -125,7 +140,13 @@ const Remito = sequelize.define('Remito', {
       fields: ['numero_remito']
     },
     {
-      fields: ['fecha']
+      fields: ['estado']
+    },
+    {
+      fields: ['solicitante_id']
+    },
+    {
+      fields: ['tecnico_id']
     },
     {
       fields: ['sede_origen_id']
@@ -134,71 +155,59 @@ const Remito = sequelize.define('Remito', {
       fields: ['sede_destino_id']
     },
     {
-      fields: ['estado']
+      fields: ['es_prestamo']
     },
     {
-      fields: ['solicitante_id']
+      fields: ['activo']
     },
     {
-      fields: ['tecnico_asignado_id']
+      fields: ['fecha']
     }
   ],
   scopes: {
-    pendientes: {
+    activos: {
       where: {
-        estado: ['preparado', 'en_transito', 'entregado']
+        activo: true
       }
     },
-    confirmados: {
+    porEstado: (estado) => ({
       where: {
-        estado: 'confirmado'
+        estado,
+        activo: true
       }
-    },
+    }),
+    porSolicitante: (solicitanteId) => ({
+      where: {
+        solicitante_id: solicitanteId,
+        activo: true
+      }
+    }),
     porTecnico: (tecnicoId) => ({
       where: {
-        tecnico_asignado_id: tecnicoId
+        tecnico_id: tecnicoId,
+        activo: true
       }
-    })
+    }),
+    prestamos: {
+      where: {
+        es_prestamo: true,
+        activo: true
+      }
+    }
   }
 });
 
 // Métodos de instancia
-Remito.prototype.puedeTransitar = function() {
-  return this.estado === 'preparado';
+Remito.prototype.puedeEditarse = function() {
+  return this.estado === 'borrador';
 };
 
-Remito.prototype.puedeEntregar = function() {
-  return this.estado === 'en_transito';
+Remito.prototype.puedeDevolverse = function() {
+  return this.es_prestamo && this.estado === 'en_transito';
 };
 
-Remito.prototype.puedeConfirmar = function() {
-  return this.estado === 'entregado';
+Remito.prototype.getDescripcion = function() {
+  return `Remito ${this.numero_remito} - ${this.estado}`;
 };
 
-Remito.prototype.cambiarEstado = async function(nuevoEstado, usuarioId = null) {
-  const estadosValidos = {
-    'preparado': ['en_transito'],
-    'en_transito': ['entregado'],
-    'entregado': ['confirmado']
-  };
-
-  if (!estadosValidos[this.estado] || !estadosValidos[this.estado].includes(nuevoEstado)) {
-    throw new Error(`No se puede cambiar de ${this.estado} a ${nuevoEstado}`);
-  }
-
-  this.estado = nuevoEstado;
-
-  // Registrar fechas según el estado
-  if (nuevoEstado === 'entregado') {
-    this.fecha_entrega = new Date();
-  } else if (nuevoEstado === 'confirmado') {
-    this.fecha_confirmacion = new Date();
-  }
-
-  await this.save();
-  
-  // Aquí se podría agregar lógica para enviar emails
-  return this;
-};
-
-module.exports = Remito
+module.exports = Remito;
