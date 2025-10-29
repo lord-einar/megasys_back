@@ -137,7 +137,12 @@ class RemitoController {
         roles: userRoles
       });
 
-      const remito = await remitoService.cambiarEstado(id, estado, usuarioId, { userRoles });
+      const remito = await remitoService.cambiarEstado(id, estado, usuarioId, {
+        userRoles,
+        usuarioEmail: req.user.email,
+        userAgent: req.get('user-agent'),
+        ipAddress: req.ip
+      });
 
       return success(res, remito, `Estado del remito actualizado a "${estado}"`);
     } catch (err) {

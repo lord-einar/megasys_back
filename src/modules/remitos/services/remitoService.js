@@ -11,6 +11,7 @@ const {
 } = require('../../../models');
 const logger = require('../../../shared/utils/logger');
 const { Op, Sequelize } = require('sequelize');
+const AuditService = require('../../../shared/services/auditService');
 
 class RemitoService {
   /**
@@ -604,7 +605,7 @@ class RemitoService {
    * Solo Infraestructura puede cambiar estados
    */
   async cambiarEstado(remitoId, nuevoEstado, usuarioId, options = {}) {
-    const { transaction, userRoles = [] } = options;
+    const { transaction, userRoles = [], usuarioEmail = null, userAgent = null, ipAddress = null } = options;
 
     const estadosValidos = ['preparado', 'en_transito', 'entregado', 'completado', 'devuelto', 'cancelado'];
     if (!estadosValidos.includes(nuevoEstado)) {
@@ -616,14 +617,14 @@ class RemitoService {
       throw new Error('El remito no existe');
     }
 
-    // Validar autorización: Super Administrador, Sistemas, Infraestructura o el técnico asignado puede cambiar estado
-    const esSuperAdministrador = userRoles.includes('Super Administrador');
-    const esSistemas = userRoles.includes('Sistemas');
-    const esInfraestructura = userRoles.includes('Infraestructura');
+    // Validar autorización:
+    // - Infraestructura = Super Administrador (acceso total)
+    // - Otros = acceso limitado (solo sus remitos asignados)
+    const esSuperAdministrador = userRoles.includes('Infraestructura');
     const esTecnicoAsignado = remito.tecnico_asignado_id === usuarioId;
 
-    if (!esSuperAdministrador && !esSistemas && !esInfraestructura && !esTecnicoAsignado) {
-      throw new Error('No tienes permisos para cambiar el estado de este remito. Solo Super Administrador, Sistemas, Infraestructura o el técnico asignado pueden hacerlo.');
+    if (!esSuperAdministrador && !esTecnicoAsignado) {
+      throw new Error('No tienes permisos para cambiar el estado de este remito. Solo usuarios de Infraestructura o el técnico asignado pueden hacerlo.');
     }
 
     // Validaciones de transiciones de estado
@@ -643,6 +644,9 @@ class RemitoService {
       );
     }
 
+    // Guardar estado anterior para auditoría
+    const estadoAnterior = remito.estado;
+
     // Actualizar estado
     const remitoActualizado = await remito.update(
       { estado: nuevoEstado },
@@ -651,10 +655,30 @@ class RemitoService {
 
     logger.info('Estado de remito actualizado:', {
       remitoId,
-      estadoAnterior: remito.estado,
+      estadoAnterior,
       estadoNuevo: nuevoEstado,
       usuarioId
     });
+
+    // Registrar en auditoría
+    if (usuarioEmail) {
+      AuditService.registrarAccion({
+        usuario_email: usuarioEmail,
+        usuario_id: usuarioId,
+        modulo: 'remitos',
+        accion: 'cambiar_estado',
+        recurso: 'Remito',
+        recurso_id: remitoId,
+        descripcion: `Cambio de estado del remito ${remito.numero_remito} de "${estadoAnterior}" a "${nuevoEstado}"`,
+        valores_anteriores: { estado: estadoAnterior },
+        valores_nuevos: { estado: nuevoEstado },
+        ip_address: ipAddress,
+        user_agent: userAgent,
+        resultado: 'exitoso'
+      }).catch(err => {
+        logger.warn('Error registrando auditoría:', err.message);
+      });
+    }
 
     return remitoActualizado;
   }
