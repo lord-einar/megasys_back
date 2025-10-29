@@ -232,7 +232,7 @@ class RemitoController {
 
       const { count, rows } = await Inventario.findAndCountAll({
         where: whereClause,
-        attributes: ['id', 'marca', 'modelo', 'numero_serie', 'service_tag', 'estado', 'tipo_articulo_id'],
+        attributes: ['id', 'marca', 'modelo', 'numero_serie', 'service_tag', 'estado', 'tipo_articulo_id', 'sede_id'],
         include: [{
           model: TipoArticulo,
           as: 'tipoArticulo',
@@ -240,20 +240,21 @@ class RemitoController {
         }],
         limit: parseInt(limit),
         offset,
-        order: [['created_at', 'DESC']]
+        order: [['created_at', 'DESC']],
+        distinct: true,
+        subQuery: false
       });
 
       return success(res, {
-        data: rows,
+        rows,
         total: count,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
           total: count,
           pages: Math.ceil(count / parseInt(limit))
-        },
-        message: 'Artículos disponibles obtenidos correctamente'
-      });
+        }
+      }, 'Artículos disponibles obtenidos correctamente');
     } catch (err) {
       logger.error('Error obteniendo artículos disponibles:', err);
       return error(res, 'Error al obtener artículos', 500);
