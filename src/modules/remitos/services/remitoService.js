@@ -165,6 +165,47 @@ class RemitoService {
   }
 
   /**
+   * Validar que un artículo NO esté en otro remito activo
+   * Un artículo no puede estar en 2 remitos activos simultáneamente
+   * Estados activos: preparado, en_transito, entregado
+   */
+  async validarArticuloNoEnTransito(inventarioId) {
+    try {
+      const { Remito } = require('../../../models');
+
+      // Buscar si existe un RemitoDetalle con este inventario en un remito activo
+      const detalleExistente = await RemitoDetalle.findOne({
+        where: { inventario_id: inventarioId },
+        include: [{
+          model: Remito,
+          as: 'remito',
+          where: {
+            estado: {
+              [require('sequelize').Op.in]: ['preparado', 'en_transito', 'entregado']
+            }
+          }
+        }]
+      });
+
+      if (detalleExistente && detalleExistente.remito) {
+        throw new Error(
+          `El artículo ${inventarioId} ya está en el remito ${detalleExistente.remito.numero_remito} ` +
+          `con estado "${detalleExistente.remito.estado}". No se puede agregar a múltiples remitos activos.`
+        );
+      }
+
+      return true;
+    } catch (err) {
+      logger.error('validarArticuloNoEnTransito - Error:', {
+        error: err.message,
+        linea: err.stack?.split('\n')[1]?.trim() || 'Desconocida',
+        inventarioId
+      });
+      throw err;
+    }
+  }
+
+  /**
    * Crear nuevo remito con detalles - TRANSACCIÓN ATÓMICA
    *
    * Proceso:
@@ -241,13 +282,20 @@ class RemitoService {
           es_prestamo: articulo.es_prestamo
         });
 
+        // Validar que el artículo existe y está disponible en la sede
         await this.validarInventarioDisponible(articulo.inventario_id, sede_origen_id);
-        logger.info(`crear - Artículo [${i}] validado correctamente`);
+        logger.info(`crear - Artículo [${i}] disponible`);
+
+        // Validar que el artículo NO está en otro remito activo
+        await this.validarArticuloNoEnTransito(articulo.inventario_id);
+        logger.info(`crear - Artículo [${i}] no está en otro remito activo`);
 
         // Si es préstamo, fecha_devolucion_esperada es requerida
         if (articulo.es_prestamo && !articulo.fecha_devolucion_esperada) {
           throw new Error('La fecha de devolución es requerida para préstamos');
         }
+
+        logger.info(`crear - Artículo [${i}] validado correctamente`);
       }
 
       logger.info('crear - Validación de artículos completada');
