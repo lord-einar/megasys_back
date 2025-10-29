@@ -245,6 +245,13 @@ class RemitoController {
         subQuery: false
       });
 
+      logger.info('Articulos encontrados:', {
+        count,
+        rowsLength: rows.length,
+        whereClause,
+        firstArticulo: rows[0] || 'ninguno'
+      });
+
       return success(res, {
         rows,
         total: count,
