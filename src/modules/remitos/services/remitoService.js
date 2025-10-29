@@ -619,12 +619,13 @@ class RemitoService {
 
     // Validar autorización:
     // - Infraestructura = Super Administrador (acceso total)
+    // - Sistemas = Acceso administrativo total (para usuarios no-Infraestructura)
     // - Otros = acceso limitado (solo sus remitos asignados)
-    const esSuperAdministrador = userRoles.includes('Infraestructura');
+    const esSuperAdministrador = userRoles.includes('Infraestructura') || userRoles.includes('Sistemas');
     const esTecnicoAsignado = remito.tecnico_asignado_id === usuarioId;
 
     if (!esSuperAdministrador && !esTecnicoAsignado) {
-      throw new Error('No tienes permisos para cambiar el estado de este remito. Solo usuarios de Infraestructura o el técnico asignado pueden hacerlo.');
+      throw new Error('No tienes permisos para cambiar el estado de este remito. Solo usuarios administrativos o el técnico asignado pueden hacerlo.');
     }
 
     // Validaciones de transiciones de estado
