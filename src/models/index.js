@@ -229,11 +229,11 @@ Remito.belongsTo(Personal, {
 
 // Personal técnico asignado
 Personal.hasMany(Remito, {
-  foreignKey: 'tecnico_id',
+  foreignKey: 'tecnico_asignado_id',
   as: 'remitosAsignados'
 });
 Remito.belongsTo(Personal, {
-  foreignKey: 'tecnico_id',
+  foreignKey: 'tecnico_asignado_id',
   as: 'tecnicoAsignado'
 });
 

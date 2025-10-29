@@ -30,8 +30,17 @@ const RemitoDetalle = sequelize.define('RemitoDetalle', {
     defaultValue: false,
     allowNull: false
   },
-  fecha_devolucion: {
-    type: DataTypes.DATEONLY,
+  fecha_devolucion_esperada: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    validate: {
+      isDate: {
+        msg: 'Debe ser una fecha válida'
+      }
+    }
+  },
+  fecha_devolucion_real: {
+    type: DataTypes.DATE,
     allowNull: true,
     validate: {
       isDate: {
@@ -64,7 +73,7 @@ const RemitoDetalle = sequelize.define('RemitoDetalle', {
       fields: ['devuelto']
     },
     {
-      fields: ['fecha_devolucion']
+      fields: ['fecha_devolucion_esperada']
     }
   ],
   scopes: {
@@ -83,7 +92,7 @@ const RemitoDetalle = sequelize.define('RemitoDetalle', {
       where: {
         es_prestamo: true,
         devuelto: false,
-        fecha_devolucion: {
+        fecha_devolucion_esperada: {
           [Op.lte]: Sequelize.literal('CURRENT_DATE')
         }
       }
@@ -92,7 +101,7 @@ const RemitoDetalle = sequelize.define('RemitoDetalle', {
       where: {
         es_prestamo: true,
         devuelto: false,
-        fecha_devolucion: {
+        fecha_devolucion_esperada: {
           [Op.between]: [
             Sequelize.literal('CURRENT_DATE'),
             Sequelize.literal(`CURRENT_DATE + INTERVAL '${dias} days'`)

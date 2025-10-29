@@ -7,7 +7,8 @@ const Remito = sequelize.define('Remito', {
   id: {
     type: DataTypes.UUID,
     primaryKey: true,
-    defaultValue: () => uuidv4()
+    defaultValue: () => uuidv4(),
+    allowNull: false
   },
   numero_remito: {
     type: DataTypes.STRING(20),
@@ -76,50 +77,23 @@ const Remito = sequelize.define('Remito', {
       }
     }
   },
-  tecnico_id: {
+  tecnico_asignado_id: {
     type: DataTypes.UUID,
-    allowNull: false,
+    allowNull: true,
+    columnName: 'tecnico_asignado_id',
     references: {
       model: 'personal',
       key: 'id'
-    },
-    validate: {
-      notNull: {
-        msg: 'El técnico es requerido'
-      }
     }
   },
   estado: {
-    type: DataTypes.ENUM('borrador', 'en_transito', 'entregado', 'devuelto', 'cancelado'),
+    type: DataTypes.ENUM('preparado', 'en_transito', 'entregado', 'confirmado'),
     allowNull: false,
-    defaultValue: 'borrador',
+    defaultValue: 'preparado',
     validate: {
       isIn: {
-        args: [['borrador', 'en_transito', 'entregado', 'devuelto', 'cancelado']],
-        msg: 'El estado debe ser: borrador, en_transito, entregado, devuelto o cancelado'
-      }
-    }
-  },
-  es_prestamo: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: false
-  },
-  fecha_devolucion_estimada: {
-    type: DataTypes.DATEONLY,
-    allowNull: true,
-    validate: {
-      isDate: {
-        msg: 'Debe ser una fecha válida'
-      }
-    }
-  },
-  fecha_devolucion_real: {
-    type: DataTypes.DATEONLY,
-    allowNull: true,
-    validate: {
-      isDate: {
-        msg: 'Debe ser una fecha válida'
+        args: [['preparado', 'en_transito', 'entregado', 'confirmado']],
+        msg: 'El estado debe ser: preparado, en_transito, entregado o confirmado'
       }
     }
   },
@@ -127,10 +101,23 @@ const Remito = sequelize.define('Remito', {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  activo: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: true,
-    allowNull: false
+  fecha_entrega: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    validate: {
+      isDate: {
+        msg: 'Debe ser una fecha válida'
+      }
+    }
+  },
+  fecha_confirmacion: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    validate: {
+      isDate: {
+        msg: 'Debe ser una fecha válida'
+      }
+    }
   }
 }, {
   tableName: 'remitos',
@@ -146,7 +133,7 @@ const Remito = sequelize.define('Remito', {
       fields: ['solicitante_id']
     },
     {
-      fields: ['tecnico_id']
+      fields: ['tecnico_asignado_id']
     },
     {
       fields: ['sede_origen_id']
@@ -155,55 +142,39 @@ const Remito = sequelize.define('Remito', {
       fields: ['sede_destino_id']
     },
     {
-      fields: ['es_prestamo']
-    },
-    {
-      fields: ['activo']
-    },
-    {
       fields: ['fecha']
     }
   ],
   scopes: {
-    activos: {
-      where: {
-        activo: true
-      }
-    },
     porEstado: (estado) => ({
       where: {
-        estado,
-        activo: true
+        estado
       }
     }),
     porSolicitante: (solicitanteId) => ({
       where: {
-        solicitante_id: solicitanteId,
-        activo: true
+        solicitante_id: solicitanteId
       }
     }),
     porTecnico: (tecnicoId) => ({
       where: {
-        tecnico_id: tecnicoId,
-        activo: true
+        tecnico_asignado_id: tecnicoId
       }
-    }),
-    prestamos: {
-      where: {
-        es_prestamo: true,
-        activo: true
-      }
-    }
+    })
   }
 });
 
 // Métodos de instancia
 Remito.prototype.puedeEditarse = function() {
-  return this.estado === 'borrador';
+  return this.estado === 'preparado';
 };
 
-Remito.prototype.puedeDevolverse = function() {
-  return this.es_prestamo && this.estado === 'en_transito';
+Remito.prototype.puedeEnviarse = function() {
+  return this.estado === 'preparado';
+};
+
+Remito.prototype.puedeConfirmarse = function() {
+  return this.estado === 'entregado';
 };
 
 Remito.prototype.getDescripcion = function() {

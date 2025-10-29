@@ -9,7 +9,7 @@ const {
   sequelize
 } = require('../../../models');
 const logger = require('../../../shared/utils/logger');
-const { Op } = require('sequelize');
+const { Op, Sequelize } = require('sequelize');
 
 class RemitoService {
   /**
@@ -20,30 +20,36 @@ class RemitoService {
     try {
       const year = new Date().getFullYear();
 
-      // Obtener el máximo número para este año
-      const ultimoRemito = await Remito.findOne({
-        where: {
-          numero_remito: {
-            [Op.like]: `REM-${year}-%`
-          }
-        },
-        order: [['createdAt', 'DESC']],
-        attributes: ['numero_remito']
+      // Simply query all remitos ordered by id (descending for most recent)
+      const remitos = await Remito.findAll({
+        attributes: ['numero_remito'],
+        order: [['id', 'DESC']],
+        limit: 1000,
+        raw: true
       });
 
+      // Filtrar remitos del año actual y encontrar el máximo
       let nextNumber = 1;
-      if (ultimoRemito && ultimoRemito.numero_remito) {
-        const matches = ultimoRemito.numero_remito.match(/REM-\d+-(\d+)/);
+      const currentYearPattern = new RegExp(`^REM-${year}-(\\d+)$`);
+
+      for (const remito of remitos) {
+        const matches = remito.numero_remito.match(currentYearPattern);
         if (matches) {
-          nextNumber = parseInt(matches[1]) + 1;
+          const num = parseInt(matches[1]);
+          if (num >= nextNumber) {
+            nextNumber = num + 1;
+          }
         }
       }
 
       const numeroRemito = `REM-${year}-${String(nextNumber).padStart(5, '0')}`;
       return numeroRemito;
     } catch (error) {
-      logger.error('Error generando número de remito:', error);
-      throw new Error('No se pudo generar el número de remito');
+      logger.error('Error generando número de remito:', {
+        error: error.message,
+        stack: error.stack
+      });
+      throw error;
     }
   }
 
@@ -87,39 +93,79 @@ class RemitoService {
    * Validar que inventario existe, está activo y disponible
    */
   async validarInventarioDisponible(inventarioId, sedeId) {
-    const inventario = await Inventario.findOne({
-      where: {
-        id: inventarioId,
-        sede_id: sedeId,
-        activo: true
+    try {
+      logger.info('validarInventarioDisponible - Iniciando validación:', {
+        inventarioId,
+        sedeId,
+        inventarioIdType: typeof inventarioId,
+        sedeIdType: typeof sedeId
+      });
+
+      // Validar que los parámetros no sean undefined
+      if (!inventarioId || !sedeId) {
+        throw new Error(`Parámetros inválidos: inventarioId=${inventarioId}, sedeId=${sedeId}`);
       }
-    });
 
-    if (!inventario) {
-      throw new Error(`El artículo no existe en la sede seleccionada o no está disponible`);
-    }
+      logger.info('validarInventarioDisponible - Buscando inventario:', {
+        inventarioId,
+        sedeId
+      });
 
-    // Verificar que no esté en otro remito activo
-    const remitoActivo = await RemitoDetalle.findOne({
-      where: {
-        inventario_id: inventarioId
-      },
-      include: [{
-        model: Remito,
-        as: 'remito',
+      const inventario = await Inventario.findOne({
         where: {
-          estado: {
-            [Op.in]: ['borrador', 'en_transito']
-          }
+          id: inventarioId,
+          sede_id: sedeId,
+          activo: true
         }
-      }]
-    });
+      });
 
-    if (remitoActivo) {
-      throw new Error(`El artículo ya está asignado a otro remito activo`);
+      if (!inventario) {
+        throw new Error(`El artículo no existe en la sede seleccionada o no está disponible`);
+      }
+
+      logger.info('validarInventarioDisponible - Inventario encontrado, verificando remitos activos:', {
+        inventarioId,
+        inventarioFound: true
+      });
+
+      // Verificar que no esté en otro remito activo
+      // Primero buscar detalles del inventario
+      const detallesExistentes = await RemitoDetalle.findAll({
+        where: {
+          inventario_id: inventarioId
+        },
+        include: [{
+          model: Remito,
+          as: 'remito',
+          attributes: ['id', 'estado']
+        }],
+        limit: 10
+      });
+
+      logger.info('validarInventarioDisponible - Detalles encontrados:', {
+        detallesCount: detallesExistentes.length
+      });
+
+      // Verificar si alguno está en estado activo
+      const remitoActivo = detallesExistentes.find(detalle => {
+        return detalle.remito && ['preparado', 'en_transito'].includes(detalle.remito.estado);
+      });
+
+      if (remitoActivo) {
+        throw new Error(`El artículo ya está asignado a otro remito activo`);
+      }
+
+      logger.info('validarInventarioDisponible - Validación completada exitosamente');
+      return inventario;
+    } catch (err) {
+      logger.error('validarInventarioDisponible - Error:', {
+        error: err.message,
+        linea: err.stack?.split('\n')[1]?.trim() || 'Desconocida',
+        inventarioId,
+        sedeId
+      });
+      throw err;
     }
-
-    return inventario;
   }
 
   /**
@@ -142,32 +188,79 @@ class RemitoService {
       es_prestamo,
       fecha_devolucion_estimada,
       observaciones,
-      articulos // Array de { inventario_id, es_prestamo, fecha_devolucion }
+      articulos // Array de { inventario_id, es_prestamo, fecha_devolucion_esperada }
     } = datosNueva;
 
     // Validaciones (fuera de transacción - operaciones de lectura)
-    await this.validarPersonaActiva(solicitante_id, 'Solicitante');
-    await this.validarPersonaActiva(tecnico_id, 'Técnico');
-    await this.validarSedeActiva(sede_origen_id, 'Sede de origen');
-    await this.validarSedeActiva(sede_destino_id, 'Sede de destino');
+    try {
+      logger.info('crear - Iniciando validaciones de remito');
 
-    if (!Array.isArray(articulos) || articulos.length === 0) {
-      throw new Error('Debes incluir al menos un artículo en el remito');
-    }
+      await this.validarPersonaActiva(solicitante_id, 'Solicitante');
+      logger.info('crear - Solicitante validado');
 
-    // Validar que origen y destino sean diferentes
-    if (sede_origen_id === sede_destino_id) {
-      throw new Error('La sede de origen y destino deben ser diferentes');
-    }
+      await this.validarPersonaActiva(tecnico_id, 'Técnico');
+      logger.info('crear - Técnico validado');
 
-    // Validar cada artículo
-    for (const articulo of articulos) {
-      await this.validarInventarioDisponible(articulo.inventario_id, sede_origen_id);
+      await this.validarSedeActiva(sede_origen_id, 'Sede de origen');
+      logger.info('crear - Sede origen validada');
 
-      // Si es préstamo, fecha_devolucion es requerida
-      if (articulo.es_prestamo && !articulo.fecha_devolucion) {
-        throw new Error('La fecha de devolución es requerida para préstamos');
+      await this.validarSedeActiva(sede_destino_id, 'Sede de destino');
+      logger.info('crear - Sede destino validada');
+
+      if (!Array.isArray(articulos) || articulos.length === 0) {
+        throw new Error('Debes incluir al menos un artículo en el remito');
       }
+      logger.info('crear - Array de artículos validado', { articulosCount: articulos.length });
+
+      // Validar que origen y destino sean diferentes
+      if (sede_origen_id === sede_destino_id) {
+        throw new Error('La sede de origen y destino deben ser diferentes');
+      }
+      logger.info('crear - Sedes diferentes validadas');
+
+      logger.info('crear - Todas las validaciones completadas exitosamente');
+    } catch (validationErr) {
+      logger.error('crear - Error en validaciones:', {
+        error: validationErr.message,
+        linea: validationErr.stack?.split('\n')[1]?.trim() || 'Desconocida'
+      });
+      throw validationErr;
+    }
+
+    // Normalizar artículos: aceptar fecha_devolucion o fecha_devolucion_esperada
+    // IMPORTANTE: Se hace FUERA del try-catch para que esté disponible en la transacción
+    const articulosNormalizados = articulos.map(art => ({
+      ...art,
+      fecha_devolucion_esperada: art.fecha_devolucion_esperada || art.fecha_devolucion
+    }));
+    logger.info('crear - Artículos normalizados');
+
+    // Validar cada artículo normalizado
+    try {
+      for (let i = 0; i < articulosNormalizados.length; i++) {
+        const articulo = articulosNormalizados[i];
+        logger.info(`crear - Validando artículo [${i}]`, {
+          inventario_id: articulo.inventario_id,
+          sede_origen_id: sede_origen_id,
+          es_prestamo: articulo.es_prestamo
+        });
+
+        await this.validarInventarioDisponible(articulo.inventario_id, sede_origen_id);
+        logger.info(`crear - Artículo [${i}] validado correctamente`);
+
+        // Si es préstamo, fecha_devolucion_esperada es requerida
+        if (articulo.es_prestamo && !articulo.fecha_devolucion_esperada) {
+          throw new Error('La fecha de devolución es requerida para préstamos');
+        }
+      }
+
+      logger.info('crear - Validación de artículos completada');
+    } catch (articuloErr) {
+      logger.error('crear - Error validando artículos:', {
+        error: articuloErr.message,
+        linea: articuloErr.stack?.split('\n')[1]?.trim() || 'Desconocida'
+      });
+      throw articuloErr;
     }
 
     // Manejar transacción - usar externa si existe, crear nueva si no
@@ -190,12 +283,9 @@ class RemitoService {
         sede_origen_id,
         sede_destino_id,
         solicitante_id,
-        tecnico_id,
-        estado: 'borrador',
-        es_prestamo: articulos.some(a => a.es_prestamo),
-        fecha_devolucion_estimada: fecha_devolucion_estimada || null,
-        observaciones: observaciones || null,
-        activo: true
+        tecnico_asignado_id: tecnico_id || null,
+        estado: 'preparado',
+        observaciones: observaciones || null
       }, { transaction: t });
 
       logger.info('Remito creado:', {
@@ -205,13 +295,13 @@ class RemitoService {
       });
 
       // 3. Crear detalles y actualizar inventario
-      for (const articulo of articulos) {
+      for (const articulo of articulosNormalizados) {
         // 3a. Crear RemitoDetalle
         const detalle = await RemitoDetalle.create({
           remito_id: remito.id,
           inventario_id: articulo.inventario_id,
           es_prestamo: articulo.es_prestamo || false,
-          fecha_devolucion: articulo.fecha_devolucion || null,
+          fecha_devolucion_esperada: articulo.fecha_devolucion_esperada || null,
           devuelto: false,
           observaciones: articulo.observaciones || null
         }, { transaction: t });
@@ -280,8 +370,15 @@ class RemitoService {
         await t.rollback();
       }
 
-      logger.error('Error creando remito:', {
+      // Extraer información de línea y función del stack trace
+      const stackLines = error.stack?.split('\n') || [];
+      const lineaInfo = stackLines[1]?.trim() || 'Desconocida';
+      const funcionInfo = error.stack?.split('\n')[0] || 'Desconocida';
+
+      logger.error('Error creando remito en transacción:', {
         error: error.message,
+        funcion: funcionInfo,
+        linea: lineaInfo,
         stack: error.stack,
         datos: {
           solicitante_id,
@@ -313,12 +410,8 @@ class RemitoService {
     const offset = (parseInt(page) - 1) * parseInt(limit);
     const whereClause = {};
 
-    // Filtro activo (por defecto true)
-    if (activo !== null && activo !== undefined) {
-      whereClause.activo = activo === 'true' || activo === true;
-    } else {
-      whereClause.activo = true;
-    }
+    // Nota: La tabla remitos no tiene columna 'activo', solo 'estado'
+    // Por lo tanto no filtramos por activo aquí
 
     // Filtros específicos
     if (estado) {
@@ -371,7 +464,7 @@ class RemitoService {
         {
           model: RemitoDetalle,
           as: 'detalles',
-          attributes: ['id', 'inventario_id', 'es_prestamo', 'fecha_devolucion', 'devuelto'],
+          attributes: ['id', 'inventario_id', 'es_prestamo', 'fecha_devolucion_esperada', 'devuelto'],
           include: [{
             model: Inventario,
             as: 'inventarioDetalle',
@@ -455,7 +548,7 @@ class RemitoService {
   async cambiarEstado(remitoId, nuevoEstado, usuarioId, options = {}) {
     const { transaction } = options;
 
-    const estadosValidos = ['borrador', 'en_transito', 'entregado', 'devuelto', 'cancelado'];
+    const estadosValidos = ['preparado', 'en_transito', 'entregado', 'confirmado'];
     if (!estadosValidos.includes(nuevoEstado)) {
       throw new Error(`Estado "${nuevoEstado}" no es válido`);
     }
@@ -467,11 +560,10 @@ class RemitoService {
 
     // Validaciones de transiciones de estado
     const transicionesValidas = {
-      'borrador': ['en_transito', 'cancelado'],
-      'en_transito': ['entregado', 'cancelado'],
-      'entregado': ['devuelto'],
-      'devuelto': [],
-      'cancelado': []
+      'preparado': ['en_transito'],
+      'en_transito': ['entregado'],
+      'entregado': ['confirmado'],
+      'confirmado': []
     };
 
     if (!transicionesValidas[remito.estado].includes(nuevoEstado)) {
@@ -510,10 +602,6 @@ class RemitoService {
       throw new Error('El remito original no existe');
     }
 
-    if (!remitoOriginal.es_prestamo) {
-      throw new Error('Solo se pueden devolver artículos de remitos que sean préstamos');
-    }
-
     // Obtener detalles a devolver
     const detallesADevolver = await RemitoDetalle.findAll({
       where: {
@@ -546,11 +634,9 @@ class RemitoService {
         sede_origen_id: remitoOriginal.sede_destino_id, // Inverted
         sede_destino_id: remitoOriginal.sede_origen_id,  // Inverted
         solicitante_id: remitoOriginal.solicitante_id,
-        tecnico_id: remitoOriginal.tecnico_id,
-        estado: 'en_transito',
-        es_prestamo: false,
-        observaciones: `Devolución de remito ${remitoOriginal.numero_remito}`,
-        activo: true
+        tecnico_asignado_id: remitoOriginal.tecnico_asignado_id,
+        estado: 'preparado',
+        observaciones: `Devolución de remito ${remitoOriginal.numero_remito}`
       }, { transaction: t });
 
       // Crear detalles de devolución

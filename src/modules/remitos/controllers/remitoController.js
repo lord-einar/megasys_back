@@ -30,8 +30,14 @@ class RemitoController {
         statusCode: 201
       });
     } catch (err) {
+      // Extraer información de línea y función del stack trace
+      const stackLines = err.stack?.split('\n') || [];
+      const lineaInfo = stackLines[1]?.trim() || 'Desconocida';
+
       logger.error('Error creando remito:', {
         error: err.message,
+        linea: lineaInfo,
+        stack: err.stack,
         usuario: req.user?.email || 'desconocido',
         body: req.body
       });
