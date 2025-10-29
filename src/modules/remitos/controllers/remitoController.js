@@ -108,6 +108,7 @@ class RemitoController {
       const { id } = req.params;
       const { estado } = req.body;
       const usuarioId = req.user.personalId;
+      const userRoles = req.user.roles || [];
 
       if (!estado) {
         return error(res, 'El nuevo estado es requerido', 400);
@@ -116,15 +117,13 @@ class RemitoController {
       logger.info('Cambiando estado de remito:', {
         remitoId: id,
         nuevoEstado: estado,
-        usuarioId
+        usuarioId,
+        roles: userRoles
       });
 
-      const remito = await remitoService.cambiarEstado(id, estado, usuarioId);
+      const remito = await remitoService.cambiarEstado(id, estado, usuarioId, { userRoles });
 
-      return success(res, {
-        data: remito,
-        message: `Estado del remito actualizado a "${estado}"`
-      });
+      return success(res, remito, `Estado del remito actualizado a "${estado}"`);
     } catch (err) {
       logger.error('Error cambiando estado de remito:', err);
 

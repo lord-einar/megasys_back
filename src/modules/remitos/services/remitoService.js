@@ -546,7 +546,7 @@ class RemitoService {
    * Solo Infraestructura puede cambiar estados
    */
   async cambiarEstado(remitoId, nuevoEstado, usuarioId, options = {}) {
-    const { transaction } = options;
+    const { transaction, userRoles = [] } = options;
 
     const estadosValidos = ['preparado', 'en_transito', 'entregado', 'confirmado'];
     if (!estadosValidos.includes(nuevoEstado)) {
@@ -556,6 +556,14 @@ class RemitoService {
     const remito = await Remito.findByPk(remitoId);
     if (!remito) {
       throw new Error('El remito no existe');
+    }
+
+    // Validar autorización: solo Infraestructura o el técnico asignado puede cambiar estado
+    const esInfraestructura = userRoles.includes('Infraestructura');
+    const esTecnicoAsignado = remito.tecnico_asignado_id === usuarioId;
+
+    if (!esInfraestructura && !esTecnicoAsignado) {
+      throw new Error('No tienes permisos para cambiar el estado de este remito. Solo Infraestructura o el técnico asignado pueden hacerlo.');
     }
 
     // Validaciones de transiciones de estado

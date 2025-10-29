@@ -48,11 +48,10 @@ router.get('/:id', remitoController.obtener.bind(remitoController));
 /**
  * PATCH /remitos/:id/estado
  * Cambiar estado del remito
- * Requiere: Rol "Infraestructura"
+ * Requiere: Rol "Infraestructura" O ser el técnico asignado al remito
  */
 router.patch(
   '/:id/estado',
-  requireDatabaseRole('Infraestructura'),
   remitoController.cambiarEstado.bind(remitoController)
 );
 
