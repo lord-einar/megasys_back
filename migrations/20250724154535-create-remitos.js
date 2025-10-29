@@ -62,7 +62,7 @@ module.exports = {
         onDelete: 'SET NULL'
       },
       estado: {
-        type: Sequelize.ENUM('preparado', 'en_transito', 'entregado', 'confirmado'),
+        type: Sequelize.ENUM('preparado', 'en_transito', 'entregado', 'completado', 'devuelto', 'cancelado'),
         allowNull: false,
         defaultValue: 'preparado'
       },
