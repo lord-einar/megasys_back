@@ -531,8 +531,17 @@ class RemitoService {
       distinct: true
     });
 
+    // Calcular es_prestamo para cada remito basándose en sus artículos
+    const rowsConTipo = rows.map(remito => {
+      const tieneArticulosEnPrestamo = remito.detalles && remito.detalles.some(detalle => detalle.es_prestamo);
+      return {
+        ...remito.toJSON(),
+        es_prestamo: tieneArticulosEnPrestamo
+      };
+    });
+
     return {
-      rows,
+      rows: rowsConTipo,
       count,
       pagination: {
         page: parseInt(page),
@@ -596,6 +605,11 @@ class RemitoService {
     if (!remito) {
       throw new Error('El remito no existe');
     }
+
+    // Calcular si es préstamo basándose en los artículos del remito
+    // Un remito es "préstamo" si al menos uno de sus artículos es préstamo
+    const tieneArticulosEnPrestamo = remito.detalles && remito.detalles.some(detalle => detalle.es_prestamo);
+    remito.es_prestamo = tieneArticulosEnPrestamo;
 
     return remito;
   }
