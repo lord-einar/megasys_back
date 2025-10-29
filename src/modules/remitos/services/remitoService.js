@@ -6,6 +6,7 @@ const {
   HistorialMovimiento,
   Personal,
   Sede,
+  TipoArticulo,
   sequelize
 } = require('../../../models');
 const logger = require('../../../shared/utils/logger');
@@ -571,10 +572,16 @@ class RemitoService {
         {
           model: RemitoDetalle,
           as: 'detalles',
+          attributes: ['id', 'inventario_id', 'es_prestamo', 'fecha_devolucion_esperada', 'devuelto', 'fecha_devolucion_real', 'observaciones'],
           include: [{
             model: Inventario,
             as: 'inventarioDetalle',
-            attributes: ['id', 'marca', 'modelo', 'numero_serie', 'estado']
+            attributes: ['id', 'marca', 'modelo', 'numero_serie', 'estado', 'tipo_articulo_id'],
+            include: [{
+              model: TipoArticulo,
+              as: 'tipoArticulo',
+              attributes: ['id', 'nombre']
+            }]
           }]
         },
         {
