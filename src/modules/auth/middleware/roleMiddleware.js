@@ -108,8 +108,69 @@ const enrichUserWithRole = (req, res, next) => {
   }
 };
 
+/**
+ * Middleware para verificar que el usuario tiene un rol específico en base de datos
+ * Verifica contra la tabla Personal.rol_id
+ */
+const requireDatabaseRole = (roleName) => {
+  const { Personal, Rol } = require('../../../models');
+
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return error(res, 'Usuario no autenticado', 401);
+      }
+
+      // Buscar el usuario en base de datos por email
+      const personal = await Personal.findOne({
+        where: { email: req.user.email.toLowerCase(), activo: true },
+        include: [{
+          model: Rol,
+          as: 'rol',
+          attributes: ['id', 'nombre']
+        }]
+      });
+
+      if (!personal) {
+        logger.warn('Personal no encontrado para email:', {
+          email: req.user.email,
+          userId: req.user.id
+        });
+        return error(res, 'Usuario no registrado en el sistema', 404);
+      }
+
+      // Verificar si tiene el rol requerido
+      if (!personal.rol || personal.rol.nombre !== roleName) {
+        logger.warn('Acceso denegado por rol insuficiente en BD:', {
+          email: req.user.email,
+          rolRequerido: roleName,
+          rolActual: personal.rol?.nombre || 'ninguno'
+        });
+        return error(res, `Se requiere el rol "${roleName}" para acceder a este recurso`, 403);
+      }
+
+      // Agregar información al request
+      req.user.personalId = personal.id;
+      req.user.databaseRole = personal.rol.nombre;
+      req.user.personalData = personal;
+
+      logger.info('Acceso autorizado por rol de BD:', {
+        email: req.user.email,
+        rol: roleName,
+        personalId: personal.id
+      });
+
+      next();
+    } catch (err) {
+      logger.error('Error en middleware de rol de base de datos:', err);
+      return error(res, 'Error al verificar rol', 500);
+    }
+  };
+};
+
 module.exports = {
   requirePermission,
   requireRole,
-  enrichUserWithRole
+  enrichUserWithRole,
+  requireDatabaseRole
 };

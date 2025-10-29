@@ -2,6 +2,7 @@
 const { Personal, Sede, Rol, PersonalSede, Remito, sequelize } = require('../../../models');
 const logger = require('../../../shared/utils/logger');
 const { Op } = require('sequelize');
+const { assignSistemasRoleIfAuthorized } = require('../../../shared/utils/sistemasRoleAssignment');
 
 class PersonalService {
   /**
@@ -288,6 +289,7 @@ class PersonalService {
 
     try {
       // Crear persona dentro de la transacción
+      let personaRolId = rol_id;
       const persona = await Personal.create({
         nombre: nombre.trim(),
         apellido: apellido.trim(),
@@ -298,12 +300,36 @@ class PersonalService {
         activo: true
       }, { transaction: t });
 
+      // Asignar automáticamente rol "Sistemas" si el rol actual está autorizado
+      const rolAutorizado = await Rol.findByPk(rol_id);
+      if (rolAutorizado) {
+        const roleAssignmentResult = await assignSistemasRoleIfAuthorized(
+          persona.id,
+          rol_id,
+          t
+        );
+
+        if (roleAssignmentResult) {
+          // Refrescar el usuario para obtener el nuevo rol_id asignado
+          await persona.reload({ transaction: t });
+          personaRolId = persona.rol_id;
+
+          logger.info('Rol Sistemas asignado automáticamente al crear personal:', {
+            personalId: persona.id,
+            nombre: persona.nombre,
+            rolAnterior: rol_id,
+            rolNuevo: persona.rol_id
+          });
+        }
+      }
+
       // Crear asignaciones a sedes dentro de la MISMA transacción
+      // Usar el rol_id que fue asignado automáticamente (si aplica)
       for (const sedeId of sedes) {
         await PersonalSede.create({
           personal_id: persona.id,
           sede_id: sedeId,
-          rol_id,
+          rol_id: personaRolId,
           fecha_inicio: new Date(),
           activo: true
         }, { transaction: t });

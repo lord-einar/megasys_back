@@ -68,6 +68,7 @@ Rol.ROLES_DEFAULT = [
   { nombre: 'Gerente Comercial', descripcion: 'Gerente del área comercial', nivel_jerarquia: 8 },
   { nombre: 'Gerente de Servicio', descripcion: 'Gerente del área de servicio', nivel_jerarquia: 8 },
   { nombre: 'Supervisor', descripcion: 'Supervisor de área', nivel_jerarquia: 6 },
+  { nombre: 'Sistemas', descripcion: 'Técnico de sistemas - responsable de remitos', nivel_jerarquia: 5 },
   { nombre: 'Técnico Senior', descripcion: 'Técnico con experiencia', nivel_jerarquia: 4 },
   { nombre: 'Técnico', descripcion: 'Técnico estándar', nivel_jerarquia: 2 },
   { nombre: 'Empleado', descripcion: 'Empleado general', nivel_jerarquia: 1 }

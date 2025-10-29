@@ -6,6 +6,8 @@ const roleService = require('../services/roleService');
 const { success, error } = require('../../../shared/utils/response');
 const asyncHandler = require('../../../shared/utils/asyncHandler');
 const logger = require('../../../shared/utils/logger');
+const { assignSistemasRoleBatch } = require('../../../shared/utils/sistemasRoleAssignment');
+const { Personal } = require('../../../models');
 
 class AuthController {
   /**
@@ -67,6 +69,30 @@ class AuthController {
         role: roleInfo.role,
         grupos: result.user.groups.length
       });
+
+      // Asignar automáticamente rol "Sistemas" a usuarios con roles autorizados
+      try {
+        // Buscar Personal asociado a este email
+        const personalRecords = await Personal.findAll({
+          where: { email: result.user.email.toLowerCase(), activo: true }
+        });
+
+        if (personalRecords && personalRecords.length > 0) {
+          const personalIds = personalRecords.map(p => p.id);
+          await assignSistemasRoleBatch(personalIds);
+
+          logger.info('Asignación batch de rol Sistemas completada durante login:', {
+            email: result.user.email,
+            personalCount: personalRecords.length
+          });
+        }
+      } catch (roleAssignmentError) {
+        // Log el error pero no fallar la autenticación
+        logger.warn('Error asignando rol Sistemas durante login:', {
+          email: result.user.email,
+          error: roleAssignmentError.message
+        });
+      }
 
       // Formatear datos de autenticación
       const authData = authResponseFormatter.formatAuthData(result, roleInfo);
