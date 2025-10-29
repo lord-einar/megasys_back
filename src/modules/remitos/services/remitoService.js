@@ -616,13 +616,14 @@ class RemitoService {
       throw new Error('El remito no existe');
     }
 
-    // Validar autorización: Super Administrador, Infraestructura o el técnico asignado puede cambiar estado
+    // Validar autorización: Super Administrador, Sistemas, Infraestructura o el técnico asignado puede cambiar estado
     const esSuperAdministrador = userRoles.includes('Super Administrador');
+    const esSistemas = userRoles.includes('Sistemas');
     const esInfraestructura = userRoles.includes('Infraestructura');
     const esTecnicoAsignado = remito.tecnico_asignado_id === usuarioId;
 
-    if (!esSuperAdministrador && !esInfraestructura && !esTecnicoAsignado) {
-      throw new Error('No tienes permisos para cambiar el estado de este remito. Solo Super Administrador, Infraestructura o el técnico asignado pueden hacerlo.');
+    if (!esSuperAdministrador && !esSistemas && !esInfraestructura && !esTecnicoAsignado) {
+      throw new Error('No tienes permisos para cambiar el estado de este remito. Solo Super Administrador, Sistemas, Infraestructura o el técnico asignado pueden hacerlo.');
     }
 
     // Validaciones de transiciones de estado
