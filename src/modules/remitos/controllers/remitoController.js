@@ -24,11 +24,7 @@ class RemitoController {
 
       const remito = await remitoService.crear(datosNueva, usuarioEmail, { usuarioId });
 
-      return success(res, {
-        data: remito,
-        message: `Remito ${remito.numero_remito} creado exitosamente`,
-        statusCode: 201
-      });
+      return success(res, remito, `Remito ${remito.numero_remito} creado exitosamente`, 201);
     } catch (err) {
       // Extraer información de línea y función del stack trace
       const stackLines = err.stack?.split('\n') || [];
@@ -182,11 +178,7 @@ class RemitoController {
         usuarioEmail
       );
 
-      return success(res, {
-        data: remitoDevolucion,
-        message: `Remito de devolución ${remitoDevolucion.numero_remito} creado exitosamente`,
-        statusCode: 201
-      });
+      return success(res, remitoDevolucion, `Remito de devolución ${remitoDevolucion.numero_remito} creado exitosamente`, 201);
     } catch (err) {
       logger.error('Error generando remito de devolución:', err);
 
@@ -243,13 +235,6 @@ class RemitoController {
         order: [['created_at', 'DESC']],
         distinct: true,
         subQuery: false
-      });
-
-      logger.info('Articulos encontrados:', {
-        count,
-        rowsLength: rows.length,
-        whereClause,
-        firstArticulo: rows[0] || 'ninguno'
       });
 
       return success(res, {
