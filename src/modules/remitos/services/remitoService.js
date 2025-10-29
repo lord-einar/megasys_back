@@ -799,7 +799,7 @@ class RemitoService {
           },
           {
             model: Inventario,
-            as: 'inventario',
+            as: 'inventarioDetalle',
             attributes: ['id', 'marca', 'modelo', 'numero_serie', 'service_tag', 'estado']
           }
         ],
@@ -864,7 +864,7 @@ class RemitoService {
           },
           {
             model: Inventario,
-            as: 'inventario',
+            as: 'inventarioDetalle',
             attributes: ['id', 'marca', 'modelo', 'numero_serie', 'service_tag', 'estado']
           }
         ],
