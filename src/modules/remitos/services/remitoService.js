@@ -707,9 +707,12 @@ class RemitoService {
           devuelto: false
         }, { transaction: t });
 
-        // Actualizar ubicación: devolver a sede origen
+        // Actualizar ubicación y estado: devolver a sede origen y marcar como disponible
         await Inventario.update(
-          { sede_id: remitoOriginal.sede_origen_id },
+          {
+            sede_id: remitoOriginal.sede_origen_id,
+            estado: 'Disponible' // Revertir estado a disponible cuando se devuelve el artículo
+          },
           {
             where: { id: detalleOriginal.inventario_id },
             transaction: t
