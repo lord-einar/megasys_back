@@ -199,9 +199,9 @@ class RemitoController {
   }
 
   /**
-   * GET /remitos/:id/disponibles
+   * GET /remitos/articulos-disponibles
    * Listar artículos disponibles para agregar a un remito
-   * Filtra por tipo_articulo y sede
+   * Filtra por tipo_articulo_id y sede_id con paginación
    */
   async obtenerArticulosDisponibles(req, res) {
     try {
@@ -218,7 +218,7 @@ class RemitoController {
         limit
       });
 
-      const { Inventario } = require('../../../models');
+      const { Inventario, TipoArticulo } = require('../../../models');
       const offset = (parseInt(page) - 1) * parseInt(limit);
 
       const whereClause = {
@@ -232,7 +232,12 @@ class RemitoController {
 
       const { count, rows } = await Inventario.findAndCountAll({
         where: whereClause,
-        attributes: ['id', 'marca', 'modelo', 'numero_serie', 'estado', 'tipo_articulo_id'],
+        attributes: ['id', 'codigo', 'marca', 'modelo', 'numero_serie', 'estado', 'tipo_articulo_id'],
+        include: [{
+          model: TipoArticulo,
+          as: 'tipoArticulo',
+          attributes: ['id', 'nombre']
+        }],
         limit: parseInt(limit),
         offset,
         order: [['created_at', 'DESC']]
@@ -240,6 +245,7 @@ class RemitoController {
 
       return success(res, {
         data: rows,
+        total: count,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),

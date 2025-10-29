@@ -21,11 +21,12 @@ router.use(authenticate);
 router.get('/', remitoController.listar.bind(remitoController));
 
 /**
- * GET /remitos/:id/disponibles
+ * GET /remitos/articulos-disponibles
  * Obtener artículos disponibles para agregar a un remito
- * Filtra por tipo_articulo y sede
+ * Filtra por tipo_articulo_id, sede_id, con paginación (page, limit)
+ * Acceso: Todos los usuarios autenticados
  */
-router.get('/:id/disponibles', remitoController.obtenerArticulosDisponibles.bind(remitoController));
+router.get('/articulos-disponibles', remitoController.obtenerArticulosDisponibles.bind(remitoController));
 
 /**
  * POST /remitos
