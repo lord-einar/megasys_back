@@ -1,5 +1,5 @@
 // src/models/RemitoDetalle.js
-const { DataTypes } = require('sequelize');
+const { DataTypes, Op, Sequelize } = require('sequelize');
 const { sequelize } = require('../shared/utils/database');
 const { v4: uuidv4 } = require('uuid');
 
@@ -84,7 +84,7 @@ const RemitoDetalle = sequelize.define('RemitoDetalle', {
         es_prestamo: true,
         devuelto: false,
         fecha_devolucion: {
-          [sequelize.Sequelize.Op.lte]: sequelize.sequelize.literal('CURRENT_DATE')
+          [Op.lte]: Sequelize.literal('CURRENT_DATE')
         }
       }
     },
@@ -93,9 +93,9 @@ const RemitoDetalle = sequelize.define('RemitoDetalle', {
         es_prestamo: true,
         devuelto: false,
         fecha_devolucion: {
-          [sequelize.Sequelize.Op.between]: [
-            sequelize.sequelize.literal('CURRENT_DATE'),
-            sequelize.sequelize.literal(`CURRENT_DATE + INTERVAL '${dias} days'`)
+          [Op.between]: [
+            Sequelize.literal('CURRENT_DATE'),
+            Sequelize.literal(`CURRENT_DATE + INTERVAL '${dias} days'`)
           ]
         }
       }

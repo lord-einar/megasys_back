@@ -229,11 +229,11 @@ Remito.belongsTo(Personal, {
 
 // Personal técnico asignado
 Personal.hasMany(Remito, {
-  foreignKey: 'tecnico_asignado_id',
+  foreignKey: 'tecnico_id',
   as: 'remitosAsignados'
 });
 Remito.belongsTo(Personal, {
-  foreignKey: 'tecnico_asignado_id',
+  foreignKey: 'tecnico_id',
   as: 'tecnicoAsignado'
 });
 
@@ -333,20 +333,20 @@ RemitoDetalle.addHook('afterCreate', async (remitoDetalle, options) => {
   }
 });
 
-// Hook para actualizar ubicación del inventario cuando se confirma remito
+// Hook para actualizar ubicación del inventario cuando se entrega remito
 Remito.addHook('afterUpdate', async (remito, options) => {
-  if (remito.changed('estado') && remito.estado === 'confirmado') {
+  if (remito.changed('estado') && remito.estado === 'entregado') {
     try {
       // Obtener todos los detalles del remito
       const detalles = await RemitoDetalle.findAll({
         where: { remito_id: remito.id },
-        include: ['inventario']
+        include: ['inventarioDetalle']
       });
 
       // Actualizar la sede de cada item de inventario (solo si no es préstamo)
       for (const detalle of detalles) {
         if (!detalle.es_prestamo) {
-          await detalle.inventario.update({
+          await detalle.inventarioDetalle.update({
             sede_id: remito.sede_destino_id
           }, { transaction: options.transaction });
         }
