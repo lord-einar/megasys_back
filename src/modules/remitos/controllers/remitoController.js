@@ -86,10 +86,7 @@ class RemitoController {
 
       const remito = await remitoService.obtener(id);
 
-      return success(res, {
-        data: remito,
-        message: 'Remito obtenido correctamente'
-      });
+      return success(res, remito, 'Remito obtenido correctamente');
     } catch (err) {
       logger.error('Error obteniendo remito:', err);
 
