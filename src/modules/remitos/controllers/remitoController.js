@@ -107,17 +107,37 @@ class RemitoController {
     try {
       const { id } = req.params;
       const { estado } = req.body;
-      const usuarioId = req.user.personalId;
-      const userRoles = req.user.roles || [];
+      const { Personal, Rol } = require('../../../models');
 
       if (!estado) {
         return error(res, 'El nuevo estado es requerido', 400);
       }
 
+      // Buscar el usuario en la base de datos para obtener su rol
+      const personal = await Personal.findOne({
+        where: { email: req.user.email.toLowerCase(), activo: true },
+        include: [{
+          model: Rol,
+          as: 'rol',
+          attributes: ['nombre']
+        }]
+      });
+
+      if (!personal) {
+        logger.warn('Personal no encontrado para cambio de estado:', {
+          email: req.user.email
+        });
+        return error(res, 'Usuario no registrado en el sistema', 404);
+      }
+
+      const usuarioId = personal.id;
+      const userRoles = personal.rol ? [personal.rol.nombre] : [];
+
       logger.info('Cambiando estado de remito:', {
         remitoId: id,
         nuevoEstado: estado,
         usuarioId,
+        email: req.user.email,
         roles: userRoles
       });
 
