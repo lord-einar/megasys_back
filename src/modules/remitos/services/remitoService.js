@@ -12,6 +12,9 @@ const {
 const logger = require('../../../shared/utils/logger');
 const { Op, Sequelize } = require('sequelize');
 const AuditService = require('../../../shared/services/auditService');
+const pdfService = require('../../../shared/services/pdfService');
+const emailService = require('../../../shared/services/emailService');
+const tokenService = require('../../../shared/services/tokenService');
 
 class RemitoService {
   /**
@@ -416,6 +419,105 @@ class RemitoService {
         articulos: articulos.length
       });
 
+      // Obtener remito completo con relaciones para PDF y email
+      const remitoCompleto = await this.obtener(remito.id);
+
+      // Generar PDF del remito (asincrónico, no bloquea la respuesta)
+      try {
+        logger.info('=== GENERACIÓN DE PDF - INICIANDO ===', {
+          remitoId: remito.id,
+          numeroRemito: remitoCompleto.numero_remito,
+          timestamp: new Date().toISOString()
+        });
+
+        const resultadoPDF = await pdfService.generarPDF(remitoCompleto, { confirmado: false });
+
+        logger.info('✓ PDF DEL REMITO GENERADO EXITOSAMENTE', {
+          remitoId: remito.id,
+          numeroRemito: remitoCompleto.numero_remito,
+          rutaPDF: resultadoPDF.path,
+          tamaño: resultadoPDF.size,
+          timestamp: new Date().toISOString()
+        });
+
+        // Enviar emails SOLO cuando el estado es "en_transito" (asincrónico, en background)
+        // Los emails se enviarán cuando el estado cambie a "en_transito" via cambiarEstado()
+        if (remito.estado === 'en_transito') {
+        setImmediate(async () => {
+          try {
+            logger.info('=== ENVÍO DE EMAILS - INICIANDO ===', {
+              remitoId: remito.id,
+              numeroRemito: remitoCompleto.numero_remito,
+              timestamp: new Date().toISOString()
+            });
+
+            // Email a infraestructura
+            logger.info('📧 Enviando email a infraestructura...', {
+              remitoId: remito.id,
+              numeroRemito: remitoCompleto.numero_remito,
+              destinatario: 'infraestructura@megatlon.com.ar'
+            });
+            await emailService.enviarAInfraestructura(remitoCompleto, resultadoPDF.path);
+            logger.info('✓ EMAIL A INFRAESTRUCTURA ENVIADO', {
+              remitoId: remito.id,
+              numeroRemito: remitoCompleto.numero_remito,
+              destinatario: 'infraestructura@megatlon.com.ar',
+              timestamp: new Date().toISOString()
+            });
+
+            // Email al solicitante con link de confirmación
+            logger.info('📧 Enviando email al solicitante...', {
+              remitoId: remito.id,
+              numeroRemito: remitoCompleto.numero_remito,
+              destinatario: remitoCompleto.solicitante?.email
+            });
+            const urlConfirmacion = tokenService.generarUrlConfirmacion(
+              remitoCompleto.id,
+              remitoCompleto.solicitante?.email,
+              process.env.FRONTEND_URL || 'http://localhost:3000'
+            );
+            await emailService.enviarAlSolicitante(remitoCompleto, resultadoPDF.path, urlConfirmacion);
+            logger.info('✓ EMAIL AL SOLICITANTE ENVIADO', {
+              remitoId: remito.id,
+              numeroRemito: remitoCompleto.numero_remito,
+              destinatario: remitoCompleto.solicitante?.email,
+              timestamp: new Date().toISOString()
+            });
+
+            logger.info('=== ENVÍO DE EMAILS - COMPLETADO EXITOSAMENTE ===', {
+              remitoId: remito.id,
+              numeroRemito: remitoCompleto.numero_remito,
+              timestamp: new Date().toISOString()
+            });
+          } catch (emailError) {
+            logger.error('✗ ERROR ENVIANDO EMAILS', {
+              remitoId: remito.id,
+              numeroRemito: remitoCompleto.numero_remito,
+              error: emailError.message,
+              stack: emailError.stack,
+              timestamp: new Date().toISOString()
+            });
+            // No lanzar el error para no afectar la creación del remito
+          }
+        });
+        } else {
+          logger.info('⏭️ Envío de emails será realizado cuando el estado cambie a "en_transito"', {
+            remitoId: remito.id,
+            numeroRemito: remitoCompleto.numero_remito,
+            estadoActual: remito.estado
+          });
+        }
+      } catch (pdfError) {
+        logger.error('✗ ERROR GENERANDO PDF', {
+          remitoId: remito.id,
+          numeroRemito: remitoCompleto.numero_remito,
+          error: pdfError.message,
+          stack: pdfError.stack,
+          timestamp: new Date().toISOString()
+        });
+        // No lanzar el error para no afectar la creación del remito
+      }
+
       return remito;
     } catch (error) {
       // Rollback automático si usamos transacción local
@@ -700,6 +802,88 @@ class RemitoService {
       });
     }
 
+    // Enviar emails cuando el estado cambia a "en_transito"
+    if (nuevoEstado === 'en_transito' && estadoAnterior === 'preparado') {
+      setImmediate(async () => {
+        try {
+          logger.info('=== ENVÍO DE EMAILS EN ESTADO "EN_TRANSITO" - INICIANDO ===', {
+            remitoId,
+            numeroRemito: remito.numero_remito,
+            estadoAnterior,
+            estadoNuevo: nuevoEstado,
+            timestamp: new Date().toISOString()
+          });
+
+          // Obtener remito completo con relaciones
+          const remitoCompleto = await this.obtener(remitoId);
+
+          // Obtener o regenerar PDF
+          const nombreArchivo = pdfService.generarNombreArchivo(remito.numero_remito, false);
+          const rutaArchivo = pdfService.obtenerRutaArchivo(nombreArchivo, false);
+
+          const fs = require('fs');
+          let rutaPDFParaEmail = rutaArchivo;
+
+          if (!fs.existsSync(rutaArchivo)) {
+            logger.warn('⚠️ PDF no encontrado, regenerando para envío de emails...', { rutaArchivo });
+            const remitoJSON = remitoCompleto.toJSON();
+            remitoJSON.es_prestamo = remitoCompleto.detalles && remitoCompleto.detalles.some(d => d.es_prestamo);
+            const resultadoPDF = await pdfService.generarPDF(remitoJSON, { confirmado: false });
+            rutaPDFParaEmail = resultadoPDF.path;
+            logger.info('✓ PDF regenerado para envío', {
+              rutaPDF: resultadoPDF.path,
+              tamaño: resultadoPDF.size
+            });
+          }
+
+          // Enviar email a infraestructura
+          logger.info('📧 Enviando email a infraestructura...', {
+            remitoId,
+            numeroRemito: remito.numero_remito
+          });
+          await emailService.enviarAInfraestructura(remitoCompleto, rutaPDFParaEmail);
+          logger.info('✓ EMAIL A INFRAESTRUCTURA ENVIADO', {
+            remitoId,
+            numeroRemito: remito.numero_remito,
+            timestamp: new Date().toISOString()
+          });
+
+          // Enviar email al solicitante con link de confirmación
+          logger.info('📧 Enviando email al solicitante...', {
+            remitoId,
+            numeroRemito: remito.numero_remito,
+            emailSolicitante: remitoCompleto.solicitante?.email
+          });
+          const urlConfirmacion = tokenService.generarUrlConfirmacion(
+            remitoCompleto.id,
+            remitoCompleto.solicitante?.email,
+            process.env.FRONTEND_URL || 'http://localhost:3000'
+          );
+          await emailService.enviarAlSolicitante(remitoCompleto, rutaPDFParaEmail, urlConfirmacion);
+          logger.info('✓ EMAIL AL SOLICITANTE ENVIADO', {
+            remitoId,
+            numeroRemito: remito.numero_remito,
+            emailSolicitante: remitoCompleto.solicitante?.email,
+            timestamp: new Date().toISOString()
+          });
+
+          logger.info('=== ENVÍO DE EMAILS EN ESTADO "EN_TRANSITO" - COMPLETADO EXITOSAMENTE ===', {
+            remitoId,
+            numeroRemito: remito.numero_remito,
+            timestamp: new Date().toISOString()
+          });
+        } catch (emailError) {
+          logger.error('✗ ERROR ENVIANDO EMAILS EN ESTADO "EN_TRANSITO"', {
+            remitoId,
+            numeroRemito: remito.numero_remito,
+            error: emailError.message,
+            stack: emailError.stack,
+            timestamp: new Date().toISOString()
+          });
+        }
+      });
+    }
+
     return remitoActualizado;
   }
 
@@ -970,6 +1154,331 @@ class RemitoService {
       return resumen;
     } catch (error) {
       logger.error('Error obteniendo resumen de préstamos:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Confirmar recepción de un remito mediante token JWT
+   * @param {number} remitoId - ID del remito
+   * @param {string} token - Token JWT de confirmación
+   * @returns {Promise<object>} Remito actualizado con estado COMPLETADO
+   */
+  async confirmarRecepcion(remitoId, token) {
+    const t = await sequelize.transaction();
+
+    try {
+      logger.info('Iniciando confirmación de recepción:', { remitoId });
+
+      // 1. Validar token JWT
+      let tokenPayload;
+      try {
+        tokenPayload = tokenService.validarTokenConfirmacion(token);
+      } catch (tokenError) {
+        throw new Error(`Token de confirmación ${tokenError.message}`);
+      }
+
+      // 2. Validar que el remitoId del token coincide
+      if (parseInt(tokenPayload.remitoId) !== parseInt(remitoId)) {
+        throw new Error('El token no corresponde a este remito');
+      }
+
+      logger.info('Token validado correctamente:', {
+        remitoId: tokenPayload.remitoId,
+        email: tokenPayload.email
+      });
+
+      // 3. Obtener remito
+      const remito = await Remito.findByPk(remitoId, {
+        include: [
+          {
+            model: Personal,
+            as: 'solicitante',
+            attributes: ['id', 'nombre', 'apellido', 'email']
+          },
+          {
+            model: Sede,
+            as: 'sedeOrigen',
+            attributes: ['id', 'nombre_sede']
+          },
+          {
+            model: Sede,
+            as: 'sedeDestino',
+            attributes: ['id', 'nombre_sede']
+          },
+          {
+            model: RemitoDetalle,
+            as: 'detalles',
+            include: [{
+              model: Inventario,
+              as: 'inventarioDetalle',
+              attributes: ['id', 'numero_serie', 'marca', 'modelo', 'tipo_articulo_id'],
+              include: [{
+                model: TipoArticulo,
+                as: 'tipoArticulo',
+                attributes: ['id', 'nombre']
+              }]
+            }]
+          }
+        ]
+      });
+
+      if (!remito) {
+        throw new Error('El remito no existe');
+      }
+
+      // 4. Verificar que el remito no esté ya confirmado
+      if (remito.estado === 'completado') {
+        throw new Error('Este remito ya fue confirmado previamente');
+      }
+
+      logger.info('Remito encontrado:', {
+        numeroRemito: remito.numero_remito,
+        estadoActual: remito.estado
+      });
+
+      // 5. Generar PDF con watermark de confirmación
+      const fechaConfirmacion = new Date();
+      const remitoCompleto = remito.toJSON();
+      remitoCompleto.es_prestamo = remito.detalles && remito.detalles.some(d => d.es_prestamo);
+
+      const resultadoPDFConfirmado = await pdfService.generarPDF(
+        remitoCompleto,
+        {
+          confirmado: true,
+          fechaConfirmacion: fechaConfirmacion
+        }
+      );
+
+      logger.info('PDF confirmado generado:', {
+        rutaPDF: resultadoPDFConfirmado.path
+      });
+
+      // 6. Actualizar estado del remito a COMPLETADO
+      remito.estado = 'completado';
+      await remito.save({ transaction: t });
+
+      logger.info('Estado del remito actualizado a COMPLETADO:', {
+        numeroRemito: remito.numero_remito
+      });
+
+      // 7. Registrar en audit log
+      AuditService.registrarAccion({
+        usuario_email: tokenPayload.email || 'confirmacion_automatica@sistema.com',
+        usuario_id: null,
+        modulo: 'remitos',
+        accion: 'confirmar_recepcion',
+        recurso: 'Remito',
+        recurso_id: remitoId,
+        descripcion: `Confirmación de recepción del remito ${remito.numero_remito}`,
+        valores_anteriores: { estado: 'preparado' },
+        valores_nuevos: { estado: 'completado' },
+        ip_address: 'token-confirmation',
+        resultado: 'exitoso'
+      });
+
+      // 8. Commit transacción
+      await t.commit();
+
+      logger.info('Confirmación de recepción completada exitosamente:', {
+        numeroRemito: remito.numero_remito,
+        fechaConfirmacion
+      });
+
+      // 9. Enviar email de confirmación (asincrónico, en background)
+      setImmediate(async () => {
+        try {
+          await emailService.enviarConfirmacionRecepcion(
+            remitoCompleto,
+            resultadoPDFConfirmado.path,
+            tokenPayload.email,
+            fechaConfirmacion
+          );
+          logger.info('Email de confirmación enviado');
+        } catch (emailError) {
+          logger.error('Error enviando email de confirmación:', {
+            error: emailError.message,
+            numeroRemito: remito.numero_remito
+          });
+        }
+      });
+
+      return {
+        success: true,
+        numeroRemito: remito.numero_remito,
+        estado: 'completado',
+        fechaConfirmacion: fechaConfirmacion.toLocaleString('es-AR'),
+        pdfConfirmado: resultadoPDFConfirmado.path
+      };
+    } catch (error) {
+      await t.rollback();
+
+      logger.error('Error confirmando recepción del remito:', {
+        error: error.message,
+        remitoId,
+        stack: error.stack
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Reenviar emails del remito (a infraestructura y solicitante)
+   * @param {number} remitoId - ID del remito
+   * @returns {Promise<object>} Resultado del reenvío
+   */
+  async reenviarEmails(remitoId) {
+    try {
+      logger.info('=== REENVÍO DE EMAILS - INICIANDO ===', { remitoId });
+
+      // 1. Obtener remito con relaciones
+      const remito = await Remito.findByPk(remitoId, {
+        include: [
+          {
+            model: Personal,
+            as: 'solicitante',
+            attributes: ['id', 'nombre', 'apellido', 'email']
+          },
+          {
+            model: Sede,
+            as: 'sedeOrigen',
+            attributes: ['id', 'nombre_sede']
+          },
+          {
+            model: Sede,
+            as: 'sedeDestino',
+            attributes: ['id', 'nombre_sede']
+          },
+          {
+            model: RemitoDetalle,
+            as: 'detalles',
+            include: [{
+              model: Inventario,
+              as: 'inventarioDetalle',
+              attributes: ['id', 'numero_serie', 'marca', 'modelo', 'tipo_articulo_id'],
+              include: [{
+                model: TipoArticulo,
+                as: 'tipoArticulo',
+                attributes: ['id', 'nombre']
+              }]
+            }]
+          }
+        ]
+      });
+
+      if (!remito) {
+        throw new Error('El remito no existe');
+      }
+
+      logger.info('✓ Remito encontrado', {
+        remitoId,
+        numeroRemito: remito.numero_remito,
+        solicitante: remito.solicitante?.email,
+        estado: remito.estado
+      });
+
+      // 2. Verificar si el PDF existe
+      const nombreArchivo = pdfService.generarNombreArchivo(remito.numero_remito, false);
+      const rutaArchivo = pdfService.obtenerRutaArchivo(nombreArchivo, false);
+
+      const fs = require('fs');
+      if (!fs.existsSync(rutaArchivo)) {
+        logger.warn('⚠ PDF no encontrado, regenerando...', { rutaArchivo });
+        // Regenerar PDF
+        const remitoCompleto = remito.toJSON();
+        remitoCompleto.es_prestamo = remito.detalles && remito.detalles.some(d => d.es_prestamo);
+        const resultadoPDF = await pdfService.generarPDF(remitoCompleto, { confirmado: false });
+        logger.info('✓ PDF regenerado exitosamente', {
+          remitoId,
+          rutaPDF: resultadoPDF.path,
+          tamaño: resultadoPDF.size
+        });
+        rutaArchivo = resultadoPDF.path;
+      } else {
+        logger.info('✓ PDF encontrado', {
+          remitoId,
+          rutaPDF: rutaArchivo,
+          tamaño: fs.statSync(rutaArchivo).size
+        });
+      }
+
+      const remitoCompleto = remito.toJSON();
+      remitoCompleto.es_prestamo = remito.detalles && remito.detalles.some(d => d.es_prestamo);
+
+      // 3. Reenviar email a infraestructura
+      try {
+        logger.info('📧 Enviando email a infraestructura...', {
+          remitoId,
+          numeroRemito: remito.numero_remito
+        });
+        await emailService.enviarAInfraestructura(remitoCompleto, rutaArchivo);
+        logger.info('✓ Email a infraestructura enviado exitosamente', {
+          remitoId,
+          numeroRemito: remito.numero_remito,
+          timestamp: new Date().toISOString()
+        });
+      } catch (emailError) {
+        logger.error('✗ Error enviando email a infraestructura', {
+          remitoId,
+          numeroRemito: remito.numero_remito,
+          error: emailError.message,
+          timestamp: new Date().toISOString()
+        });
+        throw new Error(`Error enviando email a infraestructura: ${emailError.message}`);
+      }
+
+      // 4. Reenviar email al solicitante con link de confirmación
+      try {
+        logger.info('📧 Enviando email al solicitante...', {
+          remitoId,
+          numeroRemito: remito.numero_remito,
+          emailSolicitante: remito.solicitante?.email
+        });
+        const urlConfirmacion = tokenService.generarUrlConfirmacion(
+          remitoCompleto.id,
+          remitoCompleto.solicitante?.email,
+          process.env.FRONTEND_URL || 'http://localhost:3000'
+        );
+        await emailService.enviarAlSolicitante(remitoCompleto, rutaArchivo, urlConfirmacion);
+        logger.info('✓ Email al solicitante enviado exitosamente', {
+          remitoId,
+          numeroRemito: remito.numero_remito,
+          emailSolicitante: remito.solicitante?.email,
+          timestamp: new Date().toISOString()
+        });
+      } catch (emailError) {
+        logger.error('✗ Error enviando email al solicitante', {
+          remitoId,
+          numeroRemito: remito.numero_remito,
+          emailSolicitante: remito.solicitante?.email,
+          error: emailError.message,
+          timestamp: new Date().toISOString()
+        });
+        throw new Error(`Error enviando email al solicitante: ${emailError.message}`);
+      }
+
+      logger.info('=== REENVÍO DE EMAILS - COMPLETADO EXITOSAMENTE ===', {
+        remitoId,
+        numeroRemito: remito.numero_remito,
+        timestamp: new Date().toISOString()
+      });
+
+      return {
+        success: true,
+        numeroRemito: remito.numero_remito,
+        emailInfraestructura: 'infraestructura@megatlon.com.ar',
+        emailSolicitante: remito.solicitante?.email,
+        timestamp: new Date().toISOString(),
+        mensaje: 'Emails reenviados exitosamente'
+      };
+    } catch (error) {
+      logger.error('=== REENVÍO DE EMAILS - ERROR ===', {
+        error: error.message,
+        remitoId,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      });
       throw error;
     }
   }
