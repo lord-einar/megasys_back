@@ -407,6 +407,9 @@ class EmailService {
         to: EMAIL_INFRAESTRUCTURA,
         subject: `Nuevo remito creado - ${remito.numero_remito}`,
         html: html,
+        headers: {
+          'Content-Type': 'text/html; charset=UTF-8'
+        },
         attachments: [
           {
             filename: require('path').basename(rutaPDF),
@@ -459,6 +462,9 @@ class EmailService {
         to: emailSolicitante,
         subject: `Su remito ha sido registrado - ${remito.numero_remito}`,
         html: html,
+        headers: {
+          'Content-Type': 'text/html; charset=UTF-8'
+        },
         attachments: [
           {
             filename: require('path').basename(rutaPDF),
@@ -507,6 +513,9 @@ class EmailService {
         to: email,
         subject: `Confirmaci�n de recepci�n - ${remito.numero_remito}`,
         html: html,
+        headers: {
+          'Content-Type': 'text/html; charset=UTF-8'
+        },
         attachments: [
           {
             filename: require('path').basename(rutaPDFConfirmado),
