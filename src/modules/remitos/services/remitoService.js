@@ -1197,6 +1197,11 @@ class RemitoService {
             attributes: ['id', 'nombre', 'apellido', 'email']
           },
           {
+            model: Personal,
+            as: 'tecnicoAsignado',
+            attributes: ['id', 'nombre', 'apellido', 'email']
+          },
+          {
             model: Sede,
             as: 'sedeOrigen',
             attributes: ['id', 'nombre_sede']
