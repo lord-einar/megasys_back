@@ -6,6 +6,32 @@ const remitoController = require('../controllers/remitoController');
 
 const router = express.Router();
 
+// =====================================================
+// RUTAS PÚBLICAS (Sin autenticación)
+// =====================================================
+
+/**
+ * GET /remitos/:id/confirmar-recepcion
+ * Confirmar recepción del remito mediante token JWT (vía GET para enlaces en emails)
+ * No requiere autenticación - usa token JWT como parámetro
+ * Query: ?token=JWT_TOKEN
+ */
+router.get(
+  '/:id/confirmar-recepcion',
+  remitoController.confirmarRecepcion.bind(remitoController)
+);
+
+/**
+ * POST /remitos/:id/confirmar-recepcion
+ * Confirmar recepción del remito mediante token JWT (POST para programmatic access)
+ * No requiere autenticación - usa token JWT como parámetro
+ * Query: ?token=JWT_TOKEN
+ */
+router.post(
+  '/:id/confirmar-recepcion',
+  remitoController.confirmarRecepcion.bind(remitoController)
+);
+
 // Todas las rutas de remitos requieren autenticación
 router.use(authenticate);
 
@@ -98,6 +124,17 @@ router.post(
   '/:id/devolver',
   requireDatabaseRole('Infraestructura'),
   remitoController.generarDevolucion.bind(remitoController)
+);
+
+/**
+ * POST /remitos/:id/reenviar-emails
+ * Reenviar emails del remito (a infraestructura y solicitante)
+ * Requiere: Autenticación
+ * Util para reenviar emails en caso de que no se hayan entregado correctamente
+ */
+router.post(
+  '/:id/reenviar-emails',
+  remitoController.reenviarEmails.bind(remitoController)
 );
 
 module.exports = router;

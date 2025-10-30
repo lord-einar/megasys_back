@@ -1250,24 +1250,37 @@ class RemitoService {
       logger.info('=== GENERACIÓN DE PDF CONFIRMADO - INICIANDO ===', {
         remitoId,
         numeroRemito: remito.numero_remito,
+        solicitante: remito.solicitante?.nombre,
+        tecnico: remito.tecnicoAsignado?.nombre,
         timestamp: new Date().toISOString()
       });
 
-      const resultadoPDFConfirmado = await pdfService.generarPDF(
-        remitoCompleto,
-        {
-          confirmado: true,
-          fechaConfirmacion: fechaConfirmacion
-        }
-      );
+      try {
+        const resultadoPDFConfirmado = await pdfService.generarPDF(
+          remitoCompleto,
+          {
+            confirmado: true,
+            fechaConfirmacion: fechaConfirmacion
+          }
+        );
 
-      logger.info('✓ PDF CONFIRMADO GENERADO EXITOSAMENTE', {
-        remitoId,
-        numeroRemito: remito.numero_remito,
-        rutaPDF: resultadoPDFConfirmado.path,
-        tamaño: resultadoPDFConfirmado.size,
-        timestamp: new Date().toISOString()
-      });
+        logger.info('✓ PDF CONFIRMADO GENERADO EXITOSAMENTE', {
+          remitoId,
+          numeroRemito: remito.numero_remito,
+          rutaPDF: resultadoPDFConfirmado.path,
+          tamaño: resultadoPDFConfirmado.size,
+          timestamp: new Date().toISOString()
+        });
+      } catch (pdfError) {
+        logger.error('✗ ERROR GENERANDO PDF CONFIRMADO', {
+          remitoId,
+          numeroRemito: remito.numero_remito,
+          error: pdfError.message,
+          stack: pdfError.stack,
+          timestamp: new Date().toISOString()
+        });
+        throw new Error(`Error generando PDF de confirmación: ${pdfError.message}`);
+      }
 
       // 6. Actualizar estado del remito a COMPLETADO
       remito.estado = 'completado';
