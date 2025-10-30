@@ -374,6 +374,93 @@ class RemitoController {
       return error(res, 'Error al obtener resumen de préstamos', 500);
     }
   }
+
+  /**
+   * POST /remitos/:id/confirmar-recepcion
+   * Confirmar recepción del remito con token JWT
+   * El usuario puede acceder sin autenticación usando un token válido
+   */
+  async confirmarRecepcion(req, res) {
+    try {
+      const { id } = req.params;
+      const { token } = req.query;
+
+      logger.info('Iniciando confirmación de recepción de remito:', {
+        remitoId: id,
+        tokenPresent: !!token
+      });
+
+      if (!token) {
+        return error(res, 'Token de confirmación requerido', 400);
+      }
+
+      const resultado = await remitoService.confirmarRecepcion(id, token);
+
+      return success(res, resultado, 'Recepción confirmada exitosamente');
+    } catch (err) {
+      logger.error('Error confirmando recepción de remito:', {
+        error: err.message,
+        remitoId: req.params.id
+      });
+
+      if (err.message.includes('Token') || err.message.includes('expirado') || err.message.includes('inválido')) {
+        return error(res, err.message, 401);
+      }
+
+      if (err.message === 'El remito no existe') {
+        return error(res, err.message, 404);
+      }
+
+      if (err.message.includes('ya fue confirmado')) {
+        return error(res, err.message, 409);
+      }
+
+      return error(res, err.message || 'Error al confirmar recepción', 500);
+    }
+  }
+
+  /**
+   * POST /remitos/:id/reenviar-emails
+   * Reenviar emails del remito (a infraestructura y solicitante)
+   * Requiere autenticación
+   */
+  async reenviarEmails(req, res) {
+    try {
+      const { id } = req.params;
+      const usuarioEmail = req.user?.email || 'usuario-desconocido@sistema.com';
+
+      logger.info('Iniciando reenvío de emails de remito:', {
+        remitoId: id,
+        usuario: usuarioEmail
+      });
+
+      const resultado = await remitoService.reenviarEmails(id);
+
+      logger.info('Reenvío de emails completado exitosamente:', {
+        remitoId: id,
+        usuario: usuarioEmail,
+        resultado
+      });
+
+      return success(res, resultado, 'Emails reenviados exitosamente');
+    } catch (err) {
+      logger.error('Error reenviando emails del remito:', {
+        error: err.message,
+        remitoId: req.params.id,
+        usuario: req.user?.email || 'desconocido'
+      });
+
+      if (err.message === 'El remito no existe') {
+        return error(res, err.message, 404);
+      }
+
+      if (err.message.includes('Email')) {
+        return error(res, err.message, 500);
+      }
+
+      return error(res, err.message || 'Error al reenviar emails', 500);
+    }
+  }
 }
 
 module.exports = new RemitoController();
