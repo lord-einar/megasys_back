@@ -57,6 +57,26 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Servir archivos estáticos (PDFs generados)
+const storageRemitosPath = path.join(__dirname, '..', 'storage', 'remitos');
+const storageConfirmacionesPath = path.join(__dirname, '..', 'storage', 'confirmaciones');
+
+// Asegurar que los directorios existan
+[storageRemitosPath, storageConfirmacionesPath].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+    logger.info(`Directorio de almacenamiento creado: ${dir}`);
+  }
+});
+
+// Servir PDFs de remitos
+app.use('/storage/remitos', express.static(storageRemitosPath));
+
+// Servir PDFs de confirmaciones
+app.use('/storage/confirmaciones', express.static(storageConfirmacionesPath));
+
+logger.info('✅ Almacenamiento de archivos estáticos configurado');
+
 // Función para cargar rutas de forma segura
 const loadRoutes = (routePath, mountPath) => {
   try {
