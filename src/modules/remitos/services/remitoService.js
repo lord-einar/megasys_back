@@ -1242,6 +1242,12 @@ class RemitoService {
       const remitoCompleto = remito.toJSON();
       remitoCompleto.es_prestamo = remito.detalles && remito.detalles.some(d => d.es_prestamo);
 
+      logger.info('=== GENERACIÓN DE PDF CONFIRMADO - INICIANDO ===', {
+        remitoId,
+        numeroRemito: remito.numero_remito,
+        timestamp: new Date().toISOString()
+      });
+
       const resultadoPDFConfirmado = await pdfService.generarPDF(
         remitoCompleto,
         {
@@ -1250,8 +1256,12 @@ class RemitoService {
         }
       );
 
-      logger.info('PDF confirmado generado:', {
-        rutaPDF: resultadoPDFConfirmado.path
+      logger.info('✓ PDF CONFIRMADO GENERADO EXITOSAMENTE', {
+        remitoId,
+        numeroRemito: remito.numero_remito,
+        rutaPDF: resultadoPDFConfirmado.path,
+        tamaño: resultadoPDFConfirmado.size,
+        timestamp: new Date().toISOString()
       });
 
       // 6. Actualizar estado del remito a COMPLETADO
