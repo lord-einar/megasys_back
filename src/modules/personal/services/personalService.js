@@ -706,24 +706,44 @@ class PersonalService {
 
     // Buscar el rol correspondiente en la BD
     if (rolNombre) {
-      const rol = await Rol.findOne({
+      // Primero intentar búsqueda exacta case-sensitive
+      let rol = await Rol.findOne({
         where: {
           nombre: rolNombre,
           activo: true
         }
       });
 
+      // Si no encuentra, intentar búsqueda case-insensitive
+      if (!rol) {
+        const { Op } = require('sequelize');
+        rol = await Rol.findOne({
+          where: {
+            [Op.and]: [
+              sequelize.where(
+                sequelize.fn('LOWER', sequelize.col('nombre')),
+                Op.eq,
+                rolNombre.toLowerCase()
+              ),
+              { activo: true }
+            ]
+          }
+        });
+      }
+
       if (rol) {
         rolId = rol.id;
         logger.info('Rol encontrado para auto-provisioning:', {
           rolNombre,
-          rolId
+          rolId,
+          nombreEnBD: rol.nombre
         });
       } else {
-        logger.warn('Rol no encontrado en la BD:', {
+        logger.warn('Rol no encontrado en la BD (ni case-sensitive ni case-insensitive):', {
           rolNombre,
           role
         });
+        // TODO: Crear rol automáticamente si no existe
       }
     }
 
@@ -740,24 +760,27 @@ class PersonalService {
         email,
         personalId: personalInactivo.id,
         rolAnterior: personalInactivo.rol_id,
-        rolNuevo: rolId || 'Sin rol'
+        rolNuevo: rolId || 'Manteniendo rol anterior'
       });
 
       const transaction = await sequelize.transaction();
       try {
-        await personalInactivo.update(
-          {
-            activo: true,
-            rol_id: rolId
-          },
-          { transaction }
-        );
+        // Si encontramos un rol, actualizar; si no, mantener el anterior
+        const updateData = {
+          activo: true
+        };
+
+        if (rolId) {
+          updateData.rol_id = rolId;
+        }
+
+        await personalInactivo.update(updateData, { transaction });
         await transaction.commit();
 
         logger.info('Personal reactivado exitosamente:', {
           email,
           personalId: personalInactivo.id,
-          rolAsignado: rolNombre || 'Sin rol'
+          rolAsignado: rolNombre || 'Mantenido rol anterior'
         });
 
         return personalInactivo;
