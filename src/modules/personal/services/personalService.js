@@ -673,13 +673,16 @@ class PersonalService {
     const { id, email, name } = azureUser;
     const { role, roleInfo: roleInfoDetails } = roleInfo;
 
-    // Verificar si ya existe
+    // Verificar si ya existe y está activo
     const personalExistente = await Personal.findOne({
-      where: { email: email.toLowerCase() }
+      where: {
+        email: email.toLowerCase(),
+        activo: true
+      }
     });
 
     if (personalExistente) {
-      logger.info('Personal ya existe, no requiere auto-provisioning:', {
+      logger.info('Personal ya existe y está activo, no requiere auto-provisioning:', {
         email,
         personalId: personalExistente.id
       });
@@ -690,9 +693,6 @@ class PersonalService {
     const [nombre, ...apellidoArr] = name?.split(' ') || ['Usuario', 'Automático'];
     const apellido = apellidoArr.length > 0 ? apellidoArr.join(' ') : 'Automático';
 
-    // Buscar el rol correspondiente en la BD
-    let rolId = null;
-
     // Mapear el role a un rol en BD
     // Super_admin -> Rol de Infraestructura, etc.
     const rolMapping = {
@@ -702,7 +702,9 @@ class PersonalService {
     };
 
     const rolNombre = rolMapping[role];
+    let rolId = null;
 
+    // Buscar el rol correspondiente en la BD
     if (rolNombre) {
       const rol = await Rol.findOne({
         where: {
@@ -713,6 +715,59 @@ class PersonalService {
 
       if (rol) {
         rolId = rol.id;
+        logger.info('Rol encontrado para auto-provisioning:', {
+          rolNombre,
+          rolId
+        });
+      } else {
+        logger.warn('Rol no encontrado en la BD:', {
+          rolNombre,
+          role
+        });
+      }
+    }
+
+    // Si existe pero está inactivo, reactivarlo y actualizar rol
+    const personalInactivo = await Personal.findOne({
+      where: {
+        email: email.toLowerCase(),
+        activo: false
+      }
+    });
+
+    if (personalInactivo) {
+      logger.info('Personal encontrado pero inactivo, reactivando:', {
+        email,
+        personalId: personalInactivo.id,
+        rolAnterior: personalInactivo.rol_id,
+        rolNuevo: rolId || 'Sin rol'
+      });
+
+      const transaction = await sequelize.transaction();
+      try {
+        await personalInactivo.update(
+          {
+            activo: true,
+            rol_id: rolId
+          },
+          { transaction }
+        );
+        await transaction.commit();
+
+        logger.info('Personal reactivado exitosamente:', {
+          email,
+          personalId: personalInactivo.id,
+          rolAsignado: rolNombre || 'Sin rol'
+        });
+
+        return personalInactivo;
+      } catch (error) {
+        await transaction.rollback();
+        logger.error('Error al reactivar personal:', {
+          email,
+          error: error.message
+        });
+        throw error;
       }
     }
 
