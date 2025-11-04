@@ -84,6 +84,12 @@ const Personal = sequelize.define('Personal', {
       key: 'id'
     }
   },
+  privilegio_app: {
+    type: DataTypes.ENUM('super_admin', 'helpdesk', 'support', 'user'),
+    allowNull: true,
+    defaultValue: 'user',
+    comment: 'Privilegios de aplicación basados en grupos Azure AD'
+  },
   activo: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
@@ -117,6 +123,9 @@ const Personal = sequelize.define('Personal', {
     },
     {
       fields: ['activo']
+    },
+    {
+      fields: ['privilegio_app']
     }
   ],
   scopes: {

@@ -5,6 +5,7 @@ const { requirePermission } = require('../../auth/middleware/roleMiddleware');
 const validate = require('../../../shared/middleware/validation');
 const { body, param, query } = require('express-validator');
 const sedeController = require('../controllers/SedeController');
+const sedeAsignacionController = require('../controllers/sedeAsignacionController');
 
 const router = express.Router();
 
@@ -304,18 +305,18 @@ router.post('/:id/servicios',
     body('servicio_id')
       .isInt({ min: 1 })
       .withMessage('ID de servicio requerido y debe ser válido'),
-    
+
     body('fecha_contratacion')
       .optional()
       .isISO8601()
       .withMessage('Fecha de contratación debe ser una fecha válida'),
-    
+
     body('fecha_vencimiento')
       .optional()
       .isISO8601()
       .withMessage('Fecha de vencimiento debe ser una fecha válida')
       .custom((value, { req }) => {
-        if (value && req.body.fecha_contratacion && 
+        if (value && req.body.fecha_contratacion &&
             new Date(value) <= new Date(req.body.fecha_contratacion)) {
           throw new Error('Fecha de vencimiento debe ser posterior a la contratación');
         }
@@ -324,6 +325,114 @@ router.post('/:id/servicios',
   ],
   validate,
   sedeController.asignarServicio
+);
+
+// =====================================================
+// RUTAS DE ASIGNACIÓN DE TÉCNICOS DE SOPORTE A SEDES
+// =====================================================
+
+/**
+ * @route   POST /api/sedes/:id/asignaciones
+ * @desc    Asignar un técnico de soporte a una sede
+ * @access  Private (Only Infraestructura - super_admin)
+ */
+router.post('/:id/asignaciones',
+  requirePermission('sedes', 'update'),
+  validarId,
+  [
+    body('personal_id')
+      .notEmpty()
+      .withMessage('El ID del personal es requerido')
+      .isUUID()
+      .withMessage('El ID del personal debe ser un UUID válido'),
+
+    body('notas')
+      .optional()
+      .trim()
+      .isLength({ max: 500 })
+      .withMessage('Las notas no pueden exceder 500 caracteres')
+  ],
+  validate,
+  sedeAsignacionController.asignarTecnico
+);
+
+/**
+ * @route   GET /api/sedes/:id/asignaciones
+ * @desc    Obtener asignaciones de una sede (activas e históricas)
+ * @access  Private (Read permission)
+ */
+router.get('/:id/asignaciones',
+  requirePermission('sedes', 'read'),
+  validarId,
+  [
+    query('historicas')
+      .optional()
+      .isBoolean()
+      .withMessage('Históricas debe ser true o false')
+  ],
+  validate,
+  sedeAsignacionController.obtenerAsignacionesSede
+);
+
+/**
+ * @route   GET /api/sedes/:id/asignaciones/tecnico/activo
+ * @desc    Obtener el técnico asignado actualmente a una sede
+ * @access  Private (Read permission)
+ */
+router.get('/:id/asignaciones/tecnico/activo',
+  requirePermission('sedes', 'read'),
+  validarId,
+  validate,
+  sedeAsignacionController.obtenerTecnicoActivo
+);
+
+/**
+ * @route   DELETE /api/sedes/:id/asignaciones/:personalId
+ * @desc    Desasignar un técnico de una sede
+ * @access  Private (Only Infraestructura - super_admin)
+ */
+router.delete('/:id/asignaciones/:personalId',
+  requirePermission('sedes', 'update'),
+  [
+    param('id')
+      .isUUID()
+      .withMessage('ID de sede debe ser un UUID válido'),
+    param('personalId')
+      .isUUID()
+      .withMessage('ID de personal debe ser un UUID válido')
+  ],
+  validate,
+  sedeAsignacionController.desasignarTecnico
+);
+
+/**
+ * @route   GET /api/sedes/asignaciones/tecnicos/disponibles
+ * @desc    Listar todos los técnicos disponibles del grupo Soporte
+ * @access  Private (Read permission)
+ */
+router.get('/asignaciones/tecnicos/disponibles',
+  requirePermission('sedes', 'read'),
+  sedeAsignacionController.obtenerTecnicosDisponibles
+);
+
+/**
+ * @route   GET /api/sedes/asignaciones/personal/:personalId
+ * @desc    Obtener todas las sedes asignadas a un técnico
+ * @access  Private (Read permission)
+ */
+router.get('/asignaciones/personal/:personalId',
+  requirePermission('sedes', 'read'),
+  [
+    param('personalId')
+      .isUUID()
+      .withMessage('ID de personal debe ser un UUID válido'),
+    query('historicas')
+      .optional()
+      .isBoolean()
+      .withMessage('Históricas debe ser true o false')
+  ],
+  validate,
+  sedeAsignacionController.obtenerSedesAsignadas
 );
 
 module.exports = router;

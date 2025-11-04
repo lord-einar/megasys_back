@@ -6,7 +6,7 @@
 // Mapeo de GUIDs de Azure AD a nombres de grupos
 const GUID_TO_GROUP_MAP = {
   'edc49d22-9ee8-4d90-a8b2-41cf64db1eed': 'Infraestructura',
-  '2a16d910-c440-41a3-a896-eb6287185fef': 'Soporte',
+  '4c25f14c-c4ba-4bf9-b07b-5d03572a2661': 'Soporte',
   '88c0f708-14a1-4081-bcc6-4b3ab33a7ca6': 'Mesa de ayuda'
 };
 
@@ -91,7 +91,7 @@ const ROLES = {
     name: 'Soporte',
     description: 'Gestión de inventario y remitos, lectura total',
     azureGroup: 'Soporte',
-    azureGuid: '2a16d910-c440-41a3-a896-eb6287185fef',
+    azureGuid: '4c25f14c-c4ba-4bf9-b07b-5d03572a2661',
     level: 3
   },
   user: {

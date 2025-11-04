@@ -671,7 +671,7 @@ class PersonalService {
    */
   async autoProvisionarPersonal(azureUser, roleInfo) {
     const { id, email, name } = azureUser;
-    const { role, roleInfo: roleInfoDetails } = roleInfo;
+    const { role } = roleInfo;
 
     // Verificar si ya existe y está activo
     const personalExistente = await Personal.findOne({
@@ -684,7 +684,8 @@ class PersonalService {
     if (personalExistente) {
       logger.info('Personal ya existe y está activo, no requiere auto-provisioning:', {
         email,
-        personalId: personalExistente.id
+        personalId: personalExistente.id,
+        privilegioActual: personalExistente.privilegio_app
       });
       return personalExistente;
     }
@@ -693,61 +694,17 @@ class PersonalService {
     const [nombre, ...apellidoArr] = name?.split(' ') || ['Usuario', 'Automático'];
     const apellido = apellidoArr.length > 0 ? apellidoArr.join(' ') : 'Automático';
 
-    // Mapear el role a un rol en BD
-    // Super_admin -> Rol de Infraestructura, etc.
-    const rolMapping = {
-      'super_admin': 'Infraestructura',
-      'support': 'Soporte',
-      'helpdesk': 'Mesa de Ayuda'
-    };
+    // El role desde Azure AD ya viene como 'super_admin', 'support', 'helpdesk' o 'user'
+    // Se asigna directamente como privilegio_app
+    const privilegioApp = role || 'user';
 
-    const rolNombre = rolMapping[role];
-    let rolId = null;
+    logger.info('Asignando privilegios de aplicación basados en grupo Azure AD:', {
+      email,
+      role,
+      privilegioAsignado: privilegioApp
+    });
 
-    // Buscar el rol correspondiente en la BD
-    if (rolNombre) {
-      // Primero intentar búsqueda exacta case-sensitive
-      let rol = await Rol.findOne({
-        where: {
-          nombre: rolNombre,
-          activo: true
-        }
-      });
-
-      // Si no encuentra, intentar búsqueda case-insensitive
-      if (!rol) {
-        const { Op } = require('sequelize');
-        rol = await Rol.findOne({
-          where: {
-            [Op.and]: [
-              sequelize.where(
-                sequelize.fn('LOWER', sequelize.col('nombre')),
-                Op.eq,
-                rolNombre.toLowerCase()
-              ),
-              { activo: true }
-            ]
-          }
-        });
-      }
-
-      if (rol) {
-        rolId = rol.id;
-        logger.info('Rol encontrado para auto-provisioning:', {
-          rolNombre,
-          rolId,
-          nombreEnBD: rol.nombre
-        });
-      } else {
-        logger.warn('Rol no encontrado en la BD (ni case-sensitive ni case-insensitive):', {
-          rolNombre,
-          role
-        });
-        // TODO: Crear rol automáticamente si no existe
-      }
-    }
-
-    // Si existe pero está inactivo, reactivarlo y actualizar rol
+    // Si existe pero está inactivo, reactivarlo y actualizar privilegios
     const personalInactivo = await Personal.findOne({
       where: {
         email: email.toLowerCase(),
@@ -759,28 +716,23 @@ class PersonalService {
       logger.info('Personal encontrado pero inactivo, reactivando:', {
         email,
         personalId: personalInactivo.id,
-        rolAnterior: personalInactivo.rol_id,
-        rolNuevo: rolId || 'Manteniendo rol anterior'
+        privilegioAnterior: personalInactivo.privilegio_app,
+        privilegioNuevo: privilegioApp
       });
 
       const transaction = await sequelize.transaction();
       try {
-        // Si encontramos un rol, actualizar; si no, mantener el anterior
-        const updateData = {
-          activo: true
-        };
+        await personalInactivo.update({
+          activo: true,
+          privilegio_app: privilegioApp
+        }, { transaction });
 
-        if (rolId) {
-          updateData.rol_id = rolId;
-        }
-
-        await personalInactivo.update(updateData, { transaction });
         await transaction.commit();
 
         logger.info('Personal reactivado exitosamente:', {
           email,
           personalId: personalInactivo.id,
-          rolAsignado: rolNombre || 'Mantenido rol anterior'
+          privilegioAsignado: privilegioApp
         });
 
         return personalInactivo;
@@ -794,8 +746,7 @@ class PersonalService {
       }
     }
 
-    // Si no encontramos rol específico, crear usuario genérico sin rol asignado
-    // (solo para usuarios autorizados de Azure AD)
+    // Crear nuevo usuario con privilegios basados en grupo Azure AD
     const transaction = await sequelize.transaction();
 
     try {
@@ -804,10 +755,12 @@ class PersonalService {
         nombre: nombre.trim(),
         apellido: apellido.trim(),
         email: email.toLowerCase().trim(),
-        rol_id: rolId,
+        privilegio_app: privilegioApp,
         activo: true,
         // Sin sede principal por defecto
-        sede_id: null
+        sede_id: null,
+        // Sin rol de sede por defecto
+        rol_id: null
       }, { transaction });
 
       await transaction.commit();
@@ -817,7 +770,7 @@ class PersonalService {
         email: nuevoPersonal.email,
         nombre: nuevoPersonal.nombre,
         apellido: nuevoPersonal.apellido,
-        rolAsignado: rolNombre || 'Sin rol'
+        privilegioAsignado: privilegioApp
       });
 
       return nuevoPersonal;

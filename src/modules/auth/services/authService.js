@@ -2,8 +2,47 @@
 const jwt = require('jsonwebtoken');
 const { msalInstance } = require('../config/msalConfig');
 const logger = require('../../../shared/utils/logger');
+const { GUID_TO_GROUP_MAP } = require('../config/roles');
+
+// GUIDs de grupos autorizados
+const AUTHORIZED_GROUP_GUIDS = [
+  'edc49d22-9ee8-4d90-a8b2-41cf64db1eed', // Infraestructura
+  '4c25f14c-c4ba-4bf9-b07b-5d03572a2661', // Soporte
+  '88c0f708-14a1-4081-bcc6-4b3ab33a7ca6'  // Mesa de ayuda
+];
 
 class AuthService {
+  /**
+   * Validar que el usuario pertenece a uno de los grupos autorizados
+   */
+  validateAuthorizedGroups(userGroups = []) {
+    if (!Array.isArray(userGroups) || userGroups.length === 0) {
+      logger.warn('Usuario sin grupos de Azure AD - acceso denegado');
+      return false;
+    }
+
+    const hasAuthorizedGroup = userGroups.some(group =>
+      AUTHORIZED_GROUP_GUIDS.includes(group)
+    );
+
+    if (!hasAuthorizedGroup) {
+      logger.warn('Usuario tiene grupos pero no están autorizados:', {
+        userGroups,
+        authorizedGroups: AUTHORIZED_GROUP_GUIDS
+      });
+    }
+
+    return hasAuthorizedGroup;
+  }
+
+  /**
+   * Obtener nombres de grupos a partir de GUIDs
+   */
+  getGroupNames(groupGuids = []) {
+    return groupGuids
+      .filter(guid => GUID_TO_GROUP_MAP[guid])
+      .map(guid => GUID_TO_GROUP_MAP[guid]);
+  }
   /**
    * Generar URL de autenticación
    */
@@ -33,9 +72,20 @@ class AuthService {
       };
 
       const response = await msalInstance.acquireTokenByCode(tokenRequest);
-      
+
       if (!response || !response.account) {
         throw new Error('No se pudo obtener la información del usuario');
+      }
+
+      // Obtener grupos del usuario desde Azure AD
+      const userGroups = response.account.idTokenClaims?.groups || [];
+
+      // VALIDAR que el usuario pertenece a un grupo autorizado
+      if (!this.validateAuthorizedGroups(userGroups)) {
+        const error = new Error('No tienes permiso para acceder a esta aplicación. Por favor contacta a Infraestructura.');
+        error.code = 'UNAUTHORIZED_GROUP';
+        error.statusCode = 403;
+        throw error;
       }
 
       // Información BÁSICA del usuario (sin foto)
@@ -44,8 +94,14 @@ class AuthService {
         email: response.account.username,
         name: response.account.name,
         tenantId: response.account.tenantId,
-        groups: response.account.idTokenClaims?.groups || []
+        groups: userGroups,
+        groupNames: this.getGroupNames(userGroups)
       };
+
+      logger.info('Usuario autenticado exitosamente:', {
+        email: userInfo.email,
+        groupNames: userInfo.groupNames
+      });
 
       // Generar JWT token SOLO con datos básicos
       const token = this.generateJWT(userInfo);
@@ -62,7 +118,7 @@ class AuthService {
   }
 
   /**
-   * Generar JWT token (SOLO datos básicos)
+   * Generar JWT token con privilegios de aplicación
    */
   generateJWT(userInfo) {
     try {
@@ -71,7 +127,8 @@ class AuthService {
         email: userInfo.email,
         name: userInfo.name,
         groups: userInfo.groups,
-        tenantId: userInfo.tenantId
+        tenantId: userInfo.tenantId,
+        privilegioApp: userInfo.privilegioApp || 'user'
       };
 
       return jwt.sign(payload, process.env.JWT_SECRET, {

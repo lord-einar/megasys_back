@@ -598,7 +598,7 @@ class RemitoService {
         {
           model: Personal,
           as: 'solicitante',
-          attributes: ['id', 'nombre', 'apellido', 'email']
+          attributes: ['id', 'nombre', 'apellido', 'email', 'telefono']
         },
         {
           model: Personal,
@@ -669,7 +669,7 @@ class RemitoService {
         {
           model: Personal,
           as: 'solicitante',
-          attributes: ['id', 'nombre', 'apellido', 'email']
+          attributes: ['id', 'nombre', 'apellido', 'email', 'telefono']
         },
         {
           model: Personal,
@@ -1166,6 +1166,7 @@ class RemitoService {
    */
   async confirmarRecepcion(remitoId, token) {
     const t = await sequelize.transaction();
+    let resultadoPDFConfirmado; // Declarar aquí para que esté disponible en todo el método
 
     try {
       logger.info('Iniciando confirmación de recepción:', { remitoId });
@@ -1179,7 +1180,8 @@ class RemitoService {
       }
 
       // 2. Validar que el remitoId del token coincide
-      if (parseInt(tokenPayload.remitoId) !== parseInt(remitoId)) {
+      // Comparar UUIDs como strings (son UUID, no números)
+      if (tokenPayload.remitoId.toString() !== remitoId.toString()) {
         throw new Error('El token no corresponde a este remito');
       }
 
@@ -1194,7 +1196,7 @@ class RemitoService {
           {
             model: Personal,
             as: 'solicitante',
-            attributes: ['id', 'nombre', 'apellido', 'email']
+            attributes: ['id', 'nombre', 'apellido', 'email', 'telefono']
           },
           {
             model: Personal,
@@ -1256,7 +1258,7 @@ class RemitoService {
       });
 
       try {
-        const resultadoPDFConfirmado = await pdfService.generarPDF(
+        resultadoPDFConfirmado = await pdfService.generarPDF(
           remitoCompleto,
           {
             confirmado: true,
@@ -1339,7 +1341,17 @@ class RemitoService {
         pdfConfirmado: resultadoPDFConfirmado.path
       };
     } catch (error) {
-      await t.rollback();
+      // Solo hacer rollback si la transacción aún no ha sido commiteada
+      if (t && t.finished === undefined) {
+        try {
+          await t.rollback();
+        } catch (rollbackError) {
+          logger.warn('Error haciendo rollback de transacción:', {
+            error: rollbackError.message,
+            originalError: error.message
+          });
+        }
+      }
 
       logger.error('Error confirmando recepción del remito:', {
         error: error.message,
@@ -1366,6 +1378,11 @@ class RemitoService {
           {
             model: Personal,
             as: 'solicitante',
+            attributes: ['id', 'nombre', 'apellido', 'email', 'telefono']
+          },
+          {
+            model: Personal,
+            as: 'tecnicoAsignado',
             attributes: ['id', 'nombre', 'apellido', 'email']
           },
           {

@@ -3,11 +3,10 @@ const authService = require('../services/authService');
 const tokenCacheService = require('../services/tokenCacheService');
 const authResponseFormatter = require('../services/authResponseFormatter');
 const roleService = require('../services/roleService');
+const personalService = require('../../personal/services/personalService');
 const { success, error } = require('../../../shared/utils/response');
 const asyncHandler = require('../../../shared/utils/asyncHandler');
 const logger = require('../../../shared/utils/logger');
-const { assignSistemasRoleBatch } = require('../../../shared/utils/sistemasRoleAssignment');
-const { Personal } = require('../../../models');
 
 class AuthController {
   /**
@@ -54,7 +53,23 @@ class AuthController {
         return res.send(html);
       }
 
-      const result = await authService.processAuthCallback(code);
+      let result;
+      try {
+        result = await authService.processAuthCallback(code);
+      } catch (authError) {
+        // Verificar si es error de grupo no autorizado
+        if (authError.code === 'UNAUTHORIZED_GROUP' || authError.statusCode === 403) {
+          logger.warn('Intento de acceso denegado por grupo no autorizado:', {
+            message: authError.message
+          });
+          const html = authResponseFormatter.formatAuthErrorRedirect(
+            'unauthorized_group',
+            'No tienes permiso para acceder a esta aplicación. Solo usuarios de los grupos Infraestructura, Soporte o Mesa de ayuda pueden ingresar. Por favor contacta a Infraestructura.'
+          );
+          return res.send(html);
+        }
+        throw authError;
+      }
 
       // Guardar el access token en cache para obtener la foto después
       tokenCacheService.set(result.user.id, result.accessToken);
@@ -70,29 +85,34 @@ class AuthController {
         grupos: result.user.groups.length
       });
 
-      // Asignar automáticamente rol "Sistemas" a usuarios con roles autorizados
+      // Auto-provisionar Personal si no existe
+      let privilegioApp = roleInfo.role; // Por defecto, usar el role de Azure AD
       try {
-        // Buscar Personal asociado a este email
-        const personalRecords = await Personal.findAll({
-          where: { email: result.user.email.toLowerCase(), activo: true }
+        await personalService.autoProvisionarPersonal(result.user, roleInfo);
+
+        // Obtener el privilegio_app del registro Personal creado/actualizado
+        const { Personal } = require('../../models');
+        const personalRecord = await Personal.findOne({
+          where: { email: result.user.email.toLowerCase() }
         });
 
-        if (personalRecords && personalRecords.length > 0) {
-          const personalIds = personalRecords.map(p => p.id);
-          await assignSistemasRoleBatch(personalIds);
-
-          logger.info('Asignación batch de rol Sistemas completada durante login:', {
+        if (personalRecord && personalRecord.privilegio_app) {
+          privilegioApp = personalRecord.privilegio_app;
+          logger.info('Privilegio de aplicación obtenido de Personal:', {
             email: result.user.email,
-            personalCount: personalRecords.length
+            privilegioApp
           });
         }
-      } catch (roleAssignmentError) {
+      } catch (provisioningError) {
         // Log el error pero no fallar la autenticación
-        logger.warn('Error asignando rol Sistemas durante login:', {
+        logger.warn('Error en auto-provisioning durante login:', {
           email: result.user.email,
-          error: roleAssignmentError.message
+          error: provisioningError.message
         });
       }
+
+      // Agregar privilegio_app al resultado para incluir en JWT y respuesta
+      result.user.privilegioApp = privilegioApp;
 
       // Formatear datos de autenticación
       const authData = authResponseFormatter.formatAuthData(result, roleInfo);
@@ -117,17 +137,19 @@ class AuthController {
   me = asyncHandler(async (req, res) => {
     try {
       const user = req.user;
-      
+
       const userInfo = {
         id: user.id,
         email: user.email,
         name: user.name,
         groups: user.groups || [],
+        role: user.role || null,
+        roleInfo: user.roleInfo || null,
         tenantId: user.tenantId,
         iat: user.iat,
         exp: user.exp
       };
-      
+
       success(res, { user: userInfo }, 'Información del usuario obtenida');
     } catch (err) {
       logger.error('Error en me:', err);

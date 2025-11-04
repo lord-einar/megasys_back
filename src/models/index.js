@@ -7,6 +7,7 @@ const Empresa = require('./Empresa');
 const Sede = require('./Sede');
 const Personal = require('./Personal');
 const PersonalSede = require('./PersonalSede');
+const SedeAsignacion = require('./SedeAsignacion');
 const TipoArticulo = require('./TipoArticulo');
 const Rol = require('./Rol');
 const Inventario = require('./Inventario');
@@ -83,6 +84,30 @@ Rol.hasMany(PersonalSede, {
 PersonalSede.belongsTo(Rol, {
   foreignKey: 'rol_id',
   as: 'rol'
+});
+
+// =====================================================
+// RELACIONES SEDE-ASIGNACION (Asignación de técnicos de soporte a sedes)
+// =====================================================
+
+// Sede -> SedeAsignacion (uno a muchos)
+Sede.hasMany(SedeAsignacion, {
+  foreignKey: 'sede_id',
+  as: 'asignacionesSoporte'
+});
+SedeAsignacion.belongsTo(Sede, {
+  foreignKey: 'sede_id',
+  as: 'sede'
+});
+
+// Personal -> SedeAsignacion (uno a muchos)
+Personal.hasMany(SedeAsignacion, {
+  foreignKey: 'personal_id',
+  as: 'asignacionesSede'
+});
+SedeAsignacion.belongsTo(Personal, {
+  foreignKey: 'personal_id',
+  as: 'personal'
 });
 
 // Relaciones TipoArticulo -> Inventario
@@ -194,7 +219,7 @@ Servicio.belongsToMany(Sede, {
   through: SedeServicio,
   foreignKey: 'servicio_id',
   otherKey: 'sede_id',
-  as: 'sedes'
+  as: 'sedesServicio'
 });
 
 // Relaciones de Remito
@@ -413,6 +438,7 @@ const models = {
   Sede,
   Personal,
   PersonalSede,
+  SedeAsignacion,
   TipoArticulo,
   Rol,
   Inventario,

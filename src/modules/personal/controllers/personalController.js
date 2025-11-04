@@ -8,10 +8,36 @@ const TransactionWrapper = require('../../../shared/utils/transactionWrapper');
 class PersonalController {
   /**
    * Listar todo el personal con paginación y filtros
+   * Implementa restricción por rol:
+   * - super_admin (Infraestructura): puede ver a todos
+   * - support (Soporte): solo puede ver su propio perfil
+   * - Otros roles: acceso denegado
    */
   listar = asyncHandler(async (req, res) => {
     try {
-      const resultado = await personalService.listar(req.query);
+      // Get user's role to implement visibility restrictions
+      // The role middleware sets req.user.role to the user's role
+      const userRole = req.user?.role;
+      const userId = req.user?.id;
+
+      // Check authorization
+      if (!userRole) {
+        return error(res, 'No se pudo determinar el rol del usuario', 403);
+      }
+
+      // Restrict access by role
+      if (userRole !== 'super_admin' && userRole !== 'support' && userRole !== 'helpdesk') {
+        return error(res, 'No tienes permiso para ver el listado de personal', 403);
+      }
+
+      // If user is Soporte (support), only show their own profile
+      let filters = { ...req.query };
+      if (userRole === 'support') {
+        // For Soporte role, limit to their own data only
+        filters.personal_id = userId;
+      }
+
+      const resultado = await personalService.listar(filters, userRole, userId);
       paginated(res, resultado.rows, resultado.pagination, 'Personal obtenido correctamente');
     } catch (err) {
       logger.error('Error en listar personal:', err);

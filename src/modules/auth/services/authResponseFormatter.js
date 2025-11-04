@@ -153,6 +153,7 @@ class AuthResponseFormatter {
         lastName: lastName,
         fullName: result.user.name,
         role: roleInfo.role,
+        privilegios: result.user.privilegioApp || roleInfo.role,
         permissions: roleInfo.permissions,
         groups: result.user.groups,
         groupAnalysis: roleInfo.groupAnalysis

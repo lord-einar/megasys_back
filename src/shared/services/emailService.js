@@ -28,10 +28,17 @@ class EmailService {
 
   inicializarTransporter() {
     try {
+      logger.info('🔧 Inicializando Email transporter con config:', {
+        host: SMTP_CONFIG.host,
+        port: SMTP_CONFIG.port,
+        secure: SMTP_CONFIG.secure,
+        user: SMTP_CONFIG.auth.user,
+        from: EMAIL_FROM
+      });
       this.transporter = nodemailer.createTransport(SMTP_CONFIG);
-      logger.info('Email transporter inicializado correctamente');
+      logger.info('✓ Email transporter inicializado correctamente');
     } catch (error) {
-      logger.error('Error inicializando email transporter:', { error: error.message });
+      logger.error('✗ Error inicializando email transporter:', { error: error.message, stack: error.stack });
       throw error;
     }
   }
@@ -130,11 +137,11 @@ class EmailService {
               <div class="info-grid">
                 <div class="info-item">
                   <div class="info-label">Sede Origen</div>
-                  <div class="info-value">${remito.sedeOrigen?.nombre || 'N/A'}</div>
+                  <div class="info-value">${remito.sedeOrigen?.nombre_sede || 'N/A'}</div>
                 </div>
                 <div class="info-item">
                   <div class="info-label">Sede Destino</div>
-                  <div class="info-value">${remito.sedeDestino?.nombre || 'N/A'}</div>
+                  <div class="info-value">${remito.sedeDestino?.nombre_sede || 'N/A'}</div>
                 </div>
                 <div class="info-item">
                   <div class="info-label">Responsable</div>
@@ -180,6 +187,13 @@ class EmailService {
    */
   async enviarAInfraestructura(remito, rutaPDF) {
     try {
+      logger.info('📧 [INFRAESTRUCTURA] Iniciando envío...', {
+        remito: remito.numero_remito,
+        to: EMAIL_INFRAESTRUCTURA,
+        from: EMAIL_FROM,
+        pdfExists: require('fs').existsSync(rutaPDF)
+      });
+
       const html = this.generarHTMLInfraestructura(remito);
 
       const opciones = {
@@ -198,12 +212,14 @@ class EmailService {
         ]
       };
 
+      logger.info('📧 [INFRAESTRUCTURA] Enviando...');
       const info = await this.transporter.sendMail(opciones);
 
-      logger.info('Email enviado a infraestructura:', {
+      logger.info('✓ [INFRAESTRUCTURA] Email enviado exitosamente:', {
         remito: remito.numero_remito,
         messageId: info.messageId,
-        email: EMAIL_INFRAESTRUCTURA
+        email: EMAIL_INFRAESTRUCTURA,
+        timestamp: new Date().toISOString()
       });
 
       return {
@@ -212,10 +228,14 @@ class EmailService {
         email: EMAIL_INFRAESTRUCTURA
       };
     } catch (error) {
-      logger.error('Error enviando email a infraestructura:', {
+      logger.error('✗ [INFRAESTRUCTURA] Error enviando email:', {
         error: error.message,
+        errorCode: error.code,
+        errorResponse: error.response,
         remito: remito.numero_remito,
-        email: EMAIL_INFRAESTRUCTURA
+        email: EMAIL_INFRAESTRUCTURA,
+        timestamp: new Date().toISOString(),
+        stack: error.stack
       });
       throw error;
     }
@@ -273,11 +293,11 @@ class EmailService {
               </div>
               <div class="info-item">
                 <div class="info-label">Sede de Origen</div>
-                <div class="info-value">${remito.sedeOrigen?.nombre || 'N/A'}</div>
+                <div class="info-value">${remito.sedeOrigen?.nombre_sede || 'N/A'}</div>
               </div>
               <div class="info-item">
                 <div class="info-label">Sede de Destino</div>
-                <div class="info-value">${remito.sedeDestino?.nombre || 'N/A'}</div>
+                <div class="info-value">${remito.sedeDestino?.nombre_sede || 'N/A'}</div>
               </div>
             </div>
 
@@ -314,12 +334,28 @@ class EmailService {
    */
   async enviarAlSolicitante(remito, rutaPDF, urlConfirmacion) {
     try {
+      logger.info('📧 [SOLICITANTE] Iniciando envío...', {
+        remito: remito.numero_remito,
+        email: remito.solicitante?.email,
+        pdfExists: require('fs').existsSync(rutaPDF),
+        urlConfirmacionLength: urlConfirmacion?.length || 0
+      });
+
       const html = this.generarHTMLSolicitante(remito, urlConfirmacion);
       const emailSolicitante = remito.solicitante?.email;
 
       if (!emailSolicitante) {
+        logger.error('✗ [SOLICITANTE] Email del solicitante no disponible', {
+          remito: remito.numero_remito,
+          solicitanteData: remito.solicitante
+        });
         throw new Error('Email del solicitante no disponible');
       }
+
+      logger.info('📧 [SOLICITANTE] Email del solicitante válido:', {
+        email: emailSolicitante,
+        remito: remito.numero_remito
+      });
 
       const opciones = {
         from: EMAIL_FROM,
@@ -337,12 +373,14 @@ class EmailService {
         ]
       };
 
+      logger.info('📧 [SOLICITANTE] Enviando email...');
       const info = await this.transporter.sendMail(opciones);
 
-      logger.info('Email enviado al solicitante:', {
+      logger.info('✓ [SOLICITANTE] Email enviado exitosamente:', {
         remito: remito.numero_remito,
         messageId: info.messageId,
-        email: emailSolicitante
+        email: emailSolicitante,
+        timestamp: new Date().toISOString()
       });
 
       return {
@@ -351,10 +389,14 @@ class EmailService {
         email: emailSolicitante
       };
     } catch (error) {
-      logger.error('Error enviando email al solicitante:', {
+      logger.error('✗ [SOLICITANTE] Error enviando email:', {
         error: error.message,
+        errorCode: error.code,
+        errorResponse: error.response,
         remito: remito.numero_remito,
-        email: remito.solicitante?.email
+        email: remito.solicitante?.email,
+        timestamp: new Date().toISOString(),
+        stack: error.stack
       });
       throw error;
     }

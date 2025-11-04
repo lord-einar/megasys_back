@@ -36,6 +36,7 @@ class SedeController {
       const estadisticas = sedeService.calcularEstadisticas(sede);
       const sedeCompleta = {
         ...sede.toJSON(),
+        inventario: estadisticas.inventario,
         estadisticas
       };
 

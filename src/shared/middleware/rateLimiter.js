@@ -7,7 +7,7 @@ const logger = require('../utils/logger');
  */
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // máximo 100 requests por IP por ventana
+  max: process.env.NODE_ENV === 'development' ? 1000 : 100, // desarrollo: 1000, producción: 100
   message: {
     success: false,
     message: 'Demasiadas peticiones desde esta IP, intenta de nuevo en 15 minutos.',
@@ -24,8 +24,8 @@ const generalLimiter = rateLimit({
     });
   },
   skip: (req) => {
-    // No aplicar rate limit a rutas de autenticación (permisivo)
-    return req.path.startsWith('/api/auth');
+    // No aplicar rate limit a rutas de autenticación y confirmación pública
+    return req.path.startsWith('/api/auth') || req.path.includes('/confirmar-recepcion');
   }
 });
 
