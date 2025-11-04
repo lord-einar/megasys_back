@@ -60,19 +60,26 @@ class PersonalService {
 
   /**
    * Listar personal con paginación y filtros
+   * Soporta restricción por rol (personal_id)
    */
-  async listar(filters = {}) {
+  async listar(filters = {}, userRole = null, userId = null) {
     const {
       page = 1,
       limit = 10,
       search = '',
       activo = null,
       sede_id = null,
-      rol_id = null
+      rol_id = null,
+      personal_id = null
     } = filters;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
     const whereClause = {};
+
+    // Si se especifica un personal_id, filtrar solo esa persona (para usuarios Soporte)
+    if (personal_id) {
+      whereClause.id = personal_id;
+    }
 
     if (search) {
       whereClause[Op.or] = [
@@ -190,15 +197,13 @@ class PersonalService {
   async calcularEstadisticasRemitos(persona) {
     const remitosSolicitados = await Remito.count({
       where: {
-        solicitante_id: persona.id,
-        activo: true
+        solicitante_id: persona.id
       }
     });
 
     const remitosAsignados = await Remito.count({
       where: {
-        asignado_a_id: persona.id,
-        activo: true
+        tecnico_asignado_id: persona.id
       }
     });
 
@@ -221,7 +226,7 @@ class PersonalService {
     } = filters;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
-    const whereClause = { activo: true };
+    const whereClause = {};
 
     if (estado) {
       whereClause.estado = estado;
@@ -232,12 +237,12 @@ class PersonalService {
     if (tipo === 'solicitados') {
       query.where = { ...whereClause, solicitante_id: personalId };
     } else if (tipo === 'asignados') {
-      query.where = { ...whereClause, asignado_a_id: personalId };
+      query.where = { ...whereClause, tecnico_asignado_id: personalId };
     } else {
       query.where = {
         [Op.or]: [
           { solicitante_id: personalId, ...whereClause },
-          { asignado_a_id: personalId, ...whereClause }
+          { tecnico_asignado_id: personalId, ...whereClause }
         ]
       };
     }
@@ -484,8 +489,8 @@ class PersonalService {
     const remitosPendientes = await Remito.count({
       where: {
         [Op.or]: [
-          { solicitante_id: personalId, estado: { [Op.ne]: 'completado' }, activo: true },
-          { asignado_a_id: personalId, estado: { [Op.ne]: 'completado' }, activo: true }
+          { solicitante_id: personalId, estado: { [Op.ne]: 'completado' } },
+          { tecnico_asignado_id: personalId, estado: { [Op.ne]: 'completado' } }
         ]
       }
     });
@@ -656,6 +661,106 @@ class PersonalService {
     };
 
     return estadisticas;
+  }
+
+  /**
+   * Auto-provisionar un Personal cuando se loguea desde Azure AD
+   * Crea automáticamente un registro en Personal si no existe
+   * @param {Object} azureUser - Datos del usuario desde Azure AD
+   * @param {Object} roleInfo - Información del rol obtenida del servicio de roles
+   */
+  async autoProvisionarPersonal(azureUser, roleInfo) {
+    const { id, email, name } = azureUser;
+    const { role, roleInfo: roleInfoDetails } = roleInfo;
+
+    // Verificar si ya existe
+    const personalExistente = await Personal.findOne({
+      where: { email: email.toLowerCase() }
+    });
+
+    if (personalExistente) {
+      logger.info('Personal ya existe, no requiere auto-provisioning:', {
+        email,
+        personalId: personalExistente.id
+      });
+      return personalExistente;
+    }
+
+    // Extraer nombre y apellido del name completo
+    const [nombre, ...apellidoArr] = name?.split(' ') || ['Usuario', 'Automático'];
+    const apellido = apellidoArr.length > 0 ? apellidoArr.join(' ') : 'Automático';
+
+    // Buscar el rol correspondiente en la BD
+    let rolId = null;
+
+    // Mapear el role a un rol en BD
+    // Super_admin -> Rol de Infraestructura, etc.
+    const rolMapping = {
+      'super_admin': 'Infraestructura',
+      'support': 'Soporte',
+      'helpdesk': 'Mesa de Ayuda'
+    };
+
+    const rolNombre = rolMapping[role];
+
+    if (rolNombre) {
+      const rol = await Rol.findOne({
+        where: {
+          nombre: rolNombre,
+          activo: true
+        }
+      });
+
+      if (rol) {
+        rolId = rol.id;
+      }
+    }
+
+    // Si no encontramos rol específico, crear usuario genérico sin rol asignado
+    // (solo para usuarios autorizados de Azure AD)
+    const transaction = await sequelize.transaction();
+
+    try {
+      const nuevoPersonal = await Personal.create({
+        id: id, // Usar el homeAccountId de Azure como ID único
+        nombre: nombre.trim(),
+        apellido: apellido.trim(),
+        email: email.toLowerCase().trim(),
+        rol_id: rolId,
+        activo: true,
+        // Sin sede principal por defecto
+        sede_id: null
+      }, { transaction });
+
+      await transaction.commit();
+
+      logger.info('Personal creado automáticamente por auto-provisioning:', {
+        personalId: nuevoPersonal.id,
+        email: nuevoPersonal.email,
+        nombre: nuevoPersonal.nombre,
+        apellido: nuevoPersonal.apellido,
+        rolAsignado: rolNombre || 'Sin rol'
+      });
+
+      return nuevoPersonal;
+    } catch (error) {
+      await transaction.rollback();
+
+      logger.error('Error en auto-provisioning de personal:', {
+        email,
+        error: error.message,
+        stack: error.stack
+      });
+
+      // No fallar la autenticación si hay error en provisioning
+      // Solo loguear la advertencia
+      logger.warn('Continuando con autenticación a pesar del error de auto-provisioning', {
+        email,
+        error: error.message
+      });
+
+      return null; // Retornar null pero no fallar la autenticación
+    }
   }
 }
 
