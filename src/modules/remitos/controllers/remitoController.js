@@ -162,17 +162,20 @@ class RemitoController {
 
       const usuarioId = personal.id;
       const userRoles = personal.rol ? [personal.rol.nombre] : [];
+      const privilegioApp = personal.privilegio_app || req.user.privilegioApp || null;
 
       logger.info('Cambiando estado de remito:', {
         remitoId: id,
         nuevoEstado: estado,
         usuarioId,
         email: req.user.email,
-        roles: userRoles
+        roles: userRoles,
+        privilegioApp
       });
 
       const remito = await remitoService.cambiarEstado(id, estado, usuarioId, {
         userRoles,
+        privilegioApp,
         usuarioEmail: req.user.email,
         userAgent: req.get('user-agent'),
         ipAddress: req.ip

@@ -726,7 +726,7 @@ class RemitoService {
    * Solo Infraestructura puede cambiar estados
    */
   async cambiarEstado(remitoId, nuevoEstado, usuarioId, options = {}) {
-    const { transaction, userRoles = [], usuarioEmail = null, userAgent = null, ipAddress = null } = options;
+    const { transaction, userRoles = [], usuarioEmail = null, userAgent = null, ipAddress = null, privilegioApp = null } = options;
 
     const estadosValidos = ['preparado', 'en_transito', 'entregado', 'completado', 'devuelto', 'cancelado'];
     if (!estadosValidos.includes(nuevoEstado)) {
@@ -741,8 +741,12 @@ class RemitoService {
     // Validar autorización:
     // - Infraestructura = Super Administrador (acceso total)
     // - Sistemas = Acceso administrativo total (para usuarios no-Infraestructura)
+    // - super_admin (privilegio_app) = Acceso total desde Entra ID
     // - Otros = acceso limitado (solo sus remitos asignados)
-    const esSuperAdministrador = userRoles.includes('Infraestructura') || userRoles.includes('Sistemas');
+    const esSuperAdministrador =
+      userRoles.includes('Infraestructura') ||
+      userRoles.includes('Sistemas') ||
+      privilegioApp === 'super_admin';
     const esTecnicoAsignado = remito.tecnico_asignado_id === usuarioId;
 
     if (!esSuperAdministrador && !esTecnicoAsignado) {
