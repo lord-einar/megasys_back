@@ -295,7 +295,7 @@ class PDFService {
       .fontSize(18)
       .font('Helvetica-Bold')
       .fillColor('#27ae60')
-      .text(fechaFormato, 0, centerY + 18, {
+      .text(fechaFormato, 0, centerY + 60, {
         width: pageWidth,
         align: 'center'
       });
