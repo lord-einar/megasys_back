@@ -338,16 +338,28 @@ class EmailService {
         remito: remito.numero_remito,
         email: remito.solicitante?.email,
         pdfExists: require('fs').existsSync(rutaPDF),
-        urlConfirmacionLength: urlConfirmacion?.length || 0
+        urlConfirmacionLength: urlConfirmacion?.length || 0,
+        remitoKeys: Object.keys(remito),
+        solicitanteObject: remito.solicitante
       });
 
       const html = this.generarHTMLSolicitante(remito, urlConfirmacion);
       const emailSolicitante = remito.solicitante?.email;
 
+      logger.info('📧 [SOLICITANTE] Después de extraer email', {
+        email: emailSolicitante,
+        emailType: typeof emailSolicitante,
+        emailIsNull: emailSolicitante === null,
+        emailIsUndefined: emailSolicitante === undefined,
+        solicitanteType: typeof remito.solicitante,
+        solicitanteData: remito.solicitante
+      });
+
       if (!emailSolicitante) {
         logger.error('✗ [SOLICITANTE] Email del solicitante no disponible', {
           remito: remito.numero_remito,
-          solicitanteData: remito.solicitante
+          solicitanteData: remito.solicitante,
+          solicitanteKeys: remito.solicitante ? Object.keys(remito.solicitante) : 'null'
         });
         throw new Error('Email del solicitante no disponible');
       }
@@ -373,13 +385,21 @@ class EmailService {
         ]
       };
 
-      logger.info('📧 [SOLICITANTE] Enviando email...');
+      logger.info('📧 [SOLICITANTE] Opciones de email preparadas', {
+        to: opciones.to,
+        from: opciones.from,
+        subject: opciones.subject,
+        attachmentPath: opciones.attachments?.[0]?.path
+      });
+
+      logger.info('📧 [SOLICITANTE] Enviando email via SMTP...');
       const info = await this.transporter.sendMail(opciones);
 
       logger.info('✓ [SOLICITANTE] Email enviado exitosamente:', {
         remito: remito.numero_remito,
         messageId: info.messageId,
         email: emailSolicitante,
+        response: info.response,
         timestamp: new Date().toISOString()
       });
 
@@ -393,6 +413,7 @@ class EmailService {
         error: error.message,
         errorCode: error.code,
         errorResponse: error.response,
+        errorCommand: error.command,
         remito: remito.numero_remito,
         email: remito.solicitante?.email,
         timestamp: new Date().toISOString(),

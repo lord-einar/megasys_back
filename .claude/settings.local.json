@@ -10,7 +10,11 @@
       "Bash(mkdir:*)",
       "Bash(tree:*)",
       "Bash(for file in /home/einar/Documentos/sistema-gestion-empresarial/backend/migrations/*.js)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git reset:*)",
+      "Bash(git push:*)",
+      "Bash(npx sequelize-cli:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

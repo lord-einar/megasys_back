@@ -1463,25 +1463,26 @@ class RemitoService {
         });
       }
 
-      const remitoCompleto = remito.toJSON();
-      remitoCompleto.es_prestamo = remito.detalles && remito.detalles.some(d => d.es_prestamo);
+      // Usar obtener para asegurar que todas las relaciones se cargan correctamente
+      const remitoCompleto = await this.obtener(remitoId);
 
       // 3. Reenviar email a infraestructura
       try {
         logger.info('📧 Enviando email a infraestructura...', {
           remitoId,
-          numeroRemito: remito.numero_remito
+          numeroRemito: remitoCompleto.numero_remito,
+          emailInfraestructura: process.env.EMAIL_INFRAESTRUCTURA || 'infraestructura@megatlon.com.ar'
         });
         await emailService.enviarAInfraestructura(remitoCompleto, rutaArchivo);
         logger.info('✓ Email a infraestructura enviado exitosamente', {
           remitoId,
-          numeroRemito: remito.numero_remito,
+          numeroRemito: remitoCompleto.numero_remito,
           timestamp: new Date().toISOString()
         });
       } catch (emailError) {
         logger.error('✗ Error enviando email a infraestructura', {
           remitoId,
-          numeroRemito: remito.numero_remito,
+          numeroRemito: remitoCompleto.numero_remito,
           error: emailError.message,
           timestamp: new Date().toISOString()
         });
@@ -1492,8 +1493,9 @@ class RemitoService {
       try {
         logger.info('📧 Enviando email al solicitante...', {
           remitoId,
-          numeroRemito: remito.numero_remito,
-          emailSolicitante: remito.solicitante?.email
+          numeroRemito: remitoCompleto.numero_remito,
+          emailSolicitante: remitoCompleto.solicitante?.email,
+          solicitanteName: `${remitoCompleto.solicitante?.nombre} ${remitoCompleto.solicitante?.apellido}`
         });
         const urlConfirmacion = tokenService.generarUrlConfirmacion(
           remitoCompleto.id,
@@ -1503,15 +1505,15 @@ class RemitoService {
         await emailService.enviarAlSolicitante(remitoCompleto, rutaArchivo, urlConfirmacion);
         logger.info('✓ Email al solicitante enviado exitosamente', {
           remitoId,
-          numeroRemito: remito.numero_remito,
-          emailSolicitante: remito.solicitante?.email,
+          numeroRemito: remitoCompleto.numero_remito,
+          emailSolicitante: remitoCompleto.solicitante?.email,
           timestamp: new Date().toISOString()
         });
       } catch (emailError) {
         logger.error('✗ Error enviando email al solicitante', {
           remitoId,
-          numeroRemito: remito.numero_remito,
-          emailSolicitante: remito.solicitante?.email,
+          numeroRemito: remitoCompleto.numero_remito,
+          emailSolicitante: remitoCompleto.solicitante?.email,
           error: emailError.message,
           timestamp: new Date().toISOString()
         });
@@ -1520,15 +1522,15 @@ class RemitoService {
 
       logger.info('=== REENVÍO DE EMAILS - COMPLETADO EXITOSAMENTE ===', {
         remitoId,
-        numeroRemito: remito.numero_remito,
+        numeroRemito: remitoCompleto.numero_remito,
         timestamp: new Date().toISOString()
       });
 
       return {
         success: true,
-        numeroRemito: remito.numero_remito,
+        numeroRemito: remitoCompleto.numero_remito,
         emailInfraestructura: 'infraestructura@megatlon.com.ar',
-        emailSolicitante: remito.solicitante?.email,
+        emailSolicitante: remitoCompleto.solicitante?.email,
         timestamp: new Date().toISOString(),
         mensaje: 'Emails reenviados exitosamente'
       };
