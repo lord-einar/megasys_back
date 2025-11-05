@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e:*)",
+      "Bash(PGPASSWORD=\"Italia0454!\" psql:*)",
+      "Bash(export PGPASSWORD=\"Italia0454!\":*)",
+      "Bash(psql:*)",
+      "Bash(mkdir:*)",
+      "Bash(tree:*)",
+      "Bash(for file in /home/einar/Documentos/sistema-gestion-empresarial/backend/migrations/*.js)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

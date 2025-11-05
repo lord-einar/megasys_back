@@ -5,10 +5,10 @@ module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable('personal', {
       id: {
-        allowNull: false,
-        autoIncrement: true,
+        type: Sequelize.UUID,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        defaultValue: Sequelize.literal('gen_random_uuid()'),
+        allowNull: false
       },
       nombre: {
         type: Sequelize.STRING(50),
@@ -28,8 +28,8 @@ module.exports = {
         allowNull: true
       },
       sede_id: {
-        type: Sequelize.INTEGER,
-        allowNull: false,
+        type: Sequelize.UUID,
+        allowNull: true,
         references: {
           model: 'sedes',
           key: 'id'
@@ -38,14 +38,19 @@ module.exports = {
         onDelete: 'RESTRICT'
       },
       rol_id: {
-        type: Sequelize.INTEGER,
-        allowNull: false,
+        type: Sequelize.UUID,
+        allowNull: true,
         references: {
           model: 'roles',
           key: 'id'
         },
         onUpdate: 'CASCADE',
         onDelete: 'RESTRICT'
+      },
+      privilegio_app: {
+        type: Sequelize.ENUM('super_admin', 'helpdesk', 'support', 'user'),
+        allowNull: true,
+        defaultValue: 'user'
       },
       activo: {
         type: Sequelize.BOOLEAN,

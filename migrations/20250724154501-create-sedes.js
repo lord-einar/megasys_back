@@ -1,18 +1,24 @@
-// migrations/20241201120000-create-sedes.js
+// migrations/20250724154501-create-sedes.js
 'use strict';
 
 module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable('sedes', {
       id: {
-        allowNull: false,
-        autoIncrement: true,
+        type: Sequelize.UUID,
         primaryKey: true,
-        type: Sequelize.INTEGER
-      },
-      nombre_empresa: {
-        type: Sequelize.STRING(100),
+        defaultValue: Sequelize.literal('gen_random_uuid()'),
         allowNull: false
+      },
+      empresa_id: {
+        type: Sequelize.UUID,
+        allowNull: false,
+        references: {
+          model: 'empresas',
+          key: 'id'
+        },
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE'
       },
       nombre_sede: {
         type: Sequelize.STRING(100),
@@ -32,7 +38,7 @@ module.exports = {
       },
       pais: {
         type: Sequelize.STRING(100),
-        allowNull: false,
+        allowNull: true,
         defaultValue: 'Argentina'
       },
       telefono: {
@@ -61,13 +67,17 @@ module.exports = {
     });
 
     // Agregar índices
-    await queryInterface.addIndex('sedes', ['nombre_empresa', 'nombre_sede'], {
+    await queryInterface.addIndex('sedes', ['empresa_id', 'nombre_sede'], {
       unique: true,
       name: 'idx_sedes_empresa_sede'
     });
-    
+
     await queryInterface.addIndex('sedes', ['activo'], {
       name: 'idx_sedes_activo'
+    });
+
+    await queryInterface.addIndex('sedes', ['empresa_id'], {
+      name: 'idx_sedes_empresa_id'
     });
   },
 

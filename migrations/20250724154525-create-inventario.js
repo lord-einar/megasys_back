@@ -5,13 +5,13 @@ module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable('inventario', {
       id: {
-        allowNull: false,
-        autoIncrement: true,
+        type: Sequelize.UUID,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        defaultValue: Sequelize.literal('gen_random_uuid()'),
+        allowNull: false
       },
       tipo_articulo_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'tipos_articulo',
@@ -38,7 +38,7 @@ module.exports = {
         allowNull: true
       },
       sede_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'sedes',
@@ -48,7 +48,7 @@ module.exports = {
         onDelete: 'RESTRICT'
       },
       estado: {
-        type: Sequelize.ENUM('disponible', 'en_uso', 'mantenimiento', 'dado_de_baja'),
+        type: Sequelize.ENUM('disponible', 'en_uso', 'en_prestamo', 'mantenimiento', 'dado_de_baja'),
         allowNull: false,
         defaultValue: 'disponible'
       },

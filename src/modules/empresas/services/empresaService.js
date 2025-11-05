@@ -11,14 +11,14 @@ class EmpresaService {
       const where = { activo: true };
 
       if (filtros.nombre) {
-        where.nombre = {
+        where.nombre_empresa = {
           [require('sequelize').Op.iLike]: `%${filtros.nombre}%`
         };
       }
 
       const empresas = await Empresa.findAll({
         where,
-        order: [['nombre', 'ASC']]
+        order: [['nombre_empresa', 'ASC']]
       });
 
       logger.info('Empresas activas obtenidas', { cantidad: empresas.length });
@@ -37,7 +37,7 @@ class EmpresaService {
       const where = {};
 
       if (filtros.nombre) {
-        where.nombre = {
+        where.nombre_empresa = {
           [require('sequelize').Op.iLike]: `%${filtros.nombre}%`
         };
       }
@@ -48,7 +48,7 @@ class EmpresaService {
 
       const empresas = await Empresa.findAll({
         where,
-        order: [['nombre', 'ASC']]
+        order: [['nombre_empresa', 'ASC']]
       });
 
       logger.info('Todas las empresas obtenidas', { cantidad: empresas.length });
@@ -89,17 +89,16 @@ class EmpresaService {
   async crearEmpresa(datosEmpresa) {
     try {
       const empresa = await Empresa.create({
-        nombre: datosEmpresa.nombre,
-        razon_social: datosEmpresa.razonSocial,
-        rfc: datosEmpresa.rfc,
+        nombre_empresa: datosEmpresa.nombre,
+        rason_social: datosEmpresa.razonSocial,
+        cuit: datosEmpresa.cuit,
         direccion: datosEmpresa.direccion,
         telefono: datosEmpresa.telefono,
         email: datosEmpresa.email,
-        sitio_web: datosEmpresa.sitioWeb,
         activo: datosEmpresa.activo !== false
       });
 
-      logger.info('Nueva empresa creada', { empresaId: empresa.id, nombre: empresa.nombre });
+      logger.info('Nueva empresa creada', { empresaId: empresa.id, nombre: empresa.nombre_empresa });
       return empresa;
     } catch (error) {
       logger.error('Error creando empresa:', error);
@@ -119,13 +118,12 @@ class EmpresaService {
       }
 
       await empresa.update({
-        nombre: datosEmpresa.nombre || empresa.nombre,
-        razon_social: datosEmpresa.razonSocial || empresa.razon_social,
-        rfc: datosEmpresa.rfc || empresa.rfc,
+        nombre_empresa: datosEmpresa.nombre || empresa.nombre_empresa,
+        rason_social: datosEmpresa.razonSocial || empresa.rason_social,
+        cuit: datosEmpresa.cuit || empresa.cuit,
         direccion: datosEmpresa.direccion || empresa.direccion,
         telefono: datosEmpresa.telefono || empresa.telefono,
         email: datosEmpresa.email || empresa.email,
-        sitio_web: datosEmpresa.sitioWeb || empresa.sitio_web,
         activo: datosEmpresa.activo !== undefined ? datosEmpresa.activo : empresa.activo
       });
 

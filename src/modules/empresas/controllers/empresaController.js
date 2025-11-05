@@ -60,7 +60,7 @@ class EmpresaController {
    */
   crear = asyncHandler(async (req, res) => {
     try {
-      const { nombre, razonSocial, rfc, direccion, telefono, email, sitioWeb } = req.body;
+      const { nombre, razonSocial, cuit, direccion, telefono, email } = req.body;
 
       // Validaciones básicas
       if (!nombre || nombre.trim() === '') {
@@ -70,11 +70,10 @@ class EmpresaController {
       const datosEmpresa = {
         nombre: nombre.trim(),
         razonSocial: razonSocial?.trim(),
-        rfc: rfc?.trim(),
+        cuit: cuit?.trim(),
         direccion: direccion?.trim(),
         telefono: telefono?.trim(),
-        email: email?.trim(),
-        sitioWeb: sitioWeb?.trim()
+        email: email?.trim()
       };
 
       // Ejecutar con transacción y auditoría
@@ -107,7 +106,7 @@ class EmpresaController {
   actualizar = asyncHandler(async (req, res) => {
     try {
       const { id } = req.params;
-      const { nombre, razonSocial, rfc, direccion, telefono, email, sitioWeb, activo } = req.body;
+      const { nombre, razonSocial, cuit, direccion, telefono, email, activo } = req.body;
 
       // Obtener valores anteriores para auditoría
       const empresaAnterior = await empresaService.getEmpresaById(id);
@@ -115,11 +114,10 @@ class EmpresaController {
       const datosActualizacion = {
         nombre: nombre?.trim(),
         razonSocial: razonSocial?.trim(),
-        rfc: rfc?.trim(),
+        cuit: cuit?.trim(),
         direccion: direccion?.trim(),
         telefono: telefono?.trim(),
         email: email?.trim(),
-        sitioWeb: sitioWeb?.trim(),
         activo
       };
 
@@ -134,15 +132,14 @@ class EmpresaController {
         accion: 'actualizar',
         recurso: 'Empresa',
         recursoId: id,
-        descripcion: `Actualización de empresa: ${empresaAnterior.nombre}`,
+        descripcion: `Actualización de empresa: ${empresaAnterior.nombre_empresa}`,
         valoresAnteriores: {
-          nombre: empresaAnterior.nombre,
-          razonSocial: empresaAnterior.razonSocial,
-          rfc: empresaAnterior.rfc,
+          nombre_empresa: empresaAnterior.nombre_empresa,
+          rason_social: empresaAnterior.rason_social,
+          cuit: empresaAnterior.cuit,
           direccion: empresaAnterior.direccion,
           telefono: empresaAnterior.telefono,
           email: empresaAnterior.email,
-          sitioWeb: empresaAnterior.sitioWeb,
           activo: empresaAnterior.activo
         },
         valoresNuevos: datosActualizacion,
@@ -183,11 +180,11 @@ class EmpresaController {
         accion: 'eliminar',
         recurso: 'Empresa',
         recursoId: id,
-        descripcion: `Eliminación de empresa: ${empresaAnterior.nombre}`,
+        descripcion: `Eliminación de empresa: ${empresaAnterior.nombre_empresa}`,
         valoresAnteriores: {
-          nombre: empresaAnterior.nombre,
-          razonSocial: empresaAnterior.razonSocial,
-          rfc: empresaAnterior.rfc,
+          nombre_empresa: empresaAnterior.nombre_empresa,
+          rason_social: empresaAnterior.rason_social,
+          cuit: empresaAnterior.cuit,
           activo: empresaAnterior.activo
         },
         ipAddress: req.ip,

@@ -117,7 +117,7 @@ class SedeAsignacionController {
    */
   obtenerSedesAsignadas = asyncHandler(async (req, res) => {
     try {
-      const { id: personalId } = req.params;
+      const { personalId } = req.params;
       const { historicas } = req.query;
 
       const soloActivas = !historicas || historicas !== 'true';

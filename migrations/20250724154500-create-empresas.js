@@ -1,22 +1,38 @@
-// migrations/20241201120002-create-tipos-articulo.js
 'use strict';
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('tipos_articulo', {
+    await queryInterface.createTable('empresas', {
       id: {
         type: Sequelize.UUID,
         primaryKey: true,
         defaultValue: Sequelize.literal('gen_random_uuid()'),
         allowNull: false
       },
-      nombre: {
-        type: Sequelize.STRING(50),
+      nombre_empresa: {
+        type: Sequelize.STRING(100),
         allowNull: false,
         unique: true
       },
-      descripcion: {
-        type: Sequelize.TEXT,
+      cuit: {
+        type: Sequelize.STRING(20),
+        allowNull: true,
+        unique: true
+      },
+      rason_social: {
+        type: Sequelize.STRING(200),
+        allowNull: true
+      },
+      email: {
+        type: Sequelize.STRING(100),
+        allowNull: true
+      },
+      telefono: {
+        type: Sequelize.STRING(20),
+        allowNull: true
+      },
+      direccion: {
+        type: Sequelize.STRING(200),
         allowNull: true
       },
       activo: {
@@ -37,17 +53,16 @@ module.exports = {
     });
 
     // Agregar índices
-    await queryInterface.addIndex('tipos_articulo', ['nombre'], {
-      unique: true,
-      name: 'idx_tipos_articulo_nombre'
+    await queryInterface.addIndex('empresas', ['nombre_empresa'], {
+      name: 'idx_empresas_nombre'
     });
 
-    await queryInterface.addIndex('tipos_articulo', ['activo'], {
-      name: 'idx_tipos_articulo_activo'
+    await queryInterface.addIndex('empresas', ['activo'], {
+      name: 'idx_empresas_activo'
     });
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('tipos_articulo');
+    await queryInterface.dropTable('empresas');
   }
 };

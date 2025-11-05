@@ -56,7 +56,7 @@ class SedeService {
         {
           model: Empresa,
           as: 'empresa',
-          attributes: ['id', 'nombre', 'rfc']
+          attributes: ['id', 'nombre_empresa', 'cuit']
         },
         {
           model: Personal,

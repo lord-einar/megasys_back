@@ -1,0 +1,26 @@
+{
+  "development": {
+    "username": "postgres",
+    "password": "Italia0454!",
+    "database": "gestion_empresarial",
+    "host": "localhost",
+    "port": 5432,
+    "dialect": "postgres"
+  },
+  "test": {
+    "username": "postgres",
+    "password": "Italia0454!",
+    "database": "gestion_empresarial_test",
+    "host": "localhost",
+    "port": 5432,
+    "dialect": "postgres"
+  },
+  "production": {
+    "username": "postgres",
+    "password": "Italia0454!",
+    "database": "gestion_empresarial_prod",
+    "host": "localhost",
+    "port": 5432,
+    "dialect": "postgres"
+  }
+}

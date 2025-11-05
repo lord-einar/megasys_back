@@ -6,10 +6,10 @@ module.exports = {
     // Tabla de proveedores
     await queryInterface.createTable('proveedores', {
       id: {
-        allowNull: false,
-        autoIncrement: true,
+        type: Sequelize.UUID,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        defaultValue: Sequelize.literal('gen_random_uuid()'),
+        allowNull: false
       },
       empresa: {
         type: Sequelize.STRING(100),
@@ -47,13 +47,13 @@ module.exports = {
     // Tabla de ejecutivos de cuentas
     await queryInterface.createTable('ejecutivos_cuentas', {
       id: {
-        allowNull: false,
-        autoIncrement: true,
+        type: Sequelize.UUID,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        defaultValue: Sequelize.literal('gen_random_uuid()'),
+        allowNull: false
       },
       proveedor_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'proveedores',
@@ -94,10 +94,10 @@ module.exports = {
     // Tabla de tipos de servicio
     await queryInterface.createTable('tipos_servicio', {
       id: {
-        allowNull: false,
-        autoIncrement: true,
+        type: Sequelize.UUID,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        defaultValue: Sequelize.literal('gen_random_uuid()'),
+        allowNull: false
       },
       nombre: {
         type: Sequelize.STRING(50),
@@ -128,17 +128,17 @@ module.exports = {
     // Tabla de servicios
     await queryInterface.createTable('servicios', {
       id: {
-        allowNull: false,
-        autoIncrement: true,
+        type: Sequelize.UUID,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        defaultValue: Sequelize.literal('gen_random_uuid()'),
+        allowNull: false
       },
       nombre: {
         type: Sequelize.STRING(100),
         allowNull: false
       },
       tipo_servicio_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'tipos_servicio',
@@ -148,7 +148,7 @@ module.exports = {
         onDelete: 'RESTRICT'
       },
       proveedor_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'proveedores',
@@ -181,13 +181,13 @@ module.exports = {
     // Tabla de soporte por niveles
     await queryInterface.createTable('soporte_niveles', {
       id: {
-        allowNull: false,
-        autoIncrement: true,
+        type: Sequelize.UUID,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        defaultValue: Sequelize.literal('gen_random_uuid()'),
+        allowNull: false
       },
       servicio_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'servicios',
@@ -228,13 +228,13 @@ module.exports = {
     // Tabla intermedia sede-servicios
     await queryInterface.createTable('sede_servicios', {
       id: {
-        allowNull: false,
-        autoIncrement: true,
+        type: Sequelize.UUID,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        defaultValue: Sequelize.literal('gen_random_uuid()'),
+        allowNull: false
       },
       sede_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'sedes',
@@ -244,7 +244,7 @@ module.exports = {
         onDelete: 'CASCADE'
       },
       servicio_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'servicios',

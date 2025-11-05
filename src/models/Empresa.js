@@ -9,7 +9,7 @@ const Empresa = sequelize.define('Empresa', {
     primaryKey: true,
     defaultValue: () => uuidv4()
   },
-  nombre: {
+  nombre_empresa: {
     type: DataTypes.STRING(100),
     allowNull: false,
     unique: {
@@ -25,26 +25,26 @@ const Empresa = sequelize.define('Empresa', {
       }
     }
   },
-  razon_social: {
-    type: DataTypes.STRING(150),
+  rason_social: {
+    type: DataTypes.STRING(200),
     allowNull: true,
     validate: {
       len: {
-        args: [0, 150],
-        msg: 'La razón social no puede exceder 150 caracteres'
+        args: [0, 200],
+        msg: 'La razón social no puede exceder 200 caracteres'
       }
     }
   },
-  rfc: {
-    type: DataTypes.STRING(50),
+  cuit: {
+    type: DataTypes.STRING(20),
     allowNull: true,
     unique: {
-      msg: 'Este RFC ya existe'
+      msg: 'Este CUIT ya existe'
     },
     validate: {
       len: {
-        args: [0, 50],
-        msg: 'El RFC no puede exceder 50 caracteres'
+        args: [0, 20],
+        msg: 'El CUIT no puede exceder 20 caracteres'
       }
     }
   },
@@ -77,15 +77,6 @@ const Empresa = sequelize.define('Empresa', {
       }
     }
   },
-  sitio_web: {
-    type: DataTypes.STRING(200),
-    allowNull: true,
-    validate: {
-      isUrl: {
-        msg: 'Debe ser una URL válida'
-      }
-    }
-  },
   activo: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
@@ -96,13 +87,13 @@ const Empresa = sequelize.define('Empresa', {
   indexes: [
     {
       unique: true,
-      fields: ['nombre']
+      fields: ['nombre_empresa']
     },
     {
       unique: true,
-      fields: ['rfc'],
+      fields: ['cuit'],
       where: {
-        rfc: {
+        cuit: {
           [Op.ne]: null
         }
       }
@@ -124,9 +115,9 @@ const Empresa = sequelize.define('Empresa', {
 Empresa.prototype.getInfo = function() {
   return {
     id: this.id,
-    nombre: this.nombre,
-    razonSocial: this.razon_social,
-    rfc: this.rfc,
+    nombre_empresa: this.nombre_empresa,
+    rason_social: this.rason_social,
+    cuit: this.cuit,
     activo: this.activo
   };
 };

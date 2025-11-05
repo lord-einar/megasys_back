@@ -6,10 +6,10 @@ module.exports = {
     // Tabla de remitos
     await queryInterface.createTable('remitos', {
       id: {
-        allowNull: false,
-        autoIncrement: true,
+        type: Sequelize.UUID,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        defaultValue: Sequelize.literal('gen_random_uuid()'),
+        allowNull: false
       },
       numero_remito: {
         type: Sequelize.STRING(20),
@@ -22,7 +22,7 @@ module.exports = {
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
       },
       sede_origen_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'sedes',
@@ -32,7 +32,7 @@ module.exports = {
         onDelete: 'RESTRICT'
       },
       sede_destino_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'sedes',
@@ -42,7 +42,7 @@ module.exports = {
         onDelete: 'RESTRICT'
       },
       solicitante_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'personal',
@@ -52,7 +52,7 @@ module.exports = {
         onDelete: 'RESTRICT'
       },
       tecnico_asignado_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: true,
         references: {
           model: 'personal',
@@ -93,13 +93,13 @@ module.exports = {
     // Tabla de detalles de remito
     await queryInterface.createTable('remito_detalles', {
       id: {
-        allowNull: false,
-        autoIncrement: true,
+        type: Sequelize.UUID,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        defaultValue: Sequelize.literal('gen_random_uuid()'),
+        allowNull: false
       },
       remito_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'remitos',
@@ -109,7 +109,7 @@ module.exports = {
         onDelete: 'CASCADE'
       },
       inventario_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'inventario',
@@ -155,13 +155,13 @@ module.exports = {
     // Tabla de historial de movimientos
     await queryInterface.createTable('historial_movimientos', {
       id: {
-        allowNull: false,
-        autoIncrement: true,
+        type: Sequelize.UUID,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        defaultValue: Sequelize.literal('gen_random_uuid()'),
+        allowNull: false
       },
       inventario_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'inventario',
@@ -171,7 +171,7 @@ module.exports = {
         onDelete: 'CASCADE'
       },
       remito_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: true,
         references: {
           model: 'remitos',
@@ -181,7 +181,7 @@ module.exports = {
         onDelete: 'SET NULL'
       },
       sede_origen_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'sedes',
@@ -191,7 +191,7 @@ module.exports = {
         onDelete: 'RESTRICT'
       },
       sede_destino_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: false,
         references: {
           model: 'sedes',
@@ -210,7 +210,7 @@ module.exports = {
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
       },
       usuario_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.UUID,
         allowNull: true,
         references: {
           model: 'personal',
