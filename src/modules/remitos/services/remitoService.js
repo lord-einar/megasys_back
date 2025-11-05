@@ -1295,6 +1295,9 @@ class RemitoService {
       remito.estado = 'completado';
       await remito.save({ transaction: t });
 
+      // Actualizar también el estado en el objeto remitoCompleto para el email
+      remitoCompleto.estado = 'completado';
+
       logger.info('Estado del remito actualizado a COMPLETADO:', {
         numeroRemito: remito.numero_remito
       });
