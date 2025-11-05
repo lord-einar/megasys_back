@@ -2,6 +2,7 @@
 const { Personal, Sede, Rol, PersonalSede, Remito, sequelize } = require('../../../models');
 const logger = require('../../../shared/utils/logger');
 const { Op } = require('sequelize');
+const { v4: uuidv4 } = require('uuid');
 const { assignSistemasRoleIfAuthorized } = require('../../../shared/utils/sistemasRoleAssignment');
 
 class PersonalService {
@@ -750,8 +751,12 @@ class PersonalService {
     const transaction = await sequelize.transaction();
 
     try {
+      // El id de Entra ID contiene un punto (homeAccountId) que no es válido como UUID en PostgreSQL
+      // Generar un UUID válido en su lugar - el email será el identificador único
+      const validUUID = uuidv4();
+
       const nuevoPersonal = await Personal.create({
-        id: id, // Usar el homeAccountId de Azure como ID único
+        id: validUUID, // Generar UUID válido en lugar de usar homeAccountId
         nombre: nombre.trim(),
         apellido: apellido.trim(),
         email: email.toLowerCase().trim(),

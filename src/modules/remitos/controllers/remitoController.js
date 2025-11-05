@@ -130,7 +130,7 @@ class RemitoController {
         });
 
         try {
-          const personalService = require('../../personal/services/personalService');
+          const personalService = require('../../../modules/personal/services/personalService');
           await personalService.autoProvisionarPersonal(req.user, {
             role: req.user.role || 'user',
             permissions: []
