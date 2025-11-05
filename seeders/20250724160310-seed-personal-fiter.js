@@ -244,7 +244,7 @@ module.exports = {
           email: person.email,
           telefono: person.telefono || null,
           sede_id: sedePrincipalId,
-          rol_id: null, // No asignamos rol en personal, solo en personal_sedes
+          rol_id: clubManagerRolId, // Asignar Club Manager en ambas tablas para unificar con Megatlon
           privilegio_app: 'user',
           activo: true,
           fecha_ingreso: new Date().toISOString().split('T')[0],
