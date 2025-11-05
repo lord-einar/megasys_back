@@ -492,6 +492,13 @@ class EmailService {
    */
   async enviarConfirmacionRecepcion(remito, rutaPDF, emailSolicitante, fechaConfirmacion) {
     try {
+      logger.info('📧 INICIANDO ENVÍO DE EMAIL DE CONFIRMACIÓN', {
+        remito: remito.numero_remito,
+        email: emailSolicitante,
+        from: EMAIL_FROM,
+        rutaPDF: rutaPDF
+      });
+
       const html = this.generarHTMLConfirmacion(remito, emailSolicitante, fechaConfirmacion);
 
       const opciones = {
@@ -510,12 +517,20 @@ class EmailService {
         ]
       };
 
+      logger.info('📧 Opciones de email preparadas:', {
+        to: opciones.to,
+        from: opciones.from,
+        subject: opciones.subject,
+        attachmentCount: opciones.attachments.length
+      });
+
       const info = await this.transporter.sendMail(opciones);
 
-      logger.info('Email de confirmación enviado:', {
+      logger.info('✓ Email de confirmación enviado exitosamente:', {
         remito: remito.numero_remito,
         messageId: info.messageId,
-        email: emailSolicitante
+        email: emailSolicitante,
+        response: info.response
       });
 
       return {
@@ -524,10 +539,12 @@ class EmailService {
         email: emailSolicitante
       };
     } catch (error) {
-      logger.error('Error enviando email de confirmación:', {
+      logger.error('✗ Error enviando email de confirmación:', {
         error: error.message,
+        code: error.code,
         remito: remito.numero_remito,
-        email: emailSolicitante
+        email: emailSolicitante,
+        stack: error.stack
       });
       throw error;
     }
@@ -542,19 +559,30 @@ class EmailService {
    */
   async reenviarEmails(remito, rutaPDF, urlConfirmacion) {
     try {
+      logger.info('📧 INICIANDO REENVÍO DE EMAILS', {
+        remito: remito.numero_remito,
+        rutaPDF: rutaPDF,
+        urlConfirmacion: !!urlConfirmacion
+      });
+
       const resultados = [];
 
       // Enviar a infraestructura
+      logger.info('📧 Reenviando email a INFRAESTRUCTURA...');
       const resultInfra = await this.enviarAInfraestructura(remito, rutaPDF);
       resultados.push(resultInfra);
+      logger.info('✓ Email a infraestructura reenviado');
 
       // Enviar al solicitante
+      logger.info('📧 Reenviando email al SOLICITANTE...');
       const resultSolicitante = await this.enviarAlSolicitante(remito, rutaPDF, urlConfirmacion);
       resultados.push(resultSolicitante);
+      logger.info('✓ Email al solicitante reenviado');
 
-      logger.info('Emails reenviados exitosamente:', {
+      logger.info('✓ Todos los emails reenviados exitosamente:', {
         remito: remito.numero_remito,
-        emails: resultados.map(r => r.email)
+        emails: resultados.map(r => r.email),
+        timestamp: new Date().toISOString()
       });
 
       return {
@@ -562,9 +590,12 @@ class EmailService {
         resultados: resultados
       };
     } catch (error) {
-      logger.error('Error reenviando emails:', {
+      logger.error('✗ Error reenviando emails:', {
         error: error.message,
-        remito: remito.numero_remito
+        code: error.code,
+        remito: remito.numero_remito,
+        timestamp: new Date().toISOString(),
+        stack: error.stack
       });
       throw error;
     }
