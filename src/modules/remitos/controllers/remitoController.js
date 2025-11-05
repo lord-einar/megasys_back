@@ -109,8 +109,12 @@ class RemitoController {
         return error(res, 'El nuevo estado es requerido', 400);
       }
 
-      // Buscar el usuario en la base de datos para obtener su rol
-      const personal = await Personal.findOne({
+      // El usuarioId viene del token JWT (homeAccountId de Entra ID)
+      // Si no existe en Personal, intentar buscarlo por email para auto-provisioning
+      let personal = null;
+
+      // Primero intentar buscar por email (para casos ya registrados)
+      personal = await Personal.findOne({
         where: { email: req.user.email.toLowerCase(), activo: true },
         include: [{
           model: Rol,
@@ -119,11 +123,41 @@ class RemitoController {
         }]
       });
 
+      // Si no existe, intentar auto-provisionar
       if (!personal) {
-        logger.warn('Personal no encontrado para cambio de estado:', {
+        logger.info('Personal no encontrado, intentando auto-provisioning:', {
           email: req.user.email
         });
-        return error(res, 'Usuario no registrado en el sistema', 404);
+
+        try {
+          const personalService = require('../../personal/services/personalService');
+          await personalService.autoProvisionarPersonal(req.user, {
+            role: req.user.role || 'user',
+            permissions: []
+          });
+
+          // Intentar buscar nuevamente después de auto-provisioning
+          personal = await Personal.findOne({
+            where: { email: req.user.email.toLowerCase(), activo: true },
+            include: [{
+              model: Rol,
+              as: 'rol',
+              attributes: ['nombre']
+            }]
+          });
+        } catch (provisioningError) {
+          logger.warn('Error en auto-provisioning para cambio de estado:', {
+            email: req.user.email,
+            error: provisioningError.message
+          });
+        }
+      }
+
+      if (!personal) {
+        logger.warn('Personal no encontrado incluso después de auto-provisioning:', {
+          email: req.user.email
+        });
+        return error(res, 'Usuario no registrado en el sistema. Por favor contacta a Infraestructura.', 404);
       }
 
       const usuarioId = personal.id;
