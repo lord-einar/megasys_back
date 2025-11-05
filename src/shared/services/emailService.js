@@ -463,11 +463,11 @@ class EmailService {
               <div class="section-title">INFORMACIÓN DEL REMITO</div>
               <div class="info-item">
                 <div class="info-label">Sede de Origen</div>
-                <div class="info-value">${remito.sedeOrigen?.nombre || 'N/A'}</div>
+                <div class="info-value">${remito.sedeOrigen?.nombre_sede || remito.sedeOrigen?.nombre || 'N/A'}</div>
               </div>
               <div class="info-item">
                 <div class="info-label">Sede de Destino</div>
-                <div class="info-value">${remito.sedeDestino?.nombre || 'N/A'}</div>
+                <div class="info-value">${remito.sedeDestino?.nombre_sede || remito.sedeDestino?.nombre || 'N/A'}</div>
               </div>
             </div>
 

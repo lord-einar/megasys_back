@@ -1251,16 +1251,27 @@ class RemitoService {
         estadoActual: remito.estado
       });
 
-      // 5. Generar PDF con watermark de confirmación
       const fechaConfirmacion = new Date();
+
+      // 5. Actualizar estado del remito a COMPLETADO PRIMERO
+      remito.estado = 'completado';
+      await remito.save({ transaction: t });
+
+      logger.info('Estado del remito actualizado a COMPLETADO:', {
+        numeroRemito: remito.numero_remito
+      });
+
+      // 6. AHORA generar PDF con watermark de confirmación (con estado actualizado)
       const remitoCompleto = remito.toJSON();
       remitoCompleto.es_prestamo = remito.detalles && remito.detalles.some(d => d.es_prestamo);
+      remitoCompleto.estado = 'completado'; // Asegurar que el estado es correcto
 
       logger.info('=== GENERACIÓN DE PDF CONFIRMADO - INICIANDO ===', {
         remitoId,
         numeroRemito: remito.numero_remito,
         solicitante: remito.solicitante?.nombre,
         tecnico: remito.tecnicoAsignado?.nombre,
+        estado: remitoCompleto.estado,
         timestamp: new Date().toISOString()
       });
 
@@ -1278,6 +1289,7 @@ class RemitoService {
           numeroRemito: remito.numero_remito,
           rutaPDF: resultadoPDFConfirmado.path,
           tamaño: resultadoPDFConfirmado.size,
+          estado: remitoCompleto.estado,
           timestamp: new Date().toISOString()
         });
       } catch (pdfError) {
@@ -1290,17 +1302,6 @@ class RemitoService {
         });
         throw new Error(`Error generando PDF de confirmación: ${pdfError.message}`);
       }
-
-      // 6. Actualizar estado del remito a COMPLETADO
-      remito.estado = 'completado';
-      await remito.save({ transaction: t });
-
-      // Actualizar también el estado en el objeto remitoCompleto para el email
-      remitoCompleto.estado = 'completado';
-
-      logger.info('Estado del remito actualizado a COMPLETADO:', {
-        numeroRemito: remito.numero_remito
-      });
 
       // 7. Registrar en audit log
       AuditService.registrarAccion({
