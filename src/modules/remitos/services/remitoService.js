@@ -831,12 +831,15 @@ class RemitoService {
           if (!fs.existsSync(rutaArchivo)) {
             logger.warn('⚠️ PDF no encontrado, regenerando para envío de emails...', { rutaArchivo });
             const remitoJSON = remitoCompleto.toJSON();
+            // Asegurar que el estado en el PDF sea el nuevo estado
+            remitoJSON.estado = nuevoEstado;
             remitoJSON.es_prestamo = remitoCompleto.detalles && remitoCompleto.detalles.some(d => d.es_prestamo);
             const resultadoPDF = await pdfService.generarPDF(remitoJSON, { confirmado: false });
             rutaPDFParaEmail = resultadoPDF.path;
             logger.info('✓ PDF regenerado para envío', {
               rutaPDF: resultadoPDF.path,
-              tamaño: resultadoPDF.size
+              tamaño: resultadoPDF.size,
+              estado: nuevoEstado
             });
           }
 
@@ -1337,12 +1340,16 @@ class RemitoService {
         }
       });
 
+      // Extraer solo el nombre del archivo para que el cliente pueda descargarlo vía /storage/confirmaciones
+      const nombreArchivoConfirmacion = resultadoPDFConfirmado.path.split('/').pop();
+      const rutaPDFParaCliente = `/storage/confirmaciones/${nombreArchivoConfirmacion}`;
+
       return {
         success: true,
         numeroRemito: remito.numero_remito,
         estado: 'completado',
         fechaConfirmacion: fechaConfirmacion.toLocaleString('es-AR'),
-        pdfConfirmado: resultadoPDFConfirmado.path
+        pdfConfirmado: rutaPDFParaCliente
       };
     } catch (error) {
       // Solo hacer rollback si la transacción aún no ha sido commiteada
