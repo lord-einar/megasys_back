@@ -9,9 +9,8 @@ const { VALID_STATES } = require('../../../shared/constants/inventoryStates');
 
 const router = express.Router();
 
-// Las rutas GET (lectura) son públicas para desarrollo
-// Las rutas POST/PUT/DELETE requieren autenticación
-// router.use(authenticate); // Comentado para desarrollo - se aplica por ruta
+// Todas las rutas requieren autenticación
+router.use(authenticate);
 
 // Validaciones comunes
 const validarId = [

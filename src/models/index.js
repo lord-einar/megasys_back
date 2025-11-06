@@ -1,6 +1,7 @@
 // src/models/index.js - COMPLETO CON RELACIONES
 const { Sequelize } = require('sequelize');
 const { sequelize } = require('../shared/utils/database');
+const logger = require('../shared/utils/logger');
 
 // Importar todos los modelos
 const Empresa = require('./Empresa');
@@ -382,7 +383,7 @@ RemitoDetalle.addHook('afterCreate', async (remitoDetalle, options) => {
   try {
     // Obtener el remito completo
     const remito = await Remito.findByPk(remitoDetalle.remito_id);
-    
+
     if (remito) {
       // Crear registro en historial
       await HistorialMovimiento.create({
@@ -396,7 +397,13 @@ RemitoDetalle.addHook('afterCreate', async (remitoDetalle, options) => {
       }, { transaction: options.transaction });
     }
   } catch (error) {
-    console.error('Error creando historial de movimiento:', error);
+    logger.error('Error creando historial de movimiento en hook afterCreate de RemitoDetalle:', {
+      remitoDetalleId: remitoDetalle.id,
+      remitoId: remitoDetalle.remito_id,
+      error: error.message,
+      stack: error.stack
+    });
+    throw error; // Propagate error to rollback transaction
   }
 });
 
@@ -419,7 +426,13 @@ Remito.addHook('afterUpdate', async (remito, options) => {
         }
       }
     } catch (error) {
-      console.error('Error actualizando ubicación de inventario:', error);
+      logger.error('Error actualizando ubicación de inventario en hook afterUpdate de Remito:', {
+        remitoId: remito.id,
+        remitoNumero: remito.numero_remito,
+        error: error.message,
+        stack: error.stack
+      });
+      throw error; // Propagate error to rollback transaction
     }
   }
 });
