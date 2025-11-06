@@ -309,7 +309,17 @@ class RemitoController {
       }
 
       // Validar que la fecha sea válida
-      const fechaParsed = new Date(fecha_devolucion_esperada);
+      // Importante: No usar new Date() con formato YYYY-MM-DD porque se interpreta como UTC
+      // En su lugar, parsear manualmente la fecha para evitar problemas de timezone
+      let fechaParsed;
+      if (typeof fecha_devolucion_esperada === 'string' && fecha_devolucion_esperada.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        const [year, month, day] = fecha_devolucion_esperada.split('-');
+        // Crear la fecha en zona horaria local, no UTC
+        fechaParsed = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      } else {
+        fechaParsed = new Date(fecha_devolucion_esperada);
+      }
+
       if (isNaN(fechaParsed.getTime())) {
         return error(res, 'La fecha de devolución proporcionada no es válida', 400);
       }
@@ -317,7 +327,8 @@ class RemitoController {
       logger.info('Actualizando fecha de devolución:', {
         remitoId,
         detalleId,
-        fechaDevolucion: fecha_devolucion_esperada,
+        fechaDevolucionOriginal: fecha_devolucion_esperada,
+        fechaDevolucionParsed: fechaParsed.toISOString(),
         usuario: req.user?.email
       });
 
