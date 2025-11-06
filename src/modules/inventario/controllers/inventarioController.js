@@ -1,6 +1,6 @@
 // src/modules/inventario/controllers/inventarioController.js
 const inventarioService = require('../services/inventarioService');
-const { success, error } = require('../../../shared/utils/response');
+const { success, error, paginated } = require('../../../shared/utils/response');
 const asyncHandler = require('../../../shared/utils/asyncHandler');
 const logger = require('../../../shared/utils/logger');
 
@@ -11,7 +11,7 @@ class InventarioController {
   listar = asyncHandler(async (req, res) => {
     try {
       const resultado = await inventarioService.listar(req.query);
-      success(res, resultado, 'Inventario obtenido correctamente');
+      paginated(res, resultado.rows, resultado.pagination, 'Inventario obtenido correctamente');
     } catch (err) {
       logger.error('Error listando inventario:', { error: err.message, stack: err.stack });
       return error(res, err.message || 'Error al listar inventario', 500);
