@@ -1642,19 +1642,18 @@ class RemitoService {
       `;
 
       // Enviar a infraestructura
-      await emailService.enviarAInfraestructura(
+      await emailService.enviarEmailHTML(
+        'infraestructura@megatlon.com.ar',
         asunto,
-        contenidoEmail,
-        { html: true }
+        contenidoEmail
       );
 
       // Enviar al solicitante
       if (remito.solicitante?.email) {
-        await emailService.enviarEmail(
+        await emailService.enviarEmailHTML(
           remito.solicitante.email,
           asunto,
-          contenidoEmail,
-          { html: true }
+          contenidoEmail
         );
       }
 

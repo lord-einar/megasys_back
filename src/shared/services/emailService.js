@@ -621,6 +621,58 @@ class EmailService {
       throw error;
     }
   }
+
+  /**
+   * Enviar email genérico con contenido HTML (sin PDF)
+   * Útil para notificaciones, recordatorios, etc.
+   * @param {string} destinatario - Email del destinatario
+   * @param {string} asunto - Asunto del email
+   * @param {string} contenidoHTML - Contenido HTML del email
+   * @returns {Promise<object>} Resultado del envío
+   */
+  async enviarEmailHTML(destinatario, asunto, contenidoHTML) {
+    try {
+      logger.info('📧 Enviando email HTML:', {
+        to: destinatario,
+        subject: asunto,
+        from: EMAIL_FROM
+      });
+
+      const opciones = {
+        from: EMAIL_FROM,
+        to: destinatario,
+        subject: asunto,
+        html: contenidoHTML,
+        headers: {
+          'Content-Type': 'text/html; charset=UTF-8'
+        }
+      };
+
+      const info = await this.transporter.sendMail(opciones);
+
+      logger.info('✓ Email HTML enviado exitosamente:', {
+        destinatario,
+        asunto,
+        messageId: info.messageId,
+        timestamp: new Date().toISOString()
+      });
+
+      return {
+        success: true,
+        messageId: info.messageId,
+        email: destinatario
+      };
+    } catch (error) {
+      logger.error('✗ Error enviando email HTML:', {
+        error: error.message,
+        destinatario,
+        asunto,
+        errorCode: error.code,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
 }
 
 module.exports = new EmailService();
