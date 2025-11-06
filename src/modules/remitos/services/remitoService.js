@@ -1580,11 +1580,12 @@ class RemitoService {
       const remito = detalle.remito;
       const inventario = detalle.inventarioDetalle;
       const fechaVencimiento = new Date(detalle.fecha_devolucion_esperada);
-      const fechaFormato = fechaVencimiento.toLocaleDateString('es-AR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      });
+
+      // Formato dd-mm-yyyy
+      const day = String(fechaVencimiento.getDate()).padStart(2, '0');
+      const month = String(fechaVencimiento.getMonth() + 1).padStart(2, '0');
+      const year = fechaVencimiento.getFullYear();
+      const fechaFormato = `${day}-${month}-${year}`;
 
       const descripcionArticulo = `${inventario?.tipoArticulo?.nombre || 'Artículo'} - ${inventario?.marca} ${inventario?.modelo}${inventario?.numero_serie ? ` (SN: ${inventario.numero_serie})` : ''}`;
       const asunto = `AVISO: Devolución mañana - Remito ${remito.numero_remito}`;

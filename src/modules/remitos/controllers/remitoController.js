@@ -349,6 +349,18 @@ class RemitoController {
         ]
       });
 
+      if (!remito) {
+        return error(res, 'El remito no existe', 404);
+      }
+
+      // Debuggear: verificar que el solicitante se cargó correctamente
+      logger.info('Remito cargado para actualizar fecha de devolución:', {
+        remitoId,
+        solicitanteId: remito.solicitante_id,
+        solicitante: remito.solicitante,
+        hasSolicitanteEmail: !!remito.solicitante?.email
+      });
+
       // Actualizar la fecha
       await detalle.update({
         fecha_devolucion_esperada: fechaParsed
@@ -358,11 +370,12 @@ class RemitoController {
       try {
         const inventario = detalle.inventarioDetalle;
         const nuevaFecha = new Date(fechaParsed);
-        const fechaFormato = nuevaFecha.toLocaleDateString('es-AR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric'
-        });
+
+        // Formato dd-mm-yyyy
+        const day = String(nuevaFecha.getDate()).padStart(2, '0');
+        const month = String(nuevaFecha.getMonth() + 1).padStart(2, '0');
+        const year = nuevaFecha.getFullYear();
+        const fechaFormato = `${day}-${month}-${year}`;
 
         const asunto = `Extensión de fecha de devolución - Remito ${remito.numero_remito}`;
         const descripcionArticulo = `${inventario?.tipoArticulo?.nombre || 'Artículo'} - ${inventario?.marca} ${inventario?.modelo}${inventario?.numero_serie ? ` (SN: ${inventario.numero_serie})` : ''}`;
@@ -437,7 +450,12 @@ class RemitoController {
           nuevaFecha: fechaFormato
         });
       } catch (emailErr) {
-        logger.error('Error enviando email de extensión de fecha:', emailErr);
+        logger.error('Error enviando email de extensión de fecha:', {
+          error: emailErr.message,
+          solicitante: remito.solicitante,
+          remitoId,
+          detalleId
+        });
         // No fallar la operación si el email no se envía
       }
 
