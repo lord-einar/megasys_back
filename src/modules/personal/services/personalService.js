@@ -78,8 +78,16 @@ class PersonalService {
     const whereClause = {};
 
     // Si se especifica un personal_id, filtrar solo esa persona (para usuarios Soporte)
+    // Validar que sea un UUID válido antes de usarlo
     if (personal_id) {
-      whereClause.id = personal_id;
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(personal_id)) {
+        whereClause.id = personal_id;
+      } else {
+        // Si el personal_id no es un UUID válido, ignorar el filtro
+        // Esto ocurre cuando el usuario Soporte intenta filtrar por su homeAccountId de Entra ID
+        logger.warn('personal_id inválido - ignorando filtro', { personal_id });
+      }
     }
 
     if (search) {

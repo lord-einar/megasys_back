@@ -322,10 +322,12 @@ class RemitoController {
       });
 
       const { RemitoDetalle, Remito } = require('../../../models');
+      const emailService = require('../../../shared/services/emailService');
 
       // Verificar que el detalle existe y pertenece al remito
       const detalle = await RemitoDetalle.findOne({
-        where: { id: detalleId, remito_id: remitoId }
+        where: { id: detalleId, remito_id: remitoId },
+        include: ['inventarioDetalle']
       });
 
       if (!detalle) {
@@ -337,17 +339,115 @@ class RemitoController {
         return error(res, 'Solo se puede actualizar la fecha en préstamos', 400);
       }
 
+      // Obtener el remito completo con relaciones
+      const remito = await Remito.findByPk(remitoId, {
+        include: [
+          { association: 'solicitante', attributes: ['id', 'nombre', 'apellido', 'email'] },
+          { association: 'tecnicoAsignado', attributes: ['id', 'nombre', 'apellido'] },
+          { association: 'sedeOrigen', attributes: ['id', 'nombre_sede'] },
+          { association: 'sedeDestino', attributes: ['id', 'nombre_sede'] }
+        ]
+      });
+
       // Actualizar la fecha
       await detalle.update({
         fecha_devolucion_esperada: fechaParsed
       });
+
+      // Enviar email de notificación de extensión
+      try {
+        const inventario = detalle.inventarioDetalle;
+        const nuevaFecha = new Date(fechaParsed);
+        const fechaFormato = nuevaFecha.toLocaleDateString('es-AR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+
+        const asunto = `Extensión de fecha de devolución - Remito ${remito.numero_remito}`;
+        const descripcionArticulo = `${inventario?.tipoArticulo?.nombre || 'Artículo'} - ${inventario?.marca} ${inventario?.modelo}${inventario?.numero_serie ? ` (SN: ${inventario.numero_serie})` : ''}`;
+
+        const contenidoEmail = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: #003366; color: white; padding: 20px; border-radius: 5px; }
+    .content { padding: 20px; background-color: #f9f9f9; border-radius: 5px; margin-top: 20px; }
+    .info-box { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 15px 0; }
+    .footer { margin-top: 20px; font-size: 12px; color: #666; }
+    strong { color: #003366; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Extensión de Fecha de Devolución</h2>
+    </div>
+    <div class="content">
+      <p>Se ha extendido la fecha de devolución del artículo en préstamo:</p>
+
+      <div class="info-box">
+        <p><strong>Artículo:</strong> ${descripcionArticulo}</p>
+        <p><strong>Remito:</strong> ${remito.numero_remito}</p>
+        <p><strong>Nueva fecha de devolución:</strong> <strong style="color: #d9534f; font-size: 16px;">${fechaFormato}</strong></p>
+      </div>
+
+      <p><strong>Detalles del remito:</strong></p>
+      <ul>
+        <li>Solicitante: ${remito.solicitante?.nombre} ${remito.solicitante?.apellido}</li>
+        <li>Técnico asignado: ${remito.tecnicoAsignado?.nombre} ${remito.tecnicoAsignado?.apellido}</li>
+        <li>Sede origen: ${remito.sedeOrigen?.nombre_sede}</li>
+        <li>Sede destino: ${remito.sedeDestino?.nombre_sede}</li>
+      </ul>
+
+      <p>Por favor, recuerda que el artículo debe ser devuelto en la fecha indicada.</p>
+    </div>
+    <div class="footer">
+      <p>Este es un email automático del Sistema de Gestión Empresarial. No responder a este email.</p>
+    </div>
+  </div>
+</body>
+</html>
+        `;
+
+        // Enviar a infraestructura
+        await emailService.enviarAInfraestructura(
+          asunto,
+          contenidoEmail,
+          { html: true }
+        );
+
+        // Enviar al solicitante
+        if (remito.solicitante?.email) {
+          await emailService.enviarEmail(
+            remito.solicitante.email,
+            asunto,
+            contenidoEmail,
+            { html: true }
+          );
+        }
+
+        logger.info('Email de extensión de fecha enviado correctamente', {
+          remitoId,
+          detalleId,
+          solicitanteEmail: remito.solicitante?.email,
+          nuevaFecha: fechaFormato
+        });
+      } catch (emailErr) {
+        logger.error('Error enviando email de extensión de fecha:', emailErr);
+        // No fallar la operación si el email no se envía
+      }
 
       // Obtener el remito actualizado con sus detalles
       const remitoActualizado = await Remito.findByPk(remitoId, {
         include: ['detalles']
       });
 
-      return success(res, remitoActualizado, 'Fecha de devolución actualizada correctamente');
+      return success(res, remitoActualizado, 'Fecha de devolución actualizada correctamente. Email de notificación enviado.');
     } catch (err) {
       logger.error('Error actualizando fecha de devolución:', err);
 
@@ -496,6 +596,45 @@ class RemitoController {
       }
 
       return error(res, err.message || 'Error al reenviar emails', 500);
+    }
+  }
+
+  /**
+   * POST /remitos/detalles/:detalleId/enviar-aviso-devolucion
+   * Enviar aviso de devolución próxima (para artículos que vencen en 1 día)
+   */
+  async enviarAvisoDevolucionProxima(req, res) {
+    try {
+      const { detalleId } = req.params;
+
+      if (!detalleId) {
+        return error(res, 'El ID del detalle es requerido', 400);
+      }
+
+      logger.info('Enviando aviso de devolución próxima:', {
+        detalleId,
+        usuario: req.user?.email
+      });
+
+      const resultado = await remitoService.enviarAvisoDevolucionProxima(detalleId);
+
+      return success(res, resultado, 'Aviso de devolución enviado exitosamente');
+    } catch (err) {
+      logger.error('Error enviando aviso de devolución próxima:', err);
+
+      if (err.message.includes('no encontrado')) {
+        return error(res, 'El detalle del remito no existe', 404);
+      }
+
+      if (err.message.includes('no es un préstamo')) {
+        return error(res, 'Este detalle no es un préstamo', 400);
+      }
+
+      if (err.message.includes('Email')) {
+        return error(res, 'Error enviando email: ' + err.message, 500);
+      }
+
+      return error(res, err.message || 'Error al enviar aviso de devolución', 500);
     }
   }
 }

@@ -116,6 +116,17 @@ router.patch(
 );
 
 /**
+ * POST /remitos/detalles/:detalleId/enviar-aviso-devolucion
+ * Enviar aviso de devolución próxima para un préstamo (reminders para artículos venciendo en 1 día)
+ * Requiere: Autenticación
+ * Se llama desde dashboard cuando falta 1 día para la devolución
+ */
+router.post(
+  '/detalles/:detalleId/enviar-aviso-devolucion',
+  remitoController.enviarAvisoDevolucionProxima.bind(remitoController)
+);
+
+/**
  * POST /remitos/:id/devolver
  * Generar remito de devolución automático
  * Requiere: Rol "Infraestructura"

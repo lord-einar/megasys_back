@@ -1544,6 +1544,150 @@ class RemitoService {
       throw error;
     }
   }
+
+  /**
+   * Enviar aviso de devolución próxima para un préstamo específico
+   * Se ejecuta cuando un artículo vence en 1 día
+   */
+  async enviarAvisoDevolucionProxima(remitoDetalleId) {
+    try {
+      logger.info('Enviando aviso de devolución próxima:', { remitoDetalleId });
+
+      // Obtener el detalle del remito con todas sus relaciones
+      const detalle = await RemitoDetalle.findByPk(remitoDetalleId, {
+        include: [
+          {
+            association: 'remito',
+            include: [
+              { association: 'solicitante', attributes: ['id', 'nombre', 'apellido', 'email'] },
+              { association: 'tecnicoAsignado', attributes: ['id', 'nombre', 'apellido'] },
+              { association: 'sedeOrigen', attributes: ['id', 'nombre_sede'] },
+              { association: 'sedeDestino', attributes: ['id', 'nombre_sede'] }
+            ]
+          },
+          { association: 'inventarioDetalle' }
+        ]
+      });
+
+      if (!detalle || !detalle.remito) {
+        throw new Error('Detalle de remito no encontrado');
+      }
+
+      if (!detalle.es_prestamo) {
+        throw new Error('Este detalle no es un préstamo');
+      }
+
+      const remito = detalle.remito;
+      const inventario = detalle.inventarioDetalle;
+      const fechaVencimiento = new Date(detalle.fecha_devolucion_esperada);
+      const fechaFormato = fechaVencimiento.toLocaleDateString('es-AR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+
+      const descripcionArticulo = `${inventario?.tipoArticulo?.nombre || 'Artículo'} - ${inventario?.marca} ${inventario?.modelo}${inventario?.numero_serie ? ` (SN: ${inventario.numero_serie})` : ''}`;
+      const asunto = `AVISO: Devolución mañana - Remito ${remito.numero_remito}`;
+
+      const contenidoEmail = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: #d9534f; color: white; padding: 20px; border-radius: 5px; }
+    .content { padding: 20px; background-color: #f9f9f9; border-radius: 5px; margin-top: 20px; }
+    .alert-box { background-color: #f8d7da; border-left: 4px solid #d9534f; padding: 15px; margin: 15px 0; }
+    .article-box { background-color: #e8f4f8; border-left: 4px solid #0066cc; padding: 15px; margin: 15px 0; }
+    .footer { margin-top: 20px; font-size: 12px; color: #666; }
+    strong { color: #d9534f; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>⚠️ RECORDATORIO: DEVOLUCIÓN MAÑANA</h2>
+    </div>
+    <div class="content">
+      <div class="alert-box">
+        <p><strong style="font-size: 16px;">El artículo en préstamo debe ser devuelto MAÑANA (${fechaFormato})</strong></p>
+      </div>
+
+      <p>Este es un aviso de que el siguiente artículo debe ser devuelto en la fecha especificada:</p>
+
+      <div class="article-box">
+        <p><strong>Artículo:</strong> ${descripcionArticulo}</p>
+        <p><strong>Remito:</strong> ${remito.numero_remito}</p>
+        <p><strong>Fecha de devolución:</strong> <strong style="color: #d9534f; font-size: 16px;">${fechaFormato}</strong></p>
+      </div>
+
+      <p><strong>Información del remito:</strong></p>
+      <ul>
+        <li>Solicitante: ${remito.solicitante?.nombre} ${remito.solicitante?.apellido}</li>
+        <li>Técnico asignado: ${remito.tecnicoAsignado?.nombre} ${remito.tecnicoAsignado?.apellido}</li>
+        <li>Sede origen (devolución): ${remito.sedeOrigen?.nombre_sede}</li>
+        <li>Sede actual (destino): ${remito.sedeDestino?.nombre_sede}</li>
+      </ul>
+
+      <p>Por favor, asegúrate de devolver el artículo en la fecha indicada para evitar demoras operacionales.</p>
+    </div>
+    <div class="footer">
+      <p>Este es un email automático del Sistema de Gestión Empresarial. No responder a este email.</p>
+    </div>
+  </div>
+</body>
+</html>
+      `;
+
+      // Enviar a infraestructura
+      await emailService.enviarAInfraestructura(
+        asunto,
+        contenidoEmail,
+        { html: true }
+      );
+
+      // Enviar al solicitante
+      if (remito.solicitante?.email) {
+        await emailService.enviarEmail(
+          remito.solicitante.email,
+          asunto,
+          contenidoEmail,
+          { html: true }
+        );
+      }
+
+      logger.info('Aviso de devolución próxima enviado exitosamente', {
+        remitoDetalleId,
+        remitoId: remito.id,
+        numeroRemito: remito.numero_remito,
+        fechaVencimiento: fechaFormato,
+        solicitanteEmail: remito.solicitante?.email
+      });
+
+      return {
+        success: true,
+        mensaje: 'Aviso de devolución próxima enviado exitosamente',
+        detalles: {
+          remitoNumero: remito.numero_remito,
+          articulo: descripcionArticulo,
+          fechaVencimiento: fechaFormato,
+          emailsEnviados: [
+            'infraestructura@megatlon.com.ar',
+            remito.solicitante?.email
+          ].filter(Boolean)
+        }
+      };
+    } catch (error) {
+      logger.error('Error enviando aviso de devolución próxima:', {
+        error: error.message,
+        remitoDetalleId,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
 }
 
 module.exports = new RemitoService();

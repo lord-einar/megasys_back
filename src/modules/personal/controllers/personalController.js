@@ -32,9 +32,18 @@ class PersonalController {
 
       // If user is Soporte (support), only show their own profile
       let filters = { ...req.query };
-      if (userRole === 'support') {
+      if (userRole === 'support' && userId) {
         // For Soporte role, limit to their own data only
-        filters.personal_id = userId;
+        // Note: Only set personal_id if userId is a valid UUID (not Entra ID homeAccountId format)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(userId)) {
+          filters.personal_id = userId;
+        } else {
+          logger.warn('User ID is not a valid UUID - cannot filter by personal_id', {
+            userRole,
+            userId
+          });
+        }
       }
 
       const resultado = await personalService.listar(filters, userRole, userId);
