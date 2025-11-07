@@ -19,6 +19,9 @@ const { generalLimiter, authLimiter } = require('./shared/middleware/rateLimiter
 
 const app = express();
 
+// Confiar en el proxy (necesario para Azure, Nginx, etc.)
+app.set('trust proxy', true);
+
 // Configuración de CORS
 const corsOptions = {
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
@@ -143,6 +146,7 @@ app.get('/api/test', (req, res) => {
     environment: process.env.NODE_ENV
   });
 });
+
 
 // Middleware de manejo de errores (debe ir al final)
 app.use(notFoundHandler);

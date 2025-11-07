@@ -1,6 +1,7 @@
 // src/shared/utils/database.js
 const { Sequelize } = require('sequelize');
 const logger = require('./logger');
+const { runMigrations } = require('./runMigrations');
 
 const sequelize = new Sequelize({
   host: process.env.DB_HOST,
@@ -9,13 +10,17 @@ const sequelize = new Sequelize({
   username: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   dialect: process.env.DB_DIALECT,
-  logging: process.env.NODE_ENV === 'development' ? 
+  logging: process.env.NODE_ENV === 'development' ?
     (msg) => logger.debug(msg) : false,
   pool: {
     max: 5,
     min: 0,
-    acquire: 30000,
+    acquire: 60000,
     idle: 10000
+  },
+  dialectOptions: {
+    ssl: process.env.NODE_ENV === 'production' ? { require: true, rejectUnauthorized: false } : false,
+    connectTimeout: 60000
   },
   define: {
     timestamps: true,
@@ -36,9 +41,11 @@ const connectDatabase = async () => {
     // Importar modelos
     require('../../models');
 
-    // Sync deshabilitado temporalmente - hay conflictos de esquema entre modelos y migraciones
-    // TODO: Crear migraciones para actualizar el esquema de INTEGER a UUID
-    if (process.env.NODE_ENV === 'development' && process.env.FORCE_SYNC === 'true') {
+    // Ejecutar migraciones en production
+    if (process.env.NODE_ENV === 'production') {
+      await runMigrations();
+    } else if (process.env.FORCE_SYNC === 'true') {
+      // Sync en development si se especifica FORCE_SYNC
       await sequelize.sync({ alter: true });
       logger.info('✅ Modelos sincronizados con la base de datos');
     } else if (process.env.NODE_ENV === 'development') {
@@ -46,7 +53,8 @@ const connectDatabase = async () => {
     }
   } catch (error) {
     logger.error('❌ Error al conectar con la base de datos:', error);
-    process.exit(1);
+    logger.warn('⚠️ El servidor continuará sin BD. Intenta reconectar más adelante.');
+    // NO hacer process.exit(1) para permitir que el servidor continúe
   }
 };
 

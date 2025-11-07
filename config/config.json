@@ -18,9 +18,16 @@
   "production": {
     "username": "postgres",
     "password": "Italia0454!",
-    "database": "gestion_empresarial_prod",
-    "host": "localhost",
+    "database": "megasys",
+    "host": "megasysdb62438.postgres.database.azure.com",
     "port": 5432,
-    "dialect": "postgres"
+    "dialect": "postgres",
+    "logging": false,
+    "dialectOptions": {
+      "ssl": {
+        "require": true,
+        "rejectUnauthorized": false
+      }
+    }
   }
 }

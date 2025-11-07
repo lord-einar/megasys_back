@@ -3,6 +3,35 @@ const rateLimit = require('express-rate-limit');
 const logger = require('../utils/logger');
 
 /**
+ * Función para extraer la IP real del cliente desde los headers de proxy de Azure
+ * Azure envía: X-Forwarded-For: "ip1, ip2, ip3" o X-Real-IP: "ip"
+ */
+const getClientIp = (req) => {
+  try {
+    // Intentar obtener de X-Forwarded-For (puede ser una lista)
+    const xForwardedFor = req.get('x-forwarded-for');
+    if (xForwardedFor) {
+      // Tomar la primera IP de la lista y eliminar puerto si existe
+      const ip = xForwardedFor.split(',')[0].trim();
+      return ip.split(':')[0];
+    }
+
+    // Intentar obtener de X-Real-IP
+    const xRealIp = req.get('x-real-ip');
+    if (xRealIp) {
+      return xRealIp.split(':')[0];
+    }
+
+    // Fallback a req.ip
+    const reqIp = req.ip || 'unknown';
+    return reqIp.split(':')[0];
+  } catch (error) {
+    logger.error('Error extracting client IP:', error.message);
+    return 'unknown';
+  }
+};
+
+/**
  * Rate limiter general - para la mayoría de rutas
  */
 const generalLimiter = rateLimit({
@@ -15,8 +44,13 @@ const generalLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req, res) => {
+    // Usar la función para extraer IP limpia
+    return getClientIp(req);
+  },
   handler: (req, res) => {
-    logger.warn(`Rate limit excedido para IP: ${req.ip}`);
+    const clientIp = getClientIp(req);
+    logger.warn(`Rate limit excedido para IP: ${clientIp}`);
     res.status(429).json({
       success: false,
       message: 'Demasiadas peticiones desde esta IP, intenta de nuevo en 15 minutos.',
@@ -42,8 +76,13 @@ const authLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req, res) => {
+    // Usar la función para extraer IP limpia
+    return getClientIp(req);
+  },
   handler: (req, res) => {
-    logger.warn(`Rate limit en auth para IP: ${req.ip}`);
+    const clientIp = getClientIp(req);
+    logger.warn(`Rate limit en auth para IP: ${clientIp}`);
     res.status(429).json({
       success: false,
       message: 'Demasiados intentos de autenticación. Intenta de nuevo más tarde.',

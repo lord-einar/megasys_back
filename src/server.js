@@ -15,9 +15,19 @@ console.log('DB_DIALECT:', process.env.DB_DIALECT);
 const initializeServer = async () => {
   try {
     console.log('🔄 Intentando conectar a la base de datos...');
-    
-    // Conectar a la base de datos
-    await connectDatabase();
+
+    // Conectar a la base de datos (con timeout y fallback)
+    try {
+      await Promise.race([
+        connectDatabase(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('DB connection timeout')), 15000)
+        )
+      ]);
+    } catch (dbError) {
+      console.warn('⚠️ Advertencia: No se pudo conectar a la base de datos inicialmente:', dbError.message);
+      console.warn('⚠️ El servidor continuará iniciándose. La BD puede estar disponible en breve.');
+    }
     
     // Crear directorio de logs si no existe
     const fs = require('fs');
