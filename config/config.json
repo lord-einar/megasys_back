@@ -29,5 +29,20 @@
         "rejectUnauthorized": false
       }
     }
+  },
+  "staging": {
+    "username": "postgres",
+    "password": "Italia0454!",
+    "database": "megasys_staging",
+    "host": "megasysdb62438.postgres.database.azure.com",
+    "port": 5432,
+    "dialect": "postgres",
+    "logging": false,
+    "dialectOptions": {
+      "ssl": {
+        "require": true,
+        "rejectUnauthorized": false
+      }
+    }
   }
 }
