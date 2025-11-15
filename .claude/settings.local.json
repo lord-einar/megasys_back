@@ -44,7 +44,8 @@
       "Bash(NODE_ENV=production npx sequelize-cli:*)",
       "Bash(PGPASSWORD=\"Italia0454!\" psql -h megasysdb62438.postgres.database.azure.com -U postgres -d megasys -f sql/backup_local.sql)",
       "Bash(PGPASSWORD=\"Italia0454!\" psql -h megasysdb62438.postgres.database.azure.com -U postgres -d megasys -f /tmp/data_only.sql -v ON_ERROR_STOP=0)",
-      "Bash(az ad app show:*)"
+      "Bash(az ad app show:*)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []
