@@ -3,6 +3,7 @@ const remitoService = require('../services/remitoService');
 const logger = require('../../../shared/utils/logger');
 const { success, error, paginated } = require('../../../shared/utils/response');
 const { sequelize } = require('../../../models');
+const { GUID_TO_GROUP_MAP } = require('../../auth/config/roles');
 
 class RemitoController {
   /**
@@ -161,10 +162,16 @@ class RemitoController {
       }
 
       const usuarioId = personal.id;
-      // Combinar roles de la base de datos Y grupos de Azure AD
+      // Convertir GUIDs de Azure AD a nombres de grupos
+      const azureGroupGuids = req.user.groups || [];
+      const azureGroupNames = azureGroupGuids
+        .filter(guid => GUID_TO_GROUP_MAP[guid])
+        .map(guid => GUID_TO_GROUP_MAP[guid]);
+
+      // Combinar roles de la base de datos Y grupos de Azure AD (convertidos a nombres)
       const userRoles = [
         ...(personal.rol ? [personal.rol.nombre] : []),
-        ...(req.user.groups || [])
+        ...azureGroupNames
       ];
       const privilegioApp = personal.privilegio_app || req.user.privilegioApp || null;
 
@@ -174,7 +181,8 @@ class RemitoController {
         usuarioId,
         email: req.user.email,
         rolesDB: personal.rol ? [personal.rol.nombre] : [],
-        gruposAzureAD: req.user.groups || [],
+        gruposAzureADGuids: azureGroupGuids,
+        gruposAzureADNombres: azureGroupNames,
         rolesCombinados: userRoles,
         privilegioApp
       });
