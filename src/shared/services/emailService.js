@@ -673,6 +673,233 @@ class EmailService {
       throw error;
     }
   }
+
+  /**
+   * Enviar email al receptor alternativo con link de confirmación
+   * @param {object} remito - Datos completos del remito
+   * @param {string} rutaPDF - Ruta al archivo PDF
+   * @param {string} urlConfirmacion - URL con token de confirmación
+   * @param {string} receptorNombre - Nombre del receptor
+   * @param {string} receptorEmail - Email del receptor
+   * @returns {Promise<object>} Resultado del envío
+   */
+  async enviarAlReceptor(remito, rutaPDF, urlConfirmacion, receptorNombre, receptorEmail) {
+    try {
+      logger.info('📧 Enviando email al receptor:', {
+        remito: remito.numero_remito,
+        receptorNombre,
+        receptorEmail
+      });
+
+      const asunto = `Remito ${remito.numero_remito} - Confirmación de Recepción`;
+      const contenidoHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: #003366; color: white; padding: 20px; border-radius: 5px; }
+    .content { padding: 20px; background-color: #f9f9f9; border-radius: 5px; margin-top: 20px; }
+    .info-box { background-color: #e8f4f8; border-left: 4px solid #0066cc; padding: 15px; margin: 15px 0; }
+    .button { display: inline-block; padding: 12px 30px; background-color: #27ae60; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; }
+    .footer { margin-top: 20px; font-size: 12px; color: #666; }
+    strong { color: #003366; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Remito para Recepción</h2>
+    </div>
+    <div class="content">
+      <p>Hola <strong>${receptorNombre}</strong>,</p>
+
+      <p>Se te ha asignado como receptor del siguiente remito:</p>
+
+      <div class="info-box">
+        <p><strong>Número de Remito:</strong> ${remito.numero_remito}</p>
+        <p><strong>Solicitante Original:</strong> ${remito.solicitante?.nombre} ${remito.solicitante?.apellido}</p>
+        <p><strong>Sede Origen:</strong> ${remito.sedeOrigen?.nombre_sede}</p>
+        <p><strong>Sede Destino:</strong> ${remito.sedeDestino?.nombre_sede}</p>
+        <p><strong>Cantidad de Artículos:</strong> ${remito.detalles?.length || 0}</p>
+      </div>
+
+      <p><strong>Por favor, confirma la recepción de este remito haciendo clic en el siguiente botón:</strong></p>
+
+      <p style="text-align: center; margin: 25px 0;">
+        <a href="${urlConfirmacion}" class="button">✓ CONFIRMAR RECEPCIÓN</a>
+      </p>
+
+      <p style="font-size: 12px; color: #666;">O copia este enlace en tu navegador: <a href="${urlConfirmacion}">${urlConfirmacion}</a></p>
+
+      <p><strong>Detalles del remito:</strong></p>
+      <ul>
+        <li>Técnico asignado: ${remito.tecnicoAsignado?.nombre} ${remito.tecnicoAsignado?.apellido}</li>
+        <li>Fecha de emisión: ${new Date(remito.fecha).toLocaleDateString('es-AR')}</li>
+        <li>Estado: ${remito.estado}</li>
+      </ul>
+
+      <p>Encontrarás el detalle completo en el PDF adjunto.</p>
+
+      <p>Gracias,<br>
+      <strong>Equipo de Infraestructura</strong></p>
+    </div>
+    <div class="footer">
+      <p>Este es un email automático del Sistema de Gestión Empresarial. No responder a este email.</p>
+    </div>
+  </div>
+</body>
+</html>
+      `;
+
+      const opciones = {
+        from: EMAIL_FROM,
+        to: receptorEmail,
+        subject: asunto,
+        html: contenidoHTML,
+        attachments: [{
+          filename: `Remito_${remito.numero_remito}.pdf`,
+          path: rutaPDF
+        }]
+      };
+
+      const info = await this.transporter.sendMail(opciones);
+
+      logger.info('✓ Email al receptor enviado exitosamente:', {
+        remito: remito.numero_remito,
+        receptorEmail,
+        messageId: info.messageId
+      });
+
+      return {
+        success: true,
+        messageId: info.messageId,
+        email: receptorEmail
+      };
+    } catch (error) {
+      logger.error('✗ Error enviando email al receptor:', {
+        error: error.message,
+        remito: remito.numero_remito,
+        receptorEmail
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Enviar notificación al solicitante original sobre cambio de receptor
+   * @param {object} remito - Datos completos del remito
+   * @param {string} rutaPDF - Ruta al archivo PDF
+   * @param {string} solicitanteEmail - Email del solicitante original
+   * @param {string} receptorNombre - Nombre del receptor asignado
+   * @param {string} receptorEmail - Email del receptor asignado
+   * @returns {Promise<object>} Resultado del envío
+   */
+  async enviarNotificacionCambioReceptor(remito, rutaPDF, solicitanteEmail, receptorNombre, receptorEmail) {
+    try {
+      logger.info('📧 Enviando notificación de cambio de receptor al solicitante:', {
+        remito: remito.numero_remito,
+        solicitanteEmail,
+        receptorNombre
+      });
+
+      const asunto = `Remito ${remito.numero_remito} - Receptor Asignado`;
+      const contenidoHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: #003366; color: white; padding: 20px; border-radius: 5px; }
+    .content { padding: 20px; background-color: #f9f9f9; border-radius: 5px; margin-top: 20px; }
+    .info-box { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 15px 0; }
+    .receptor-box { background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 15px 0; }
+    .footer { margin-top: 20px; font-size: 12px; color: #666; }
+    strong { color: #003366; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Receptor Asignado para tu Remito</h2>
+    </div>
+    <div class="content">
+      <p>Hola <strong>${remito.solicitante?.nombre} ${remito.solicitante?.apellido}</strong>,</p>
+
+      <p>Te informamos que se ha asignado un receptor alternativo para el remito que solicitaste:</p>
+
+      <div class="info-box">
+        <p><strong>Número de Remito:</strong> ${remito.numero_remito}</p>
+        <p><strong>Sede Origen:</strong> ${remito.sedeOrigen?.nombre_sede}</p>
+        <p><strong>Sede Destino:</strong> ${remito.sedeDestino?.nombre_sede}</p>
+        <p><strong>Cantidad de Artículos:</strong> ${remito.detalles?.length || 0}</p>
+      </div>
+
+      <div class="receptor-box">
+        <p><strong>RECIBIDO POR:</strong></p>
+        <p><strong>Nombre:</strong> ${receptorNombre}</p>
+        <p><strong>Email:</strong> ${receptorEmail}</p>
+      </div>
+
+      <p>Esta persona recibirá los artículos y confirmará la recepción en tu nombre.</p>
+
+      <p><strong>Detalles adicionales:</strong></p>
+      <ul>
+        <li>Técnico asignado: ${remito.tecnicoAsignado?.nombre} ${remito.tecnicoAsignado?.apellido}</li>
+        <li>Fecha de emisión: ${new Date(remito.fecha).toLocaleDateString('es-AR')}</li>
+        <li>Estado: ${remito.estado}</li>
+      </ul>
+
+      <p>Encontrarás el detalle completo en el PDF adjunto.</p>
+
+      <p>Gracias,<br>
+      <strong>Equipo de Infraestructura</strong></p>
+    </div>
+    <div class="footer">
+      <p>Este es un email automático del Sistema de Gestión Empresarial. No responder a este email.</p>
+    </div>
+  </div>
+</body>
+</html>
+      `;
+
+      const opciones = {
+        from: EMAIL_FROM,
+        to: solicitanteEmail,
+        subject: asunto,
+        html: contenidoHTML,
+        attachments: [{
+          filename: `Remito_${remito.numero_remito}.pdf`,
+          path: rutaPDF
+        }]
+      };
+
+      const info = await this.transporter.sendMail(opciones);
+
+      logger.info('✓ Notificación al solicitante enviada exitosamente:', {
+        remito: remito.numero_remito,
+        solicitanteEmail,
+        messageId: info.messageId
+      });
+
+      return {
+        success: true,
+        messageId: info.messageId,
+        email: solicitanteEmail
+      };
+    } catch (error) {
+      logger.error('✗ Error enviando notificación al solicitante:', {
+        error: error.message,
+        remito: remito.numero_remito,
+        solicitanteEmail
+      });
+      throw error;
+    }
+  }
 }
 
 module.exports = new EmailService();

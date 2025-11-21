@@ -181,6 +181,25 @@ class PDFService {
 
     y += 15;
 
+    // Receptor (si es diferente al solicitante)
+    if (remito.receptor_nombre) {
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('#27ae60').text('RECIBIDO POR', margin, y);
+      y += 12;
+
+      doc.fontSize(8).font('Helvetica').fillColor('#34495e');
+      doc.text('Nombre:', margin, y);
+      doc.fontSize(8).font('Helvetica-Bold').fillColor('#27ae60');
+      doc.text(remito.receptor_nombre, margin + 50, y);
+
+      y += 12;
+      doc.fontSize(8).font('Helvetica').fillColor('#34495e');
+      doc.text('Email:', margin, y);
+      doc.fontSize(8).font('Helvetica-Bold').fillColor('#27ae60');
+      doc.text(remito.receptor_email || 'N/A', margin + 50, y);
+
+      y += 15;
+    }
+
     // Sedes
     doc.fontSize(9).font('Helvetica-Bold').fillColor('#2c3e50').text('SEDES', margin, y);
     y += 12;

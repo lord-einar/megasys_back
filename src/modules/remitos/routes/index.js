@@ -148,4 +148,15 @@ router.post(
   remitoController.reenviarEmails.bind(remitoController)
 );
 
+/**
+ * PATCH /remitos/:id/asignar-receptor
+ * Asignar receptor alternativo para un remito en tránsito
+ * Requiere: Autenticación (Infraestructura o Sistemas)
+ * Body: { receptor_nombre: string, receptor_email: string }
+ */
+router.patch(
+  '/:id/asignar-receptor',
+  remitoController.asignarReceptor.bind(remitoController)
+);
+
 module.exports = router;

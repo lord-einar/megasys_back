@@ -628,6 +628,52 @@ class RemitoController {
   }
 
   /**
+   * PATCH /remitos/:id/asignar-receptor
+   * Asignar receptor alternativo para un remito en tránsito
+   * Requiere: Rol "Infraestructura" o "Sistemas"
+   */
+  async asignarReceptor(req, res) {
+    try {
+      const { id } = req.params;
+      const { receptor_nombre, receptor_email } = req.body;
+      const usuarioEmail = req.user?.email || 'usuario-desconocido@sistema.com';
+
+      if (!receptor_nombre || !receptor_email) {
+        return error(res, 'El nombre y email del receptor son requeridos', 400);
+      }
+
+      // Validar formato de email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(receptor_email)) {
+        return error(res, 'El email del receptor no es válido', 400);
+      }
+
+      logger.info('Asignando receptor a remito:', {
+        remitoId: id,
+        receptorNombre: receptor_nombre,
+        receptorEmail: receptor_email,
+        usuario: usuarioEmail
+      });
+
+      const resultado = await remitoService.asignarReceptor(id, receptor_nombre, receptor_email, usuarioEmail);
+
+      return success(res, resultado, 'Receptor asignado exitosamente. Emails enviados.');
+    } catch (err) {
+      logger.error('Error asignando receptor:', err);
+
+      if (err.message === 'El remito no existe') {
+        return error(res, err.message, 404);
+      }
+
+      if (err.message.includes('estado')) {
+        return error(res, err.message, 400);
+      }
+
+      return error(res, err.message || 'Error al asignar receptor', 500);
+    }
+  }
+
+  /**
    * POST /remitos/detalles/:detalleId/enviar-aviso-devolucion
    * Enviar aviso de devolución próxima (para artículos que vencen en 1 día)
    */

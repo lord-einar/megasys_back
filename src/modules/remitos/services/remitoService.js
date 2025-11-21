@@ -1241,6 +1241,29 @@ class RemitoService {
         throw new Error('El remito no existe');
       }
 
+      // 3.1 Validar que el email del token coincide con receptor O solicitante
+      const emailToken = tokenPayload.email.toLowerCase();
+      const emailSolicitante = remito.solicitante?.email?.toLowerCase();
+      const emailReceptor = remito.receptor_email?.toLowerCase();
+
+      const esEmailValido = emailToken === emailSolicitante || (emailReceptor && emailToken === emailReceptor);
+
+      if (!esEmailValido) {
+        logger.warn('Email del token no coincide:', {
+          emailToken,
+          emailSolicitante,
+          emailReceptor,
+          remitoId
+        });
+        throw new Error('El email del token no coincide con el solicitante ni con el receptor del remito');
+      }
+
+      logger.info('✓ Email validado:', {
+        emailToken,
+        esReceptor: emailReceptor && emailToken === emailReceptor,
+        esSolicitante: emailToken === emailSolicitante
+      });
+
       // 4. Verificar que el remito no esté ya confirmado
       if (remito.estado === 'completado') {
         throw new Error('Este remito ya fue confirmado previamente');
@@ -1683,6 +1706,220 @@ class RemitoService {
       logger.error('Error enviando aviso de devolución próxima:', {
         error: error.message,
         remitoDetalleId,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Asignar receptor alternativo a un remito en tránsito
+   * @param {string} remitoId - ID del remito
+   * @param {string} receptorNombre - Nombre completo del receptor
+   * @param {string} receptorEmail - Email del receptor
+   * @param {string} usuarioEmail - Email del usuario que realiza la acción
+   * @returns {Promise<object>} Resultado de la operación
+   */
+  async asignarReceptor(remitoId, receptorNombre, receptorEmail, usuarioEmail) {
+    try {
+      logger.info('=== ASIGNAR RECEPTOR - INICIANDO ===', {
+        remitoId,
+        receptorNombre,
+        receptorEmail,
+        usuarioEmail
+      });
+
+      // 1. Obtener remito con todas las relaciones
+      const remito = await Remito.findByPk(remitoId, {
+        include: [
+          {
+            model: Personal,
+            as: 'solicitante',
+            attributes: ['id', 'nombre', 'apellido', 'email', 'telefono']
+          },
+          {
+            model: Personal,
+            as: 'tecnicoAsignado',
+            attributes: ['id', 'nombre', 'apellido', 'email']
+          },
+          {
+            model: Sede,
+            as: 'sedeOrigen',
+            attributes: ['id', 'nombre_sede', 'localidad', 'provincia']
+          },
+          {
+            model: Sede,
+            as: 'sedeDestino',
+            attributes: ['id', 'nombre_sede', 'localidad', 'provincia']
+          },
+          {
+            model: RemitoDetalle,
+            as: 'detalles',
+            include: [{
+              model: Inventario,
+              as: 'inventarioDetalle',
+              attributes: ['id', 'numero_serie', 'marca', 'modelo', 'tipo_articulo_id'],
+              include: [{
+                model: TipoArticulo,
+                as: 'tipoArticulo',
+                attributes: ['id', 'nombre']
+              }]
+            }]
+          }
+        ]
+      });
+
+      if (!remito) {
+        throw new Error('El remito no existe');
+      }
+
+      // 2. Validar que el remito está en estado "en_transito"
+      if (remito.estado !== 'en_transito') {
+        throw new Error(`Solo se puede asignar receptor a remitos en estado "en_transito". Estado actual: "${remito.estado}"`);
+      }
+
+      logger.info('✓ Remito validado', {
+        numeroRemito: remito.numero_remito,
+        estado: remito.estado
+      });
+
+      // 3. Actualizar campos de receptor
+      await remito.update({
+        receptor_nombre: receptorNombre,
+        receptor_email: receptorEmail.toLowerCase()
+      });
+
+      logger.info('✓ Receptor asignado en base de datos', {
+        numeroRemito: remito.numero_remito,
+        receptorNombre,
+        receptorEmail
+      });
+
+      // 4. Regenerar PDF con información de receptor
+      const remitoCompleto = remito.toJSON();
+      remitoCompleto.es_prestamo = remito.detalles && remito.detalles.some(d => d.es_prestamo);
+      remitoCompleto.receptor_nombre = receptorNombre;
+      remitoCompleto.receptor_email = receptorEmail;
+
+      let rutaPDF;
+      try {
+        logger.info('📄 Regenerando PDF con receptor...', {
+          numeroRemito: remito.numero_remito,
+          receptorNombre
+        });
+
+        const resultadoPDF = await pdfService.generarPDF(remitoCompleto, { confirmado: false });
+        rutaPDF = resultadoPDF.path;
+
+        logger.info('✓ PDF regenerado con receptor', {
+          numeroRemito: remito.numero_remito,
+          rutaPDF,
+          tamaño: resultadoPDF.size
+        });
+      } catch (pdfError) {
+        logger.error('✗ Error regenerando PDF', {
+          error: pdfError.message,
+          numeroRemito: remito.numero_remito
+        });
+        throw new Error(`Error generando PDF: ${pdfError.message}`);
+      }
+
+      // 5. Enviar email al receptor con link de confirmación
+      try {
+        logger.info('📧 Enviando email al receptor...', {
+          numeroRemito: remito.numero_remito,
+          receptorEmail,
+          receptorNombre
+        });
+
+        const urlConfirmacion = tokenService.generarUrlConfirmacion(
+          remito.id,
+          receptorEmail,
+          process.env.FRONTEND_URL || 'http://localhost:3000'
+        );
+
+        await emailService.enviarAlReceptor(remitoCompleto, rutaPDF, urlConfirmacion, receptorNombre, receptorEmail);
+
+        logger.info('✓ Email al receptor enviado', {
+          numeroRemito: remito.numero_remito,
+          receptorEmail
+        });
+      } catch (emailError) {
+        logger.error('✗ Error enviando email al receptor', {
+          error: emailError.message,
+          numeroRemito: remito.numero_remito,
+          receptorEmail
+        });
+        throw new Error(`Error enviando email al receptor: ${emailError.message}`);
+      }
+
+      // 6. Enviar email al solicitante informando del cambio
+      try {
+        logger.info('📧 Enviando email al solicitante...', {
+          numeroRemito: remito.numero_remito,
+          solicitanteEmail: remito.solicitante?.email,
+          receptorNombre
+        });
+
+        await emailService.enviarNotificacionCambioReceptor(
+          remitoCompleto,
+          rutaPDF,
+          remito.solicitante?.email,
+          receptorNombre,
+          receptorEmail
+        );
+
+        logger.info('✓ Email al solicitante enviado', {
+          numeroRemito: remito.numero_remito,
+          solicitanteEmail: remito.solicitante?.email
+        });
+      } catch (emailError) {
+        logger.error('✗ Error enviando email al solicitante', {
+          error: emailError.message,
+          numeroRemito: remito.numero_remito,
+          solicitanteEmail: remito.solicitante?.email
+        });
+        // No lanzar error, es solo notificación
+      }
+
+      // 7. Enviar copia a infraestructura
+      try {
+        logger.info('📧 Enviando copia a infraestructura...', {
+          numeroRemito: remito.numero_remito
+        });
+
+        await emailService.enviarAInfraestructura(remitoCompleto, rutaPDF);
+
+        logger.info('✓ Email a infraestructura enviado', {
+          numeroRemito: remito.numero_remito
+        });
+      } catch (emailError) {
+        logger.error('✗ Error enviando email a infraestructura', {
+          error: emailError.message,
+          numeroRemito: remito.numero_remito
+        });
+        // No lanzar error, es solo notificación
+      }
+
+      logger.info('=== ASIGNAR RECEPTOR - COMPLETADO EXITOSAMENTE ===', {
+        numeroRemito: remito.numero_remito,
+        receptorNombre,
+        receptorEmail
+      });
+
+      return {
+        success: true,
+        numeroRemito: remito.numero_remito,
+        receptorNombre,
+        receptorEmail,
+        mensaje: `Receptor asignado exitosamente. Emails enviados a ${receptorEmail} y ${remito.solicitante?.email}`
+      };
+    } catch (error) {
+      logger.error('=== ASIGNAR RECEPTOR - ERROR ===', {
+        error: error.message,
+        remitoId,
+        receptorNombre,
+        receptorEmail,
         stack: error.stack
       });
       throw error;

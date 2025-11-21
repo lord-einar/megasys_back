@@ -118,6 +118,21 @@ const Remito = sequelize.define('Remito', {
         msg: 'Debe ser una fecha válida'
       }
     }
+  },
+  receptor_nombre: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    comment: 'Nombre completo de la persona que recibe el remito (si es diferente al solicitante)'
+  },
+  receptor_email: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    validate: {
+      isEmail: {
+        msg: 'Debe ser un email válido'
+      }
+    },
+    comment: 'Email de la persona que recibe el remito (si es diferente al solicitante)'
   }
 }, {
   tableName: 'remitos',
