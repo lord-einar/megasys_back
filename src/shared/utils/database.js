@@ -19,7 +19,7 @@ const sequelize = new Sequelize({
     idle: 10000
   },
   dialectOptions: {
-    ssl: process.env.NODE_ENV === 'production' ? { require: true, rejectUnauthorized: false } : false,
+    ssl: (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') ? { require: true, rejectUnauthorized: false } : false,
     connectTimeout: 60000
   },
   define: {
@@ -41,8 +41,8 @@ const connectDatabase = async () => {
     // Importar modelos
     require('../../models');
 
-    // Ejecutar migraciones en production
-    if (process.env.NODE_ENV === 'production') {
+    // Ejecutar migraciones en production y staging
+    if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
       await runMigrations();
     } else if (process.env.FORCE_SYNC === 'true') {
       // Sync en development si se especifica FORCE_SYNC
