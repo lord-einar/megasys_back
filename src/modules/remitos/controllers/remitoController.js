@@ -161,7 +161,11 @@ class RemitoController {
       }
 
       const usuarioId = personal.id;
-      const userRoles = personal.rol ? [personal.rol.nombre] : [];
+      // Combinar roles de la base de datos Y grupos de Azure AD
+      const userRoles = [
+        ...(personal.rol ? [personal.rol.nombre] : []),
+        ...(req.user.groups || [])
+      ];
       const privilegioApp = personal.privilegio_app || req.user.privilegioApp || null;
 
       logger.info('Cambiando estado de remito:', {
@@ -169,7 +173,9 @@ class RemitoController {
         nuevoEstado: estado,
         usuarioId,
         email: req.user.email,
-        roles: userRoles,
+        rolesDB: personal.rol ? [personal.rol.nombre] : [],
+        gruposAzureAD: req.user.groups || [],
+        rolesCombinados: userRoles,
         privilegioApp
       });
 
