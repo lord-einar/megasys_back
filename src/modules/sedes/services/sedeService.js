@@ -143,7 +143,63 @@ class SedeService {
       ]
     });
 
-    return sede;
+    if (!sede) {
+      return null;
+    }
+
+    // Buscar artículos en préstamo EN esta sede
+    const { Remito, RemitoDetalle } = require('../../../models');
+    const prestamosEnSede = await RemitoDetalle.findAll({
+      where: {
+        es_prestamo: true,
+        devuelto: false
+      },
+      include: [
+        {
+          model: Remito,
+          as: 'remito',
+          where: {
+            sede_destino_id: sedeId,
+            estado: {
+              [Op.in]: ['preparado', 'en_transito', 'entregado']
+            }
+          },
+          include: [
+            {
+              model: Sede,
+              as: 'sedeOrigen',
+              attributes: ['id', 'nombre_sede', 'localidad']
+            }
+          ]
+        },
+        {
+          model: Inventario,
+          as: 'inventarioDetalle',
+          include: [
+            {
+              model: require('../../../models').TipoArticulo,
+              as: 'tipoArticulo',
+              attributes: ['id', 'nombre']
+            }
+          ]
+        }
+      ]
+    });
+
+    // Convertir a JSON y agregar prestamosEnSede
+    const sedeJson = sede.toJSON();
+    sedeJson.prestamosEnSede = prestamosEnSede.map(detalle => ({
+      inventario: detalle.inventarioDetalle,
+      remito: {
+        numero_remito: detalle.remito.numero_remito,
+        estado: detalle.remito.estado,
+        sedeOrigen: detalle.remito.sedeOrigen
+      },
+      fechaDevolucionEsperada: detalle.fecha_devolucion_esperada,
+      observaciones: detalle.observaciones
+    }));
+
+    return sedeJson;
   }
 
   /**
