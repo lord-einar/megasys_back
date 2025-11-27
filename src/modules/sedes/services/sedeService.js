@@ -422,13 +422,54 @@ class SedeService {
       order: [['marca', 'ASC'], ['modelo', 'ASC']]
     });
 
+    // Buscar artículos en préstamo EN esta sede (aunque no sean parte del inventario propio)
+    const { Remito, RemitoDetalle } = require('../../../models');
+    const prestamosEnSede = await RemitoDetalle.findAll({
+      where: {
+        es_prestamo: true,
+        devuelto: false
+      },
+      include: [
+        {
+          model: Remito,
+          as: 'remito',
+          where: {
+            sede_destino_id: sedeId,
+            estado: {
+              [Op.in]: ['preparado', 'en_transito', 'entregado']
+            }
+          },
+          include: [
+            {
+              model: Sede,
+              as: 'sedeOrigen',
+              attributes: ['id', 'nombre_sede', 'localidad']
+            }
+          ]
+        },
+        {
+          model: Inventario,
+          as: 'inventarioDetalle',
+          include: [
+            {
+              model: require('../../../models').TipoArticulo,
+              as: 'tipoArticulo',
+              attributes: ['id', 'nombre']
+            }
+          ]
+        }
+      ]
+    });
+
     // Estadísticas
     const estadisticas = {
       total: inventario.length,
       disponible: inventario.filter(item => item.estado === 'disponible').length,
       enUso: inventario.filter(item => item.estado === 'en_uso').length,
+      enPrestamo: inventario.filter(item => item.estado === 'en_prestamo').length,
       mantenimiento: inventario.filter(item => item.estado === 'mantenimiento').length,
-      dadoDeBaja: inventario.filter(item => item.estado === 'dado_de_baja').length
+      dadoDeBaja: inventario.filter(item => item.estado === 'dado_de_baja').length,
+      prestamosEnEstaSede: prestamosEnSede.length
     };
 
     return {
@@ -438,6 +479,16 @@ class SedeService {
         direccion: sede.direccion
       },
       inventario,
+      prestamosEnSede: prestamosEnSede.map(detalle => ({
+        inventario: detalle.inventarioDetalle,
+        remito: {
+          numero_remito: detalle.remito.numero_remito,
+          estado: detalle.remito.estado,
+          sedeOrigen: detalle.remito.sedeOrigen
+        },
+        fechaDevolucionEsperada: detalle.fecha_devolucion_esperada,
+        observaciones: detalle.observaciones
+      })),
       estadisticas
     };
   }

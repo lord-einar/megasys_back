@@ -189,7 +189,60 @@ class InventarioService {
       ]
     });
 
-    return item;
+    if (!item) {
+      return null;
+    }
+
+    // Si el artículo está en préstamo, buscar el remito activo
+    const itemJson = item.toJSON();
+    if (item.estado === 'en_prestamo') {
+      const { RemitoDetalle, Remito, Sede: SedeModel } = require('../../../models');
+
+      const prestamoActivo = await RemitoDetalle.findOne({
+        where: {
+          inventario_id: inventarioId,
+          es_prestamo: true,
+          devuelto: false
+        },
+        include: [
+          {
+            model: Remito,
+            as: 'remito',
+            where: {
+              estado: {
+                [Op.in]: ['preparado', 'en_transito', 'entregado']
+              }
+            },
+            include: [
+              {
+                model: SedeModel,
+                as: 'sedeDestino',
+                attributes: ['id', 'nombre_sede', 'localidad', 'provincia']
+              },
+              {
+                model: SedeModel,
+                as: 'sedeOrigen',
+                attributes: ['id', 'nombre_sede', 'localidad']
+              }
+            ]
+          }
+        ],
+        order: [['created_at', 'DESC']]
+      });
+
+      if (prestamoActivo) {
+        itemJson.prestamoActivo = {
+          numeroRemito: prestamoActivo.remito.numero_remito,
+          estado: prestamoActivo.remito.estado,
+          sedeDestino: prestamoActivo.remito.sedeDestino,
+          sedeOrigen: prestamoActivo.remito.sedeOrigen,
+          fechaDevolucionEsperada: prestamoActivo.fecha_devolucion_esperada,
+          observaciones: prestamoActivo.observaciones
+        };
+      }
+    }
+
+    return itemJson;
   }
 
   /**
