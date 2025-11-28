@@ -217,6 +217,13 @@ class SedeService {
       observaciones: detalle.observaciones
     }));
 
+    logger.info('🔍 Retornando sede con préstamos:', {
+      sedeId,
+      sede_nombre: sedeJson.nombre_sede,
+      prestamosEnSede_length: sedeJson.prestamosEnSede?.length,
+      prestamosEnSede_exists: !!sedeJson.prestamosEnSede
+    });
+
     return sedeJson;
   }
 
