@@ -149,6 +149,9 @@ class SedeService {
 
     // Buscar artículos en préstamo EN esta sede
     const { Remito, RemitoDetalle } = require('../../../models');
+
+    logger.info('🔍 Buscando préstamos para sede:', { sedeId });
+
     const prestamosEnSede = await RemitoDetalle.findAll({
       where: {
         es_prestamo: true,
@@ -183,14 +186,23 @@ class SedeService {
             }
           ]
         }
-      ]
+      ],
+      logging: (sql) => logger.info('SQL Query:', sql)
     });
 
-    console.log('🔍 DEBUG - Préstamos en sede:', sedeId);
-    console.log('🔍 DEBUG - Cantidad encontrada:', prestamosEnSede.length);
-    if (prestamosEnSede.length > 0) {
-      console.log('🔍 DEBUG - Primer préstamo:', JSON.stringify(prestamosEnSede[0], null, 2));
-    }
+    logger.info('🔍 Préstamos encontrados:', {
+      sedeId,
+      cantidad: prestamosEnSede.length,
+      prestamos: prestamosEnSede.map(p => ({
+        remito_id: p.remito_id,
+        inventario_id: p.inventario_id,
+        es_prestamo: p.es_prestamo,
+        devuelto: p.devuelto,
+        remito_numero: p.remito?.numero_remito,
+        remito_estado: p.remito?.estado,
+        remito_sede_destino: p.remito?.sede_destino_id
+      }))
+    });
 
     // Convertir a JSON y agregar prestamosEnSede
     const sedeJson = sede.toJSON();
