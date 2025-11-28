@@ -210,7 +210,7 @@ class InventarioService {
             as: 'remito',
             where: {
               estado: {
-                [Op.in]: ['preparado', 'en_transito', 'entregado']
+                [Op.in]: ['preparado', 'en_transito', 'entregado', 'completado']
               }
             },
             include: [

@@ -164,7 +164,7 @@ class SedeService {
           where: {
             sede_destino_id: sedeId,
             estado: {
-              [Op.in]: ['preparado', 'en_transito', 'entregado']
+              [Op.in]: ['preparado', 'en_transito', 'entregado', 'completado']
             }
           },
           include: [
@@ -517,7 +517,7 @@ class SedeService {
           where: {
             sede_destino_id: sedeId,
             estado: {
-              [Op.in]: ['preparado', 'en_transito', 'entregado']
+              [Op.in]: ['preparado', 'en_transito', 'entregado', 'completado']
             }
           },
           include: [
