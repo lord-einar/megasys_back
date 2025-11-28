@@ -186,6 +186,12 @@ class SedeService {
       ]
     });
 
+    console.log('🔍 DEBUG - Préstamos en sede:', sedeId);
+    console.log('🔍 DEBUG - Cantidad encontrada:', prestamosEnSede.length);
+    if (prestamosEnSede.length > 0) {
+      console.log('🔍 DEBUG - Primer préstamo:', JSON.stringify(prestamosEnSede[0], null, 2));
+    }
+
     // Convertir a JSON y agregar prestamosEnSede
     const sedeJson = sede.toJSON();
     sedeJson.prestamosEnSede = prestamosEnSede.map(detalle => ({
