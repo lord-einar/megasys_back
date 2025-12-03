@@ -22,6 +22,12 @@ const RemitoDetalle = require('./RemitoDetalle');
 const HistorialMovimiento = require('./HistorialMovimiento');
 const HistoricoInventario = require('./HistoricoInventario');
 const Auditoria = require('./Auditoria');
+const Visita = require('./Visita');
+const VisitaRecurrencia = require('./VisitaRecurrencia');
+const VisitaSolicitudPrevia = require('./VisitaSolicitudPrevia');
+const VisitaInforme = require('./VisitaInforme');
+const VisitaProblemaResuelto = require('./VisitaProblemaResuelto');
+const VisitaChecklistItem = require('./VisitaChecklistItem');
 
 // =====================================================
 // DEFINICIÓN DE RELACIONES
@@ -375,6 +381,110 @@ HistoricoInventario.belongsTo(Sede, {
 });
 
 // =====================================================
+// RELACIONES MÓDULO VISITAS
+// =====================================================
+
+// Visita -> Sede
+Sede.hasMany(Visita, {
+  foreignKey: 'sede_id',
+  as: 'visitas'
+});
+Visita.belongsTo(Sede, {
+  foreignKey: 'sede_id',
+  as: 'sedePrincipal'
+});
+
+// Visita -> Personal (Técnico Asignado)
+Personal.hasMany(Visita, {
+  foreignKey: 'tecnico_asignado_id',
+  as: 'visitasAsignadas'
+});
+Visita.belongsTo(Personal, {
+  foreignKey: 'tecnico_asignado_id',
+  as: 'tecnicoAsignado'
+});
+
+// Visita -> Personal (Creado Por)
+Personal.hasMany(Visita, {
+  foreignKey: 'creado_por_id',
+  as: 'visitasCreadas'
+});
+Visita.belongsTo(Personal, {
+  foreignKey: 'creado_por_id',
+  as: 'creador'
+});
+
+// VisitaRecurrencia -> Visita
+VisitaRecurrencia.hasMany(Visita, {
+  foreignKey: 'recurrencia_id',
+  as: 'instancias'
+});
+Visita.belongsTo(VisitaRecurrencia, {
+  foreignKey: 'recurrencia_id',
+  as: 'recurrencia'
+});
+
+// VisitaRecurrencia -> Sede
+Sede.hasMany(VisitaRecurrencia, {
+  foreignKey: 'sede_id',
+  as: 'recurrenciasVisita'
+});
+VisitaRecurrencia.belongsTo(Sede, {
+  foreignKey: 'sede_id',
+  as: 'sede'
+});
+
+// VisitaRecurrencia -> Personal (Técnico)
+Personal.hasMany(VisitaRecurrencia, {
+  foreignKey: 'tecnico_asignado_id',
+  as: 'recurrenciasAsignadas'
+});
+VisitaRecurrencia.belongsTo(Personal, {
+  foreignKey: 'tecnico_asignado_id',
+  as: 'tecnicoAsignado'
+});
+
+// Visita -> VisitaSolicitudPrevia
+Visita.hasMany(VisitaSolicitudPrevia, {
+  foreignKey: 'visita_id',
+  as: 'solicitudesPrevias'
+});
+VisitaSolicitudPrevia.belongsTo(Visita, {
+  foreignKey: 'visita_id',
+  as: 'visita'
+});
+
+// Visita -> VisitaInforme
+Visita.hasOne(VisitaInforme, {
+  foreignKey: 'visita_id',
+  as: 'informe'
+});
+VisitaInforme.belongsTo(Visita, {
+  foreignKey: 'visita_id',
+  as: 'visita'
+});
+
+// VisitaInforme -> Personal (Técnico)
+Personal.hasMany(VisitaInforme, {
+  foreignKey: 'tecnico_id',
+  as: 'informesVisita'
+});
+VisitaInforme.belongsTo(Personal, {
+  foreignKey: 'tecnico_id',
+  as: 'tecnico'
+});
+
+// VisitaInforme -> VisitaProblemaResuelto
+VisitaInforme.hasMany(VisitaProblemaResuelto, {
+  foreignKey: 'informe_id',
+  as: 'problemasResueltos'
+});
+VisitaProblemaResuelto.belongsTo(VisitaInforme, {
+  foreignKey: 'informe_id',
+  as: 'informe'
+});
+
+// =====================================================
 // HOOKS Y FUNCIONES AUTOMÁTICAS
 // =====================================================
 
@@ -417,13 +527,11 @@ Remito.addHook('afterUpdate', async (remito, options) => {
         include: ['inventarioDetalle']
       });
 
-      // Actualizar la sede de cada item de inventario (solo si no es préstamo)
+      // Actualizar la sede de cada item de inventario (siempre, independientemente de si es préstamo)
       for (const detalle of detalles) {
-        if (!detalle.es_prestamo) {
-          await detalle.inventarioDetalle.update({
-            sede_id: remito.sede_destino_id
-          }, { transaction: options.transaction });
-        }
+        await detalle.inventarioDetalle.update({
+          sede_id: remito.sede_destino_id
+        }, { transaction: options.transaction });
       }
     } catch (error) {
       logger.error('Error actualizando ubicación de inventario en hook afterUpdate de Remito:', {
@@ -473,7 +581,15 @@ const models = {
   Auditoria,
 
   // Tablas intermedias
-  SedeServicio
+  SedeServicio,
+
+  // Módulo Visitas
+  Visita,
+  VisitaRecurrencia,
+  VisitaSolicitudPrevia,
+  VisitaInforme,
+  VisitaProblemaResuelto,
+  VisitaChecklistItem
 };
 
 // Agregar métodos de asociación globales

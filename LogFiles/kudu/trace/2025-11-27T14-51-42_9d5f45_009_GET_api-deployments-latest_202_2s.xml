@@ -1,0 +1,11 @@
+<step title="Incoming Request" date="2025-11-27T14:51:42.769" instance="9d5f45" url="/api/deployments/latest" method="GET" type="request" pid="834,1,5" Accept="*/*" Host="megasys-api-staging.scm.azurewebsites.net" User-Agent="AZURECLI/2.80.0 (DEB)" Accept-Encoding="gzip, deflate" Authorization="Bea..." x-ms-client-request-id="65bac71e-cba0-11f0-a833-d03745c626be" X-ARR-LOG-ID="65bac71e-cba0-11f0-a833-d03745c626be" CLIENT-IP="186.158.120.171:10746" X-SITE-DEPLOYMENT-ID="megasys-api__4993" WAS-DEFAULT-HOSTNAME="megasys-api-staging.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/deployments/latest" X-Client-IP="186.158.120.171" X-Client-Port="10746" >
+  <step title="Cleanup Xml Logs" date="2025-11-27T14:51:42.818" >
+    <step title="Cleanup Infos" date="2025-11-27T14:51:42.884" totalFiles="253" totalCleanup="93" /><!-- duration: 49ms -->
+  </step><!-- duration: 164ms -->
+  <step title="DeploymentService.GetResult" date="2025-11-27T14:51:43.100" >
+    <step title="DeploymentService.GetLatestDeployment" date="2025-11-27T14:51:43.112" >
+      <step title="DeploymentManager.GetResults" date="2025-11-27T14:51:43.140" /><!-- duration: 1580ms -->
+    </step><!-- duration: 1753ms -->
+  </step><!-- duration: 1835ms -->
+  <step title="Outgoing response" date="2025-11-27T14:51:45.019" type="response" statusCode="202" statusText="Accepted" /><!-- duration: 91ms -->
+</step><!-- duration: 2415ms -->

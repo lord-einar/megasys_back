@@ -92,7 +92,7 @@ const loadRoutes = (routePath, mountPath) => {
       error: error.message,
       stack: error.stack
     });
-    
+
     // Crear una ruta de fallback que responda con el error
     app.use(mountPath, (req, res) => {
       res.status(500).json({
@@ -134,6 +134,9 @@ loadRoutes('./modules/remitos/routes', '/api/remitos');
 
 // Rutas de proveedores
 loadRoutes('./modules/proveedores/routes', '/api/proveedores');
+
+// Rutas de visitas
+loadRoutes('./modules/visitas/routes', '/api/visitas');
 
 logger.info('✅ Todas las rutas han sido procesadas');
 

@@ -1,0 +1,19 @@
+<step title="Incoming Request" date="2025-11-28T02:01:12.872" instance="9d5f45" url="/api/zipdeploy?isAsync=true" method="POST" type="request" pid="834,1,28" Accept="*/*" Host="megasys-api-staging.scm.azurewebsites.net" User-Agent="AZURECLI/2.80.0 (DEB)" Accept-Encoding="gzip, deflate" Authorization="Bea..." Cache-Control="no-cache" Content-Type="application/octet-stream" Content-Length="314676" x-ms-client-request-id="1a3ef040-cbfe-11f0-a833-d03745c626be" x-ms-artifact-checksum="047751d143de23903a9e911609276e62478286f087b4282029b23e4903c316a8" X-ARR-LOG-ID="1a3ef040-cbfe-11f0-a833-d03745c626be" CLIENT-IP="186.158.120.171:38863" X-SITE-DEPLOYMENT-ID="megasys-api__4993" WAS-DEFAULT-HOSTNAME="megasys-api-staging.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/zipdeploy?isAsync=true" X-Client-IP="186.158.120.171" X-Client-Port="38863" >
+  <step title="Cleanup Xml Logs" date="2025-11-28T02:01:12.875" >
+    <step title="Cleanup Infos" date="2025-11-28T02:01:12.884" totalFiles="347" totalCleanup="187" /><!-- duration: 9ms -->
+  </step><!-- duration: 20ms -->
+  <step title="ZipPushDeploy" date="2025-11-28T02:01:12.913" >
+    <step title="ZipDeploy. Extract zip. Remote build." date="2025-11-28T02:01:12.923" /><!-- duration: 8ms -->
+    <step title="Starting PushDeployAsync" date="2025-11-28T02:01:12.952" /><!-- duration: 4ms -->
+    <step title="Removing node_modules symlink" date="2025-11-28T02:01:12.970" >
+      <step title="Writing artifact to /tmp/zipdeploy/b1aa5175-2f36-4ab5-bed6-a66f1a467515.zip" date="2025-11-28T02:01:13.072" >
+        <step title="Writing multipart request body to /tmp/zipdeploy/b1aa5175-2f36-4ab5-bed6-a66f1a467515.zip" date="2025-11-28T02:01:13.075" /><!-- duration: 7ms -->
+      </step><!-- duration: 156ms -->
+      <step title="Removing previous build artifact&apos;s manifest file" date="2025-11-28T02:01:13.266" >
+        <step title="Start deployment in the background" date="2025-11-28T02:01:13.287" >
+          <step title="Acquiring Deployment Lock" date="2025-11-28T02:01:13.450" /><!-- duration: 3ms -->
+          <step title="Acquired Deployment Lock" date="2025-11-28T02:01:13.480" /><!-- duration: 2ms -->
+        </step><!-- duration: 274ms -->
+      </step><!-- duration: 305ms -->
+      <step title="Outgoing response" date="2025-11-28T02:01:13.575" type="response" statusCode="202" statusText="Accepted" /><!-- duration: 3ms -->
+    </step><!-- duration: 610ms -->

@@ -1,0 +1,4 @@
+<step title="Incoming Request" date="2025-11-28T02:14:14.661" instance="9d5f45" url="/dump" method="GET" type="request" pid="834,1,15" Host="megasys-api-staging.scm.azurewebsites.net" User-Agent="AZURECLI/2.80.0 (DEB)" Accept-Encoding="identity" Authorization="Bea..." x-ms-client-request-id="e9d1c912-cbff-11f0-a833-d03745c626be" X-ARR-LOG-ID="e9d1c912-cbff-11f0-a833-d03745c626be" CLIENT-IP="186.158.120.171:24966" X-SITE-DEPLOYMENT-ID="megasys-api__4993" WAS-DEFAULT-HOSTNAME="megasys-api-staging.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/dump" X-Client-IP="186.158.120.171" X-Client-Port="24966" >
+  <step title="Cleanup Xml Logs" date="2025-11-28T02:14:14.663" >
+    <step title="Cleanup Infos" date="2025-11-28T02:14:14.673" totalFiles="396" totalCleanup="236" /><!-- duration: 9ms -->
+  </step><!-- duration: 21ms -->
