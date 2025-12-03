@@ -90,7 +90,7 @@ class AuthService {
 
       // Información BÁSICA del usuario (sin foto)
       const userInfo = {
-        id: response.account.homeAccountId,
+        id: response.account.localAccountId, // Usar localAccountId en lugar de homeAccountId
         email: response.account.username,
         name: response.account.name,
         tenantId: response.account.tenantId,
@@ -103,7 +103,34 @@ class AuthService {
         groupNames: userInfo.groupNames
       });
 
-      // Generar JWT token SOLO con datos básicos
+      // IMPORTANTE: Antes de generar el JWT, mapear al ID de la tabla Personal
+      // en lugar de usar el Azure AD localAccountId
+      try {
+        const { Personal } = require('../../../models');
+        const personalRecord = await Personal.findOne({
+          where: { email: userInfo.email.toLowerCase() }
+        });
+
+        if (personalRecord) {
+          // Guardar el Azure ID original como referencia
+          userInfo.azureId = userInfo.id;
+          // Usar el ID de la tabla Personal
+          userInfo.id = personalRecord.id;
+
+          logger.info('Usuario mapeado a ID de Personal:', {
+            email: userInfo.email,
+            azureId: userInfo.azureId,
+            personalId: personalRecord.id
+          });
+        }
+      } catch (mappingError) {
+        logger.warn('Error mapeando usuario a Personal, usando Azure ID:', {
+          email: userInfo.email,
+          error: mappingError.message
+        });
+      }
+
+      // Generar JWT token con el ID de Personal (no el de Azure)
       const token = this.generateJWT(userInfo);
 
       return {

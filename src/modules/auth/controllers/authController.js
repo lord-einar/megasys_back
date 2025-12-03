@@ -15,13 +15,13 @@ class AuthController {
   login = asyncHandler(async (req, res) => {
     try {
       const authUrl = await authService.generateAuthUrl();
-      
+
       logger.info('URL de autenticación generada para:', {
         ip: req.ip,
         userAgent: req.get('User-Agent')
       });
-      
-      success(res, { 
+
+      success(res, {
         authUrl,
         message: 'Redirige al usuario a esta URL para autenticarse'
       }, 'URL de autenticación generada');
@@ -90,16 +90,24 @@ class AuthController {
       try {
         await personalService.autoProvisionarPersonal(result.user, roleInfo);
 
-        // Obtener el privilegio_app del registro Personal creado/actualizado
-        const { Personal } = require('../../models');
+        // Obtener el privilegio_app y el ID del registro Personal creado/actualizado
+        const { Personal } = require('../../../models');
         const personalRecord = await Personal.findOne({
           where: { email: result.user.email.toLowerCase() }
         });
 
-        if (personalRecord && personalRecord.privilegio_app) {
-          privilegioApp = personalRecord.privilegio_app;
-          logger.info('Privilegio de aplicación obtenido de Personal:', {
+        if (personalRecord) {
+          // IMPORTANTE: Usar el ID de la tabla personal, no el de Azure AD
+          result.user.id = personalRecord.id;
+
+          if (personalRecord.privilegio_app) {
+            privilegioApp = personalRecord.privilegio_app;
+          }
+
+          logger.info('Usuario mapeado a registro Personal:', {
             email: result.user.email,
+            azureId: result.user.azureId || 'N/A',
+            personalId: personalRecord.id,
             privilegioApp
           });
         }
@@ -163,15 +171,15 @@ class AuthController {
   refresh = asyncHandler(async (req, res) => {
     try {
       const { refreshToken } = req.body;
-      
+
       if (!refreshToken) {
         return error(res, 'Refresh token requerido', 400);
       }
 
       const result = await authService.refreshToken(refreshToken);
-      
+
       logger.info('Token refrescado para usuario:', result.user.id);
-      
+
       success(res, {
         user: {
           id: result.user.id,
@@ -194,11 +202,11 @@ class AuthController {
   logout = asyncHandler(async (req, res) => {
     try {
       const userId = req.user.id;
-      
+
       await authService.logout(userId);
-      
+
       logger.info('Usuario cerró sesión:', userId);
-      
+
       success(res, null, 'Sesión cerrada exitosamente');
     } catch (err) {
       logger.error('Error en logout:', err);
@@ -212,7 +220,7 @@ class AuthController {
   status = asyncHandler(async (req, res) => {
     try {
       const user = req.user;
-      
+
       success(res, {
         authenticated: true,
         user: {
@@ -338,6 +346,48 @@ class AuthController {
     } catch (err) {
       logger.error('Error en debugGroups:', err);
       error(res, 'Error al analizar grupos', 500);
+    }
+  });
+  /**
+   * DEV ONLY: Bypass login for development
+   */
+  devLogin = asyncHandler(async (req, res) => {
+    if (process.env.NODE_ENV !== 'development') {
+      return error(res, 'Endpoint solo disponible en desarrollo', 403);
+    }
+
+    try {
+      // Usuario simulado (Super Admin / Infraestructura)
+      const mockUser = {
+        id: 'dev-user-id',
+        email: 'dev@megatlon.com.ar',
+        name: 'Usuario Desarrollo',
+        tenantId: 'dev-tenant',
+        groups: ['edc49d22-9ee8-4d90-a8b2-41cf64db1eed'], // Grupo Infraestructura
+        groupNames: ['Infraestructura'],
+        privilegioApp: 'super_admin'
+      };
+
+      // Generar token
+      const token = authService.generateJWT(mockUser);
+
+      // Auto-provisionar Personal si no existe
+      try {
+        const roleInfo = roleService.getRoleAndPermissions(mockUser.groups);
+        await personalService.autoProvisionarPersonal(mockUser, roleInfo);
+      } catch (provError) {
+        logger.warn('Error provisionando usuario dev:', provError);
+      }
+
+      success(res, {
+        user: mockUser,
+        token,
+        accessToken: 'mock-access-token'
+      }, 'Login de desarrollo exitoso');
+
+    } catch (err) {
+      logger.error('Error en devLogin:', err);
+      error(res, 'Error en login de desarrollo', 500);
     }
   });
 }
