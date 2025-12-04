@@ -124,9 +124,9 @@ class VisitaController {
 
             const visita = await visitaService.cancelar(id, motivo, usuarioId);
             return success(res, visita);
-        } catch (error) {
-            logger.error('Error cancelando visita:', error);
-            return error(res, error.message || "Error en la operación", 500);
+        } catch (err) {
+            logger.error('Error cancelando visita:', err);
+            return error(res, err.message || "Error en la operación", 500);
         }
     }
 
@@ -138,9 +138,9 @@ class VisitaController {
 
             const visita = await visitaService.reprogramar(id, nueva_fecha, usuarioId);
             return success(res, visita);
-        } catch (error) {
-            logger.error('Error reprogramando visita:', error);
-            return error(res, error.message || "Error en la operación", 500);
+        } catch (err) {
+            logger.error('Error reprogramando visita:', err);
+            return error(res, err.message || "Error en la operación", 500);
         }
     }
 
@@ -150,9 +150,9 @@ class VisitaController {
 
             const stats = await visitaService.obtenerEstadisticas(fecha_desde, fecha_hasta);
             return success(res, stats);
-        } catch (error) {
-            logger.error('Error obteniendo estadísticas:', error);
-            return error(res, error.message || "Error en la operación", 500);
+        } catch (err) {
+            logger.error('Error obteniendo estadísticas:', err);
+            return error(res, err.message || "Error en la operación", 500);
         }
     }
 }

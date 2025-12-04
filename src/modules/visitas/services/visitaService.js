@@ -50,7 +50,7 @@ class VisitaService {
             const { count, rows } = await Visita.findAndCountAll({
                 where,
                 include: [
-                    { model: Sede, as: 'sedePrincipal', attributes: ['id', 'nombre'] },
+                    { model: Sede, as: 'sedePrincipal', attributes: ['id', 'nombre_sede'] },
                     { model: Personal, as: 'tecnicoAsignado', attributes: ['id', 'nombre', 'apellido'] }
                 ],
                 order: [['fecha', 'DESC']],
@@ -512,7 +512,7 @@ class VisitaService {
             const visitas = await Visita.findAll({
                 where,
                 include: [
-                    { model: Sede, as: 'sedePrincipal', attributes: ['nombre'] },
+                    { model: Sede, as: 'sedePrincipal', attributes: ['nombre_sede'] },
                     {
                         model: VisitaInforme,
                         as: 'informe',
@@ -538,7 +538,7 @@ class VisitaService {
                 stats.por_estado[v.estado] = (stats.por_estado[v.estado] || 0) + 1;
                 stats.por_tipo[v.tipo] = (stats.por_tipo[v.tipo] || 0) + 1;
 
-                const sedeNombre = v.sedePrincipal?.nombre || 'Sin sede';
+                const sedeNombre = v.sedePrincipal?.nombre_sede || 'Sin sede';
                 stats.por_sede[sedeNombre] = (stats.por_sede[sedeNombre] || 0) + 1;
 
                 // Problemas por categoría
