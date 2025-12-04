@@ -116,7 +116,10 @@ class RemitoService {
         where: {
           id: inventarioId,
           sede_id: sedeId,
-          activo: true
+          activo: true,
+          estado: {
+            [Op.notIn]: ['en_uso', 'en_prestamo']
+          }
         }
       });
 
@@ -907,6 +910,17 @@ class RemitoService {
       throw new Error('El remito original no existe');
     }
 
+    // Buscar sede "Deposito" para devoluciones
+    const sedeDeposito = await Sede.findOne({
+      where: {
+        nombre_sede: 'Deposito'
+      }
+    });
+
+    if (!sedeDeposito) {
+      throw new Error('No se encontró la sede "Deposito" para procesar la devolución');
+    }
+
     // Obtener detalles a devolver
     const detallesADevolver = await RemitoDetalle.findAll({
       where: {
@@ -953,11 +967,11 @@ class RemitoService {
           devuelto: false
         }, { transaction: t });
 
-        // Actualizar ubicación y estado: devolver a sede origen y marcar como disponible
+        // Actualizar ubicación y estado: devolver a Deposito y marcar como disponible
         await Inventario.update(
           {
-            sede_id: remitoOriginal.sede_origen_id,
-            estado: 'Disponible' // Revertir estado a disponible cuando se devuelve el artículo
+            sede_id: sedeDeposito.id,
+            estado: 'disponible' // Revertir estado a disponible cuando se devuelve el artículo
           },
           {
             where: { id: detalleOriginal.inventario_id },
@@ -976,7 +990,7 @@ class RemitoService {
           inventario_id: detalleOriginal.inventario_id,
           remito_id: remitoDevolucion.id,
           sede_origen_id: remitoOriginal.sede_destino_id,
-          sede_destino_id: remitoOriginal.sede_origen_id,
+          sede_destino_id: sedeDeposito.id,
           tipo_movimiento: 'devolucion',
           fecha_movimiento: new Date(),
           observaciones: `Devolución de préstamo - Remito original: ${remitoOriginal.numero_remito}`
