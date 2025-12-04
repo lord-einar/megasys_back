@@ -111,8 +111,9 @@ const enrichUserWithRole = (req, res, next) => {
 /**
  * Middleware para verificar que el usuario tiene un rol específico en base de datos
  * Verifica contra la tabla Personal.rol_id
+ * @param {string|string[]} roleNames - Nombre del rol o array de nombres de roles permitidos
  */
-const requireDatabaseRole = (roleName) => {
+const requireDatabaseRole = (roleNames) => {
   const { Personal, Rol } = require('../../../models');
 
   return async (req, res, next) => {
@@ -120,6 +121,9 @@ const requireDatabaseRole = (roleName) => {
       if (!req.user) {
         return error(res, 'Usuario no autenticado', 401);
       }
+
+      // Normalizar roleNames a array
+      const allowedRoles = Array.isArray(roleNames) ? roleNames : [roleNames];
 
       // Buscar el usuario en base de datos por email
       const personal = await Personal.findOne({
@@ -139,14 +143,21 @@ const requireDatabaseRole = (roleName) => {
         return error(res, 'Usuario no registrado en el sistema', 404);
       }
 
-      // Verificar si tiene el rol requerido
-      if (!personal.rol || personal.rol.nombre !== roleName) {
+      // Verificar si tiene alguno de los roles requeridos
+      const hasRequiredRole = personal.rol && allowedRoles.includes(personal.rol.nombre);
+
+      if (!hasRequiredRole) {
         logger.warn('Acceso denegado por rol insuficiente en BD:', {
           email: req.user.email,
-          rolRequerido: roleName,
+          rolesRequeridos: allowedRoles,
           rolActual: personal.rol?.nombre || 'ninguno'
         });
-        return error(res, `Se requiere el rol "${roleName}" para acceder a este recurso`, 403);
+
+        const rolesMessage = allowedRoles.length === 1
+          ? `Se requiere el rol "${allowedRoles[0]}"`
+          : `Se requiere uno de los roles: ${allowedRoles.join(', ')}`;
+
+        return error(res, `${rolesMessage} para acceder a este recurso`, 403);
       }
 
       // Agregar información al request
@@ -156,7 +167,7 @@ const requireDatabaseRole = (roleName) => {
 
       logger.info('Acceso autorizado por rol de BD:', {
         email: req.user.email,
-        rol: roleName,
+        rol: personal.rol.nombre,
         personalId: personal.id
       });
 

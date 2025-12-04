@@ -129,11 +129,10 @@ router.post(
 /**
  * POST /remitos/:id/devolver
  * Generar remito de devolución automático
- * Requiere: Rol "Infraestructura"
+ * Requiere: Grupo "Infraestructura" (Super_admin) O ser el técnico asignado al remito
  */
 router.post(
   '/:id/devolver',
-  requireDatabaseRole('Infraestructura'),
   remitoController.generarDevolucion.bind(remitoController)
 );
 

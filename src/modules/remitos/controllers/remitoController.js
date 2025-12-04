@@ -4,6 +4,7 @@ const logger = require('../../../shared/utils/logger');
 const { success, error, paginated } = require('../../../shared/utils/response');
 const { sequelize } = require('../../../models');
 const { GUID_TO_GROUP_MAP } = require('../../auth/config/roles');
+const roleService = require('../../auth/services/roleService');
 
 class RemitoController {
   /**
@@ -211,6 +212,7 @@ class RemitoController {
    * POST /remitos/:id/devolver
    * Generar remito de devolución automático
    * Cuando se devuelven artículos préstamo
+   * Requiere: Grupo "Infraestructura" (Super_admin) O ser el técnico asignado al remito
    */
   async generarDevolucion(req, res) {
     try {
@@ -222,10 +224,43 @@ class RemitoController {
         return error(res, 'Debes seleccionar al menos un artículo a devolver', 400);
       }
 
+      // Verificar permisos: Super_admin O técnico asignado
+      const userRole = roleService.getUserRole(req.user.groups || []);
+      const isSuperAdmin = userRole === 'Super_admin';
+
+      if (!isSuperAdmin) {
+        // Si no es Super_admin, verificar si es el técnico asignado
+        const { Remito, Personal } = require('../../../models');
+        const remitoOriginal = await Remito.findByPk(remitoOriginalId, {
+          include: [{
+            model: Personal,
+            as: 'tecnicoAsignado',
+            attributes: ['id', 'email']
+          }]
+        });
+
+        if (!remitoOriginal) {
+          return error(res, 'El remito original no existe', 404);
+        }
+
+        const esTecnicoAsignado = remitoOriginal.tecnicoAsignado &&
+          remitoOriginal.tecnicoAsignado.email.toLowerCase() === usuarioEmail.toLowerCase();
+
+        if (!esTecnicoAsignado) {
+          logger.warn('Acceso denegado para generar devolución:', {
+            usuarioEmail,
+            userRole,
+            tecnicoAsignado: remitoOriginal.tecnicoAsignado?.email
+          });
+          return error(res, 'No tienes permisos para devolver artículos de este remito. Solo el técnico asignado o usuarios con rol Super_admin pueden hacerlo.', 403);
+        }
+      }
+
       logger.info('Generando remito de devolución:', {
         remitoOriginalId,
         articulosADevolver: detalleIds.length,
-        usuario: usuarioEmail
+        usuario: usuarioEmail,
+        rol: userRole
       });
 
       const remitoDevolucion = await remitoService.generarRemitoDevolucion(
