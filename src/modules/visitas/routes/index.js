@@ -2,11 +2,9 @@ const express = require('express');
 const router = express.Router();
 const visitaController = require('../controllers/visitaController');
 const { authenticate } = require('../../auth/middleware/authMiddleware');
+const { requireRole } = require('../../auth/middleware/roleMiddleware');
 const { body, param, query } = require('express-validator');
 const validate = require('../../../shared/middleware/validation');
-
-// Middleware de autorización simple (placeholder hasta que se implemente authorize real)
-const authorize = (roles) => (req, res, next) => next();
 
 // Validaciones
 const validarCrearVisita = [
@@ -63,20 +61,22 @@ router.post('/solicitudes', validarSolicitudPublica, visitaController.agregarSol
 // Rutas Protegidas
 router.use(authenticate);
 
-// Calendario y Listas
-router.get('/calendario', authorize(['Infraestructura', 'Soporte']), visitaController.obtenerCalendario);
-router.get('/checklist-items', authorize(['Infraestructura', 'Soporte']), visitaController.obtenerChecklistItems);
-router.get('/estadisticas', authorize(['Infraestructura', 'Soporte']), visitaController.obtenerEstadisticas);
-router.get('/', authorize(['Infraestructura', 'Soporte']), visitaController.listar);
+// Calendario y Listas (lectura - super_admin, support, helpdesk)
+router.get('/calendario', requireRole('helpdesk'), visitaController.obtenerCalendario);
+router.get('/checklist-items', requireRole('helpdesk'), visitaController.obtenerChecklistItems);
+router.get('/estadisticas', requireRole('support'), visitaController.obtenerEstadisticas);
+router.get('/', requireRole('helpdesk'), visitaController.listar);
 
 // CRUD Visitas
-router.post('/', authorize(['Infraestructura', 'Soporte']), validarCrearVisita, visitaController.crear);
-router.get('/:id', authorize(['Infraestructura', 'Soporte']), param('id').isUUID(), validate, visitaController.obtener);
-router.put('/:id', authorize(['Infraestructura', 'Soporte']), validarActualizarVisita, visitaController.actualizar);
+router.post('/', requireRole('support'), validarCrearVisita, visitaController.crear);
+router.get('/:id', requireRole('helpdesk'), param('id').isUUID(), validate, visitaController.obtener);
+router.put('/:id', requireRole('support'), validarActualizarVisita, visitaController.actualizar);
+router.delete('/:id', requireRole('super_admin'), param('id').isUUID(), validate, visitaController.eliminar);
 
 // Acciones específicas
-router.post('/:id/realizada', authorize(['Infraestructura', 'Soporte']), validarMarcarRealizada, visitaController.marcarRealizada);
-router.post('/:id/cancelar', authorize(['Infraestructura', 'Soporte']), validarCancelar, visitaController.cancelar);
-router.post('/:id/reprogramar', authorize(['Infraestructura', 'Soporte']), validarReprogramar, visitaController.reprogramar);
+router.post('/:id/realizada', requireRole('support'), validarMarcarRealizada, visitaController.marcarRealizada);
+router.post('/:id/cancelar', requireRole('support'), validarCancelar, visitaController.cancelar);
+router.post('/:id/reprogramar', requireRole('support'), validarReprogramar, visitaController.reprogramar);
+router.post('/:id/aviso', requireRole('support'), param('id').isUUID(), validate, visitaController.enviarAviso);
 
 module.exports = router;
