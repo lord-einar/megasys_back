@@ -224,12 +224,12 @@ class RemitoController {
         return error(res, 'Debes seleccionar al menos un artículo a devolver', 400);
       }
 
-      // Verificar permisos: Super_admin O técnico asignado
+      // Verificar permisos: super_admin O técnico asignado
       const userRole = roleService.getUserRole(req.user.groups || []);
-      const isSuperAdmin = userRole === 'Super_admin';
+      const isSuperAdmin = userRole === 'super_admin';
 
       if (!isSuperAdmin) {
-        // Si no es Super_admin, verificar si es el técnico asignado
+        // Si no es super_admin, verificar si es el técnico asignado
         const { Remito, Personal } = require('../../../models');
         const remitoOriginal = await Remito.findByPk(remitoOriginalId, {
           include: [{
@@ -252,7 +252,7 @@ class RemitoController {
             userRole,
             tecnicoAsignado: remitoOriginal.tecnicoAsignado?.email
           });
-          return error(res, 'No tienes permisos para devolver artículos de este remito. Solo el técnico asignado o usuarios con rol Super_admin pueden hacerlo.', 403);
+          return error(res, 'No tienes permisos para devolver artículos de este remito. Solo el técnico asignado o usuarios del grupo Infraestructura pueden hacerlo.', 403);
         }
       }
 
