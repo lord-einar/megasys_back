@@ -689,6 +689,7 @@ class InventarioService {
 
   /**
    * Obtener estadísticas generales del inventario
+   * Optimizado para reducir queries (5 → 1)
    */
   async obtenerEstadisticasGenerales(sedeId = null) {
     const whereClause = { activo: true };
@@ -696,19 +697,25 @@ class InventarioService {
       whereClause.sede_id = sedeId;
     }
 
-    const totalPersonal = await Inventario.count({ where: whereClause });
-    const disponible = await Inventario.count({
-      where: { ...whereClause, estado: 'disponible' }
+    // UNA SOLA query con agregaciones condicionales
+    const estadisticas = await Inventario.findAll({
+      attributes: [
+        [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
+        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN estado = 'disponible' THEN 1 END")), 'disponible'],
+        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN estado = 'en_uso' THEN 1 END")), 'enUso'],
+        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN estado = 'mantenimiento' THEN 1 END")), 'mantenimiento'],
+        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN estado = 'dado_de_baja' THEN 1 END")), 'dadoDeBaja']
+      ],
+      where: whereClause,
+      raw: true
     });
-    const enUso = await Inventario.count({
-      where: { ...whereClause, estado: 'en_uso' }
-    });
-    const mantenimiento = await Inventario.count({
-      where: { ...whereClause, estado: 'mantenimiento' }
-    });
-    const dadoDeBaja = await Inventario.count({
-      where: { ...whereClause, estado: 'dado_de_baja' }
-    });
+
+    const resumen = estadisticas[0] || {};
+    const totalPersonal = parseInt(resumen.total) || 0;
+    const disponible = parseInt(resumen.disponible) || 0;
+    const enUso = parseInt(resumen.enUso) || 0;
+    const mantenimiento = parseInt(resumen.mantenimiento) || 0;
+    const dadoDeBaja = parseInt(resumen.dadoDeBaja) || 0;
 
     // Estadísticas por tipo de artículo
     const porTipo = await Inventario.findAll({

@@ -81,34 +81,50 @@ class SedeService {
 
   /**
    * Enriquecer sedes con estadísticas
+   * Optimizado para evitar N+1 queries
    */
   async enriquecerConEstadisticas(sedes) {
-    return Promise.all(
-      sedes.map(async (sede) => {
-        const sedeJson = sede.toJSON?.() || sede;
+    if (!sedes || sedes.length === 0) {
+      return [];
+    }
 
-        const totalInventario = await Inventario.count({
-          where: { sede_id: sede.id, activo: true }
-        });
+    // Extraer todos los IDs de sedes
+    const sedeIds = sedes.map(s => s.id);
 
-        const inventarioDisponible = await Inventario.count({
-          where: {
-            sede_id: sede.id,
-            activo: true,
-            estado: 'disponible'
-          }
-        });
+    // UNA SOLA query para todas las estadísticas usando GROUP BY
+    const estadisticas = await Inventario.findAll({
+      attributes: [
+        'sede_id',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
+        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN estado = 'disponible' THEN 1 END")), 'disponible']
+      ],
+      where: {
+        sede_id: { [Op.in]: sedeIds },
+        activo: true
+      },
+      group: ['sede_id'],
+      raw: true
+    });
 
-        return {
-          ...sedeJson,
-          estadisticas: {
-            totalPersonal: sedeJson.personalSede?.length || 0,
-            totalInventario,
-            inventarioDisponible
-          }
-        };
-      })
+    // Crear un mapa para acceso O(1)
+    const statsMap = new Map(
+      estadisticas.map(s => [s.sede_id, s])
     );
+
+    // Mapear resultados (sin queries adicionales)
+    return sedes.map(sede => {
+      const sedeJson = sede.toJSON?.() || sede;
+      const stats = statsMap.get(sede.id) || { total: 0, disponible: 0 };
+
+      return {
+        ...sedeJson,
+        estadisticas: {
+          totalPersonal: sedeJson.personalSede?.length || 0,
+          totalInventario: parseInt(stats.total) || 0,
+          inventarioDisponible: parseInt(stats.disponible) || 0
+        }
+      };
+    });
   }
 
   /**
@@ -655,22 +671,45 @@ class SedeService {
 
   /**
    * Obtener estadísticas generales
+   * Optimizado para reducir queries (6 → 3)
    */
   async obtenerEstadisticasGenerales() {
+    // Ejecutar queries en paralelo con agregaciones
+    const [sedesStats, personalStats, inventarioStats] = await Promise.all([
+      // Una query con agregaciones para sedes
+      Sede.findAll({
+        attributes: [
+          [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
+          [sequelize.fn('COUNT', sequelize.literal("CASE WHEN activo = true THEN 1 END")), 'activas'],
+          [sequelize.fn('COUNT', sequelize.literal("CASE WHEN activo = false THEN 1 END")), 'inactivas']
+        ],
+        raw: true
+      }),
+      // Una query simple para personal
+      Personal.count({ where: { activo: true } }),
+      // Una query con agregaciones para inventario
+      Inventario.findAll({
+        attributes: [
+          [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
+          [sequelize.fn('COUNT', sequelize.literal("CASE WHEN estado = 'disponible' THEN 1 END")), 'disponible']
+        ],
+        where: { activo: true },
+        raw: true
+      })
+    ]);
+
     const estadisticas = {
       sedes: {
-        total: await Sede.count(),
-        activas: await Sede.count({ where: { activo: true } }),
-        inactivas: await Sede.count({ where: { activo: false } })
+        total: parseInt(sedesStats[0].total) || 0,
+        activas: parseInt(sedesStats[0].activas) || 0,
+        inactivas: parseInt(sedesStats[0].inactivas) || 0
       },
       personal: {
-        total: await Personal.count({ where: { activo: true } })
+        total: personalStats
       },
       inventario: {
-        total: await Inventario.count({ where: { activo: true } }),
-        disponible: await Inventario.count({
-          where: { activo: true, estado: 'disponible' }
-        })
+        total: parseInt(inventarioStats[0].total) || 0,
+        disponible: parseInt(inventarioStats[0].disponible) || 0
       }
     };
 
