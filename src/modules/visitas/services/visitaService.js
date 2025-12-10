@@ -497,6 +497,7 @@ class VisitaService {
     }
 
     /**
+    /**
      * Obtener estadísticas de visitas
      */
     async obtenerEstadisticas(fechaDesde, fechaHasta) {
@@ -509,49 +510,205 @@ class VisitaService {
                 if (fechaHasta) where.fecha[Op.lte] = fechaHasta;
             }
 
-            const visitas = await Visita.findAll({
-                where,
-                include: [
-                    { model: Sede, as: 'sedePrincipal', attributes: ['nombre_sede'] },
-                    {
+            // 1. Total y conteos básicos (Estado, Tipo)
+            // Ejecutamos en paralelo para mayor velocidad
+            const [
+                total,
+                porEstado,
+                porTipo,
+                porSede,
+                problemasPorCategoria
+            ] = await Promise.all([
+                // Total
+                Visita.count({ where }),
+
+                // Por Estado
+                Visita.findAll({
+                    attributes: ['estado', [sequelize.fn('COUNT', sequelize.col('estado')), 'count']],
+                    where,
+                    group: ['estado'],
+                    raw: true
+                }),
+
+                // Por Tipo
+                Visita.findAll({
+                    attributes: ['tipo', [sequelize.fn('COUNT', sequelize.col('tipo')), 'count']],
+                    where,
+                    group: ['tipo'],
+                    raw: true
+                }),
+
+                // Por Sede
+                Visita.findAll({
+                    attributes: [
+                        [sequelize.col('sedePrincipal.nombre_sede'), 'nombre_sede'],
+                        [sequelize.fn('COUNT', sequelize.col('Visita.id')), 'count']
+                    ],
+                    include: [{
+                        model: Sede,
+                        as: 'sedePrincipal',
+                        attributes: []
+                    }],
+                    where,
+                    group: ['sedePrincipal.nombre_sede', 'sedePrincipal.id'], // Agrupamos también por ID por seguridad en algunos motores DB
+                    raw: true
+                }),
+
+                // Problemas por Categoría
+                // Esto requiere un join complejo: Visita -> VisitaInforme -> VisitaProblemaResuelto
+                // Lo hacemos consultando VisitaProblemaResuelto e incluyendo los padres con el filtro de fecha
+                VisitaProblemaResuelto.findAll({
+                    attributes: ['categoria', [sequelize.fn('COUNT', sequelize.col('VisitaProblemaResuelto.id')), 'count']],
+                    include: [{
                         model: VisitaInforme,
                         as: 'informe',
-                        include: [{ model: VisitaProblemaResuelto, as: 'problemasResueltos' }]
-                    }
-                ]
-            });
+                        attributes: [],
+                        required: true,
+                        include: [{
+                            model: Visita,
+                            as: 'visita',
+                            attributes: [],
+                            where,
+                            required: true
+                        }]
+                    }],
+                    group: ['categoria'],
+                    raw: true
+                })
+            ]);
 
-            // Calcular estadísticas
+            // Formatear resultados
             const stats = {
-                total: visitas.length,
+                total,
                 por_estado: {},
                 por_tipo: {},
                 por_sede: {},
                 problemas_por_categoria: {},
-                visitas_realizadas: visitas.filter(v => v.estado === 'realizada').length,
-                visitas_canceladas: visitas.filter(v => v.estado === 'cancelada').length,
-                visitas_pendientes: visitas.filter(v => v.estado === 'programada' || v.estado === 'recordatorio_enviado').length
+                visitas_realizadas: 0,
+                visitas_canceladas: 0,
+                visitas_pendientes: 0
             };
 
-            // Estadísticas por estado
-            visitas.forEach(v => {
-                stats.por_estado[v.estado] = (stats.por_estado[v.estado] || 0) + 1;
-                stats.por_tipo[v.tipo] = (stats.por_tipo[v.tipo] || 0) + 1;
-
-                const sedeNombre = v.sedePrincipal?.nombre_sede || 'Sin sede';
-                stats.por_sede[sedeNombre] = (stats.por_sede[sedeNombre] || 0) + 1;
-
-                // Problemas por categoría
-                if (v.informe && v.informe.problemasResueltos) {
-                    v.informe.problemasResueltos.forEach(p => {
-                        stats.problemas_por_categoria[p.categoria] = (stats.problemas_por_categoria[p.categoria] || 0) + 1;
-                    });
+            // Mapear arrays a objetos
+            porEstado.forEach(item => {
+                stats.por_estado[item.estado] = parseInt(item.count);
+                if (item.estado === 'realizada') stats.visitas_realizadas = parseInt(item.count);
+                else if (item.estado === 'cancelada') stats.visitas_canceladas = parseInt(item.count);
+                else if (['programada', 'recordatorio_enviado'].includes(item.estado)) {
+                    stats.visitas_pendientes += parseInt(item.count);
                 }
+            });
+
+            porTipo.forEach(item => {
+                stats.por_tipo[item.tipo] = parseInt(item.count);
+            });
+
+            porSede.forEach(item => {
+                const nombre = item.nombre_sede || 'Sin sede';
+                stats.por_sede[nombre] = parseInt(item.count);
+            });
+
+            problemasPorCategoria.forEach(item => {
+                stats.problemas_por_categoria[item.categoria] = parseInt(item.count);
             });
 
             return stats;
         } catch (error) {
             logger.error('Error obteniendo estadísticas:', error);
+            throw error;
+        }
+    }
+    /**
+     * Eliminar visita
+     * @param {string} id ID de la visita
+     * @param {boolean} eliminarSerie Si es true y es recurrente, elimina futuras
+     * @param {string} usuarioId ID del usuario que realiza la acción
+     */
+    async eliminar(id, eliminarSerie = false, usuarioId) {
+        const t = await sequelize.transaction();
+        try {
+            const visita = await Visita.findByPk(id);
+            if (!visita) throw new Error('Visita no encontrada');
+
+            if (visita.estado === 'realizada') {
+                throw new Error('No se puede eliminar una visita que ya fue realizada');
+            }
+
+            // Si se pide eliminar serie y tiene recurrencia
+            if (eliminarSerie && visita.recurrencia_id) {
+                // 1. Eliminar visitas futuras pendientes de la misma serie
+                await Visita.destroy({
+                    where: {
+                        recurrencia_id: visita.recurrencia_id,
+                        fecha: { [Op.gte]: visita.fecha }, // Incluye la actual y futuras
+                        estado: 'programada'
+                    },
+                    transaction: t
+                });
+
+                // 2. Verificar si quedan visitas para esa recurrencia
+                const restantes = await Visita.count({
+                    where: { recurrencia_id: visita.recurrencia_id },
+                    transaction: t
+                });
+
+                // Si no quedan visitas, se podría marcar la recurrencia como inactiva o eliminarla
+                // Por ahora la dejamos, o podríamos agregar un campo 'activa' a VisitaRecurrencia
+            } else {
+                // Eliminar solo esta visita
+                await visita.destroy({ transaction: t });
+            }
+
+            await t.commit();
+            logger.info(`Visita ${id} eliminada por usuario ${usuarioId}. Serie: ${eliminarSerie}`);
+            return { message: 'Visita eliminada correctamente' };
+        } catch (error) {
+            await t.rollback();
+            logger.error(`Error eliminando visita ${id}:`, error);
+            throw error;
+        }
+    }
+    /**
+     * Enviar aviso manual de visita
+     * @param {string} id ID de la visita
+     * @param {string} usuarioId ID del usuario que solicita el envío
+     */
+    async enviarAviso(id, usuarioId) {
+        try {
+            const visita = await Visita.findByPk(id, {
+                include: [
+                    { model: Sede, as: 'sedePrincipal' },
+                    { model: Personal, as: 'tecnicoAsignado' }
+                ]
+            });
+
+            if (!visita) throw new Error('Visita no encontrada');
+
+            // Obtener emails de personal de la sede
+            const personalSede = await Personal.findAll({
+                where: { sede_id: visita.sede_id, activo: true },
+                attributes: ['email']
+            });
+
+            // Lista de destinatarios: Personal de la sede + Técnico asignado
+            const emails = personalSede.map(p => p.email).filter(e => e);
+            if (visita.tecnicoAsignado && visita.tecnicoAsignado.email) {
+                emails.push(visita.tecnicoAsignado.email);
+            }
+
+            // Eliminar duplicados
+            const uniqueEmails = [...new Set(emails)];
+
+            if (uniqueEmails.length === 0) {
+                throw new Error('No hay destinatarios con email válido para enviar el aviso');
+            }
+
+            await visitaEmailService.enviarAviso(visita, uniqueEmails);
+
+            logger.info(`Aviso manual enviado para visita ${id} por usuario ${usuarioId}`);
+            return { message: 'Aviso enviado correctamente', destinatarios: uniqueEmails.length };
+        } catch (error) {
+            logger.error(`Error enviando aviso manual para visita ${id}:`, error);
             throw error;
         }
     }

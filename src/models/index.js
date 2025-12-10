@@ -596,7 +596,7 @@ const models = {
 models.syncDatabase = async (force = false) => {
   try {
     await sequelize.sync({ force, alter: !force });
-    console.log('✅ Base de datos sincronizada correctamente');
+    // console.log('✅ Base de datos sincronizada correctamente');
   } catch (error) {
     console.error('❌ Error sincronizando base de datos:', error);
     throw error;
