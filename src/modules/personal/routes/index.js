@@ -42,7 +42,7 @@ const validarPersonalCreate = [
     .withMessage('Email no puede exceder 100 caracteres'),
 
   body('telefono')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .matches(/^[\+]?[0-9\s\-\(\)]+$/)
     .withMessage('Formato de teléfono no válido'),
@@ -99,7 +99,7 @@ const validarPersonalUpdate = [
     .withMessage('Email no puede exceder 100 caracteres'),
 
   body('telefono')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .matches(/^[\+]?[0-9\s\-\(\)]+$/)
     .withMessage('Formato de teléfono no válido'),
@@ -195,7 +195,7 @@ const validarBusqueda = [
  * @desc    Listar personal con paginación y filtros
  * @access  Private (Read permission - Todos)
  */
-router.get('/', 
+router.get('/',
   requirePermission('personal', 'read'),
   validarPaginacion,
   validate,

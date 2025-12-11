@@ -5,14 +5,14 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 class VisitaEmailService {
 
-    /**
-     * Generar HTML para recordatorio de visita
-     */
-    _generarHTMLRecordatorio(visita) {
-        const linkSolicitudes = `${FRONTEND_URL}/visitas/solicitar?token=${visita.token_solicitudes}`;
-        const fecha = new Date(visita.fecha).toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  /**
+   * Generar HTML para recordatorio de visita
+   */
+  _generarHTMLRecordatorio(visita) {
+    const linkSolicitudes = `${FRONTEND_URL}/visitas/solicitar?token=${visita.token_solicitudes}`;
+    const fecha = new Date(visita.fecha).toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-        return `
+    return `
       <!DOCTYPE html>
       <html>
       <head>
@@ -83,30 +83,30 @@ class VisitaEmailService {
       </body>
       </html>
     `;
-    }
+  }
 
-    /**
-     * Generar HTML para minuta post-visita
-     */
-    _generarHTMLMinuta(visita, informe) {
-        const fecha = new Date(visita.fecha).toLocaleDateString('es-AR');
+  /**
+   * Generar HTML para minuta post-visita
+   */
+  _generarHTMLMinuta(visita, informe) {
+    const fecha = new Date(visita.fecha).toLocaleDateString('es-AR');
 
-        // Checklist items
-        const checklistHTML = informe.checklist_items.map(item => `
+    // Checklist items
+    const checklistHTML = informe.checklist_items.map(item => `
       <div style="padding: 8px; margin: 5px 0; background-color: white; border-radius: 4px; border-left: 3px solid ${item.completado ? '#28a745' : '#dc3545'};">
         ${item.completado ? '✅' : '❌'} ${item.nombre}
       </div>
     `).join('');
 
-        // Checklist extra
-        const extraHTML = (informe.checklist_extra || []).map(item => `
+    // Checklist extra
+    const extraHTML = (informe.checklist_extra || []).map(item => `
       <div style="padding: 8px; margin: 5px 0; background-color: white; border-radius: 4px; border-left: 3px solid ${item.completado ? '#28a745' : '#dc3545'};">
         ${item.completado ? '✅' : '❌'} ${item.nombre} (Adicional)
       </div>
     `).join('');
 
-        // Problemas resueltos
-        const problemasHTML = (informe.problemasResueltos || []).map(p => `
+    // Problemas resueltos
+    const problemasHTML = (informe.problemasResueltos || []).map(p => `
       <div style="padding: 15px; margin: 10px 0; background-color: white; border-radius: 4px; border: 1px solid #eee;">
         <strong>${p.descripcion}</strong>
         <br>
@@ -115,15 +115,15 @@ class VisitaEmailService {
       </div>
     `).join('');
 
-        // Solicitudes atendidas
-        const solicitudesHTML = (visita.solicitudesPrevias || []).filter(s => s.resuelta).map(s => `
+    // Solicitudes atendidas
+    const solicitudesHTML = (visita.solicitudesPrevias || []).filter(s => s.resuelta).map(s => `
       <tr style="border-bottom: 1px solid #eee;">
         <td style="padding: 8px;">${s.solicitante_nombre}</td>
         <td style="padding: 8px;">${s.descripcion}</td>
       </tr>
     `).join('');
 
-        return `
+    return `
       <!DOCTYPE html>
       <html>
       <head>
@@ -163,8 +163,8 @@ class VisitaEmailService {
           ${(informe.casos_resueltos && informe.casos_resueltos.length > 0) ? `
           <div class="section">
             <div class="section-title">🎫 Casos/Tickets Resueltos</div>
-            <ul>
-              ${informe.casos_resueltos.map(c => `<li><strong>${c}</strong></li>`).join('')}
+            <ul style="list-style-type: disc; padding-left: 25px; margin: 10px 0;">
+              ${informe.casos_resueltos.map(c => `<li style="padding: 5px 0;"><strong style="color: #7c3aed; font-size: 15px;">${c}</strong></li>`).join('')}
             </ul>
           </div>` : ''}
 
@@ -185,10 +185,26 @@ class VisitaEmailService {
 
           ${informe.observaciones ? `
           <div class="section">
-            <div class="section-title">💬 Observaciones</div>
+            <div class="section-title">💬 Observaciones del Técnico</div>
             <p>${informe.observaciones}</p>
           </div>` : ''}
-          
+
+          ${informe.comentarios_responsable_sede ? `
+          <div class="section">
+            <div class="section-title">💭 Comentarios del Responsable de Sede</div>
+            <p style="font-style: italic; background: #fef3c7; padding: 15px; border-radius: 6px; border-left: 4px solid #f59e0b;">${informe.comentarios_responsable_sede}</p>
+          </div>` : ''}
+
+          <!-- Botón de Feedback -->
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 8px; margin: 30px 0; text-align: center;">
+            <h3 style="color: white; margin: 0 0 15px 0; font-size: 20px;">💬 ¿Cómo fue la visita?</h3>
+            <p style="color: white; margin: 0 0 20px 0; font-size: 14px;">Tu opinión es importante para nosotros. Tienes 2 días para agregar comentarios sobre esta visita.</p>
+            <a href="${FRONTEND_URL}/visitas/feedback/${visita.token_feedback}"
+               style="display: inline-block; padding: 14px 32px; background-color: white; color: #667eea; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+              Agregar Comentarios
+            </a>
+          </div>
+
           <div style="text-align: center; margin-top: 40px; color: #666; font-size: 12px;">
             <p>Este es un resumen automático generado por el Sistema de Gestión Megatlon</p>
           </div>
@@ -196,67 +212,144 @@ class VisitaEmailService {
       </body>
       </html>
     `;
+  }
+
+  /**
+   * Enviar recordatorio de visita a personal de la sede
+   */
+  async enviarRecordatorio(visita, emailsDestino) {
+    try {
+      const html = this._generarHTMLRecordatorio(visita);
+      const asunto = `Recordatorio: Visita de Soporte mañana ${new Date(visita.fecha).toLocaleDateString('es-AR')}`;
+
+      // Enviar individualmente o en copia oculta
+      // Para simplificar, usamos el servicio genérico que envía uno a uno si es un array?
+      // El servicio genérico toma un string. Haremos un loop o enviaremos a todos en CCO.
+
+      // Mejor enviar uno por uno para evitar exponer emails si no es deseado, 
+      // o usar un grupo de distribución si existe.
+      // Aquí asumimos que emailsDestino es un array de strings.
+
+      const promesas = emailsDestino.map(email =>
+        emailService.enviarEmailHTML(email, asunto, html)
+      );
+
+      await Promise.all(promesas);
+
+      logger.info(`Recordatorios enviados para visita ${visita.id} a ${emailsDestino.length} destinatarios`);
+      return true;
+    } catch (error) {
+      logger.error('Error enviando recordatorios:', error);
+      throw error;
     }
+  }
 
-    /**
-     * Enviar recordatorio de visita a personal de la sede
-     */
-    async enviarRecordatorio(visita, emailsDestino) {
-        try {
-            const html = this._generarHTMLRecordatorio(visita);
-            const asunto = `Recordatorio: Visita de Soporte mañana ${new Date(visita.fecha).toLocaleDateString('es-AR')}`;
+  /**
+   * Enviar minuta post-visita
+   */
+  async enviarMinuta(visita, informe, emailsSede) {
+    try {
+      const html = this._generarHTMLMinuta(visita, informe);
+      const asunto = `Minuta de Visita - ${visita.sedePrincipal.nombre} - ${new Date(visita.fecha).toLocaleDateString('es-AR')}`;
 
-            // Enviar individualmente o en copia oculta
-            // Para simplificar, usamos el servicio genérico que envía uno a uno si es un array?
-            // El servicio genérico toma un string. Haremos un loop o enviaremos a todos en CCO.
+      const destinatarios = [
+        process.env.EMAIL_INFRAESTRUCTURA || 'infraestructura@megatlon.com.ar',
+        ...emailsSede
+      ];
 
-            // Mejor enviar uno por uno para evitar exponer emails si no es deseado, 
-            // o usar un grupo de distribución si existe.
-            // Aquí asumimos que emailsDestino es un array de strings.
+      // Eliminar duplicados
+      const uniqueDestinatarios = [...new Set(destinatarios)];
 
-            const promesas = emailsDestino.map(email =>
-                emailService.enviarEmailHTML(email, asunto, html)
-            );
+      const promesas = uniqueDestinatarios.map(email =>
+        emailService.enviarEmailHTML(email, asunto, html)
+      );
 
-            await Promise.all(promesas);
+      await Promise.all(promesas);
 
-            logger.info(`Recordatorios enviados para visita ${visita.id} a ${emailsDestino.length} destinatarios`);
-            return true;
-        } catch (error) {
-            logger.error('Error enviando recordatorios:', error);
-            throw error;
-        }
+      logger.info(`Minuta enviada para visita ${visita.id} a ${uniqueDestinatarios.length} destinatarios`);
+      return true;
+    } catch (error) {
+      logger.error('Error enviando minuta:', error);
+      throw error;
     }
+  }
+  /**
+   * Alias para enviar aviso (mismo que recordatorio)
+   */
+  async enviarAviso(visita, emailsDestino) {
+    return this.enviarRecordatorio(visita, emailsDestino);
+  }
 
-    /**
-     * Enviar minuta post-visita
-     */
-    async enviarMinuta(visita, informe, emailsSede) {
-        try {
-            const html = this._generarHTMLMinuta(visita, informe);
-            const asunto = `Minuta de Visita - ${visita.sedePrincipal.nombre} - ${new Date(visita.fecha).toLocaleDateString('es-AR')}`;
+  /**
+   * Enviar notificación cuando el responsable de sede agrega comentarios
+   */
+  async enviarNotificacionComentarios(visita, datos, destinatarios) {
+    try {
+      const fecha = new Date(visita.fecha).toLocaleDateString('es-AR');
 
-            const destinatarios = [
-                process.env.EMAIL_INFRAESTRUCTURA || 'infraestructura@megatlon.com.ar',
-                ...emailsSede
-            ];
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #f59e0b; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+            .content { padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 0 0 5px 5px; }
+            .info-box { background: white; padding: 15px; border-radius: 6px; margin: 15px 0; border-left: 4px solid #f59e0b; }
+            .comentario-box { background: #fef3c7; padding: 20px; border-radius: 6px; margin: 20px 0; border: 1px solid #f59e0b; }
+            .footer { margin-top: 20px; font-size: 12px; color: #777; text-align: center; }
+            .label { font-weight: bold; color: #555; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1 style="margin:0; font-size: 24px;">💭 Nuevo Comentario del Responsable de Sede</h1>
+            </div>
+            <div class="content">
+              <p>Se agregaron comentarios sobre la visita de soporte:</p>
 
-            // Eliminar duplicados
-            const uniqueDestinatarios = [...new Set(destinatarios)];
+              <div class="info-box">
+                <p><span class="label">Sede:</span> ${visita.sedePrincipal.nombre_sede}</p>
+                <p><span class="label">Fecha de visita:</span> ${fecha}</p>
+                <p><span class="label">Técnico:</span> ${visita.tecnicoAsignado.nombre} ${visita.tecnicoAsignado.apellido}</p>
+              </div>
 
-            const promesas = uniqueDestinatarios.map(email =>
-                emailService.enviarEmailHTML(email, asunto, html)
-            );
+              <div class="comentario-box">
+                <p style="margin: 0 0 10px 0;"><strong>Comentarios de ${datos.nombre}:</strong></p>
+                <p style="margin: 0; font-style: italic; line-height: 1.6;">${datos.comentarios}</p>
+              </div>
 
-            await Promise.all(promesas);
+              <p style="margin-top: 30px; font-size: 12px; color: #666;">
+                Estos comentarios se agregaron a la minuta de la visita y están disponibles en el historial.
+              </p>
+            </div>
+            <div class="footer">
+              Este es un mensaje automático del Sistema de Gestión Megatlon.
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
 
-            logger.info(`Minuta enviada para visita ${visita.id} a ${uniqueDestinatarios.length} destinatarios`);
-            return true;
-        } catch (error) {
-            logger.error('Error enviando minuta:', error);
-            throw error;
-        }
+      const asunto = `💭 Comentarios recibidos - Visita ${visita.sedePrincipal.nombre_sede}`;
+
+      const uniqueDestinatarios = [...new Set(destinatarios)];
+
+      const promesas = uniqueDestinatarios.map(email =>
+        emailService.enviarEmailHTML(email, asunto, html)
+      );
+
+      await Promise.all(promesas);
+
+      logger.info(`Notificación de comentarios enviada para visita ${visita.id} a ${uniqueDestinatarios.length} destinatarios`);
+      return true;
+    } catch (error) {
+      logger.error('Error enviando notificación de comentarios:', error);
+      throw error;
     }
+  }
 }
 
 module.exports = new VisitaEmailService();

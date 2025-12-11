@@ -144,6 +144,33 @@ class VisitaController {
         }
     }
 
+    async eliminar(req, res) {
+        try {
+            const { id } = req.params;
+            const { eliminar_serie } = req.query; // ?eliminar_serie=true
+            const usuarioId = req.user.id;
+
+            const resultado = await visitaService.eliminar(id, eliminar_serie === 'true', usuarioId);
+            return success(res, resultado);
+        } catch (err) {
+            logger.error('Error eliminando visita:', err);
+            return error(res, err.message || "Error en la operación", 500);
+        }
+    }
+
+    async enviarAviso(req, res) {
+        try {
+            const { id } = req.params;
+            const usuarioId = req.user.id;
+
+            const resultado = await visitaService.enviarAviso(id, usuarioId);
+            return success(res, resultado);
+        } catch (err) {
+            logger.error('Error enviando aviso manual:', err);
+            return error(res, err.message || "Error enviando aviso", 500);
+        }
+    }
+
     async obtenerEstadisticas(req, res) {
         try {
             const { fecha_desde, fecha_hasta } = req.query;
@@ -153,6 +180,45 @@ class VisitaController {
         } catch (err) {
             logger.error('Error obteniendo estadísticas:', err);
             return error(res, err.message || "Error en la operación", 500);
+        }
+    }
+
+    // ===== Endpoints Públicos de Feedback =====
+
+    async obtenerInfoFeedback(req, res) {
+        try {
+            const { token } = req.params;
+
+            const visita = await visitaService.obtenerPorTokenFeedback(token);
+
+            // Devolver solo información necesaria para el formulario
+            return success(res, {
+                sede: visita.sedePrincipal.nombre_sede,
+                fecha: visita.fecha,
+                tecnico: `${visita.tecnicoAsignado.nombre} ${visita.tecnicoAsignado.apellido}`,
+                fecha_realizacion: visita.informe.fecha_realizacion,
+                diasRestantes: 2 - Math.floor((new Date() - new Date(visita.informe.fecha_realizacion)) / (1000 * 60 * 60 * 24))
+            });
+        } catch (err) {
+            logger.error('Error obteniendo info feedback:', err);
+            return error(res, err.message || "Error obteniendo información", 400);
+        }
+    }
+
+    async agregarFeedback(req, res) {
+        try {
+            const { token } = req.params;
+            const { comentarios, nombre } = req.body;
+
+            const resultado = await visitaService.agregarComentariosResponsable(token, {
+                comentarios,
+                nombre
+            });
+
+            return success(res, resultado);
+        } catch (err) {
+            logger.error('Error agregando feedback:', err);
+            return error(res, err.message || "Error agregando comentarios", 400);
         }
     }
 }

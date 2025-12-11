@@ -45,6 +45,21 @@ const VisitaInforme = sequelize.define('VisitaInforme', {
     observaciones: {
         type: DataTypes.TEXT,
         allowNull: true
+    },
+    comentarios_responsable_sede: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: 'Comentarios adicionales del responsable de la sede'
+    },
+    comentarios_responsable_fecha: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Fecha y hora cuando se agregaron los comentarios del responsable'
+    },
+    comentarios_responsable_nombre: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        comment: 'Nombre o email de quien agregó los comentarios'
     }
 }, {
     tableName: 'visita_informes',

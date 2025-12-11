@@ -51,7 +51,7 @@ class VisitaService {
                 where,
                 include: [
                     { model: Sede, as: 'sedePrincipal', attributes: ['id', 'nombre_sede'] },
-                    { model: Personal, as: 'tecnicoAsignado', attributes: ['id', 'nombre', 'apellido'] }
+                    { model: Personal, as: 'tecnicoAsignado', attributes: ['id', 'nombre', 'apellido', 'color'] }
                 ],
                 order: [['fecha', 'DESC']],
                 limit,
@@ -246,7 +246,11 @@ class VisitaService {
                 });
 
                 // Actualizar visitas futuras pendientes
-                await Visita.update(datos, {
+                // IMPORTANTE: No propagar la fecha a las visitas futuras, ya que todas quedarían en el mismo día.
+                // Solo propagar cambios de técnico, sede, motivo, etc.
+                const { fecha, ...datosSerie } = datos;
+
+                await Visita.update(datosSerie, {
                     where: {
                         recurrencia_id: visita.recurrencia_id,
                         fecha: { [Op.gt]: visita.fecha },
@@ -328,6 +332,16 @@ class VisitaService {
 
             await t.commit();
 
+            // Preparar objeto informe para el email con todos los datos
+            const informeParaEmail = {
+                checklist_items: informe.checklist_items,
+                checklist_extra: informe.checklist_extra,
+                casos_resueltos: informe.casos_resueltos,
+                observaciones: informe.observaciones,
+                comentarios_responsable_sede: informe.comentarios_responsable_sede,
+                problemasResueltos: datosInforme.problemas_resueltos || []
+            };
+
             // 5. Enviar email de minuta (fuera de transacción)
             // Obtener emails de personal de la sede
             const personalSede = await Personal.findAll({
@@ -337,7 +351,7 @@ class VisitaService {
             const emails = personalSede.map(p => p.email).filter(e => e);
 
             // No bloquear respuesta si falla el email
-            visitaEmailService.enviarMinuta(visita, informe, emails).catch(err =>
+            visitaEmailService.enviarMinuta(visita, informeParaEmail, emails).catch(err =>
                 logger.error('Error enviando minuta en background:', err)
             );
 
@@ -369,7 +383,7 @@ class VisitaService {
                 where,
                 include: [
                     { model: Sede, as: 'sedePrincipal', attributes: ['nombre_sede'] },
-                    { model: Personal, as: 'tecnicoAsignado', attributes: ['nombre', 'apellido', 'id'] }
+                    { model: Personal, as: 'tecnicoAsignado', attributes: ['nombre', 'apellido', 'id', 'color'] }
                 ]
             });
 
@@ -379,6 +393,8 @@ class VisitaService {
                 start: v.fecha,
                 end: v.fecha,
                 allDay: true,
+                backgroundColor: v.tecnicoAsignado?.color || '#3788d8',
+                borderColor: v.tecnicoAsignado?.color || '#3788d8',
                 extendedProps: {
                     tipo: v.tipo,
                     estado: v.estado,
@@ -668,6 +684,105 @@ class VisitaService {
             throw error;
         }
     }
+    /**
+     * Obtener información de visita por token de feedback
+     * @param {string} token Token único para feedback
+     */
+    async obtenerPorTokenFeedback(token) {
+        try {
+            const visita = await Visita.findOne({
+                where: { token_feedback: token },
+                include: [
+                    { model: Sede, as: 'sedePrincipal', attributes: ['id', 'nombre_sede'] },
+                    { model: Personal, as: 'tecnicoAsignado', attributes: ['id', 'nombre', 'apellido', 'email'] },
+                    {
+                        model: VisitaInforme,
+                        as: 'informe',
+                        attributes: ['id', 'fecha_realizacion', 'comentarios_responsable_sede', 'comentarios_responsable_fecha', 'comentarios_responsable_nombre']
+                    }
+                ]
+            });
+
+            if (!visita) throw new Error('Token inválido o visita no encontrada');
+
+            // Validar que la visita esté completada
+            if (visita.estado !== 'realizada') {
+                throw new Error('La visita aún no ha sido completada');
+            }
+
+            // Validar que el informe exista
+            if (!visita.informe) {
+                throw new Error('El informe de la visita no está disponible');
+            }
+
+            // Validar que no hayan pasado más de 2 días
+            const fechaRealizacion = new Date(visita.informe.fecha_realizacion);
+            const ahora = new Date();
+            const diasTranscurridos = (ahora - fechaRealizacion) / (1000 * 60 * 60 * 24);
+
+            if (diasTranscurridos > 2) {
+                throw new Error('El plazo para agregar comentarios ha expirado (máximo 2 días)');
+            }
+
+            // Validar que no se hayan agregado comentarios previamente
+            if (visita.informe.comentarios_responsable_sede) {
+                throw new Error('Ya se agregaron comentarios para esta visita');
+            }
+
+            return visita;
+        } catch (error) {
+            logger.error('Error obteniendo visita por token feedback:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Agregar comentarios del responsable de sede
+     * @param {string} token Token único para feedback
+     * @param {object} datos { comentarios, nombre }
+     */
+    async agregarComentariosResponsable(token, datos) {
+        const t = await sequelize.transaction();
+        try {
+            // Validar token y obtener visita (incluye todas las validaciones)
+            const visita = await this.obtenerPorTokenFeedback(token);
+
+            // Actualizar informe con comentarios
+            await VisitaInforme.update({
+                comentarios_responsable_sede: datos.comentarios,
+                comentarios_responsable_fecha: new Date(),
+                comentarios_responsable_nombre: datos.nombre
+            }, {
+                where: { visita_id: visita.id },
+                transaction: t
+            });
+
+            await t.commit();
+
+            // Enviar notificaciones (fuera de transacción)
+            // Email a infraestructura y técnico asignado
+            const destinatarios = [
+                process.env.EMAIL_INFRAESTRUCTURA || 'infraestructura@megatlon.com.ar'
+            ];
+
+            if (visita.tecnicoAsignado && visita.tecnicoAsignado.email) {
+                destinatarios.push(visita.tecnicoAsignado.email);
+            }
+
+            // Enviar notificación
+            visitaEmailService.enviarNotificacionComentarios(visita, datos, destinatarios).catch(err =>
+                logger.error('Error enviando notificación de comentarios:', err)
+            );
+
+            logger.info(`Comentarios agregados para visita ${visita.id} por ${datos.nombre}`);
+            return { message: 'Comentarios agregados exitosamente' };
+        } catch (error) {
+            await t.rollback();
+            logger.error('Error agregando comentarios responsable:', error);
+            throw error;
+        }
+    }
+
     /**
      * Enviar aviso manual de visita
      * @param {string} id ID de la visita

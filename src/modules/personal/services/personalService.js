@@ -283,7 +283,8 @@ class PersonalService {
       email,
       telefono,
       sedes,
-      rol_id
+      rol_id,
+      color
     } = datosNueva;
 
     // Validaciones (fuera de la transacción - son operaciones de lectura)
@@ -308,10 +309,11 @@ class PersonalService {
         nombre: nombre.trim(),
         apellido: apellido.trim(),
         email: email.toLowerCase().trim(),
-        telefono: telefono?.trim(),
+        telefono: telefono?.trim() || null,
         rol_id,
         sede_id: sedes[0], // Primera sede como principal
-        activo: true
+        activo: true,
+        color: color || '#007bff'
       }, { transaction: t });
 
       // Asignar automáticamente rol "Sistemas" si el rol actual está autorizado
@@ -434,6 +436,11 @@ class PersonalService {
           datosLimpios[key] = datosActualizacion[key];
         }
       });
+
+      // Asegurar que telefono sea null si está vacío
+      if (datosLimpios.telefono === '') {
+        datosLimpios.telefono = null;
+      }
 
       // Actualizar datos básicos de personal DENTRO DE LA TRANSACCIÓN
       await persona.update(datosLimpios, { transaction: t });

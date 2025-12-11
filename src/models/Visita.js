@@ -64,6 +64,12 @@ const Visita = sequelize.define('Visita', {
         unique: true,
         comment: 'Token único para el formulario público de solicitudes'
     },
+    token_feedback: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        unique: true,
+        comment: 'Token único para que el responsable de sede agregue comentarios post-visita'
+    },
     creado_por_id: {
         type: DataTypes.UUID,
         allowNull: false
@@ -94,13 +100,21 @@ const Visita = sequelize.define('Visita', {
         {
             unique: true,
             fields: ['token_solicitudes']
+        },
+        {
+            unique: true,
+            fields: ['token_feedback']
         }
     ],
     hooks: {
         beforeCreate: (visita) => {
             if (!visita.token_solicitudes) {
-                // Generar token aleatorio seguro
+                // Generar token aleatorio seguro para solicitudes pre-visita
                 visita.token_solicitudes = crypto.randomBytes(24).toString('hex');
+            }
+            if (!visita.token_feedback) {
+                // Generar token aleatorio seguro para feedback post-visita
+                visita.token_feedback = crypto.randomBytes(24).toString('hex');
             }
         }
     }

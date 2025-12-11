@@ -76,6 +76,7 @@ class PersonalController {
    */
   crear = asyncHandler(async (req, res) => {
     try {
+      console.log('➡️ Recibiendo solicitud de creación de personal:', JSON.stringify(req.body, null, 2));
       const resultado = await TransactionWrapper.execute({
         operation: async (transaction) => {
           return await personalService.crear(req.body, req.user.email, { transaction });
@@ -96,6 +97,10 @@ class PersonalController {
       success(res, resultado.data, 'Persona creada correctamente', 201);
     } catch (err) {
       logger.error('Error creando persona:', err);
+      // Log detailed validation errors if available
+      if (err.errors) {
+        logger.error('Detalles de validación:', err.errors.map(e => ({ field: e.path, message: e.message, value: e.value })));
+      }
       if (err.message.includes('email') && err.message.includes('registrado')) {
         return error(res, err.message, 409);
       }

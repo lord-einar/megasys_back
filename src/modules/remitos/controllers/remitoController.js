@@ -306,7 +306,8 @@ class RemitoController {
 
       const whereClause = {
         sede_id,
-        activo: true
+        activo: true,
+        estado: 'disponible' // Solo artículos disponibles (excluye en_uso, en_prestamo, etc.)
       };
 
       if (tipo_articulo_id) {

@@ -55,8 +55,22 @@ const validarReprogramar = [
   validate
 ];
 
+const validarFeedbackToken = [
+  param('token').notEmpty().isLength({ min: 24, max: 48 }).withMessage('Token inválido'),
+  validate
+];
+
+const validarAgregarFeedback = [
+  param('token').notEmpty().isLength({ min: 24, max: 48 }).withMessage('Token inválido'),
+  body('comentarios').notEmpty().trim().withMessage('Los comentarios son requeridos'),
+  body('nombre').notEmpty().trim().withMessage('El nombre es requerido'),
+  validate
+];
+
 // Rutas Públicas
 router.post('/solicitudes', validarSolicitudPublica, visitaController.agregarSolicitud);
+router.get('/feedback/:token', validarFeedbackToken, visitaController.obtenerInfoFeedback);
+router.post('/feedback/:token', validarAgregarFeedback, visitaController.agregarFeedback);
 
 // Rutas Protegidas
 router.use(authenticate);

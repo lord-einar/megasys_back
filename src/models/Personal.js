@@ -107,6 +107,17 @@ const Personal = sequelize.define('Personal', {
         msg: 'La fecha de ingreso es requerida'
       }
     }
+  },
+  color: {
+    type: DataTypes.STRING(7),
+    allowNull: true,
+    defaultValue: '#007bff',
+    validate: {
+      is: {
+        args: /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/,
+        msg: 'El color debe estar en formato hexadecimal (ej. #007bff)'
+      }
+    }
   }
 }, {
   tableName: 'personal',
@@ -144,26 +155,29 @@ const Personal = sequelize.define('Personal', {
 });
 
 // Métodos de instancia
-Personal.prototype.getNombreCompleto = function() {
+Personal.prototype.getNombreCompleto = function () {
   return `${this.nombre} ${this.apellido}`;
 };
 
-Personal.prototype.getInfoBasica = function() {
+Personal.prototype.getInfoBasica = function () {
   return {
     id: this.id,
     nombreCompleto: this.getNombreCompleto(),
     email: this.email,
     telefono: this.telefono,
-    activo: this.activo
+    email: this.email,
+    telefono: this.telefono,
+    activo: this.activo,
+    color: this.color
   };
 };
 
 // Métodos estáticos
-Personal.findActivos = function() {
+Personal.findActivos = function () {
   return this.scope('activos').findAll();
 };
 
-Personal.findBySede = function(sedeId) {
+Personal.findBySede = function (sedeId) {
   return this.findAll({
     where: {
       sede_id: sedeId,

@@ -13,6 +13,10 @@ const SMTP_CONFIG = {
   auth: {
     user: process.env.SMTP_USER || 'remitos@megatlon.com.ar',
     pass: process.env.SMTP_PASSWORD || 'Infra123!'
+  },
+  tls: {
+    ciphers: 'SSLv3',
+    rejectUnauthorized: false
   }
 };
 
@@ -51,8 +55,8 @@ class EmailService {
   generarHTMLInfraestructura(remito) {
     const articulosHTML = remito.detalles && remito.detalles.length > 0
       ? remito.detalles.map((detalle, idx) => {
-          const articulo = detalle.inventarioDetalle || {};
-          return `
+        const articulo = detalle.inventarioDetalle || {};
+        return `
             <tr style="border-bottom: 1px solid #ecf0f1;">
               <td style="padding: 12px; text-align: center;">${idx + 1}</td>
               <td style="padding: 12px;">${articulo.tipoArticulo?.nombre || 'N/A'}</td>
@@ -62,7 +66,7 @@ class EmailService {
               <td style="padding: 12px; text-align: center;">${detalle.es_prestamo ? 'Sí' : 'NO'}</td>
             </tr>
           `;
-        }).join('')
+      }).join('')
       : '<tr><td colspan="6" style="padding: 12px; text-align: center; color: #7f8c8d;">Sin artículos</td></tr>';
 
     return `
