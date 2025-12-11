@@ -134,8 +134,8 @@ const validarPaginacion = [
 
   query('limit')
     .optional()
-    .isInt({ min: 1, max: 100 })
-    .withMessage('Límite debe ser entre 1 y 100'),
+    .isInt({ min: 1, max: 1000 })
+    .withMessage('Límite debe ser entre 1 y 1000'),
 
   query('search')
     .optional()

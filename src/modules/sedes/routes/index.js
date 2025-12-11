@@ -132,18 +132,18 @@ const validarPaginacion = [
     .optional()
     .isInt({ min: 1 })
     .withMessage('Página debe ser un número entero positivo'),
-  
+
   query('limit')
     .optional()
-    .isInt({ min: 1, max: 100 })
-    .withMessage('Límite debe ser entre 1 y 100'),
-  
+    .isInt({ min: 1, max: 1000 })
+    .withMessage('Límite debe ser entre 1 y 1000'),
+
   query('search')
     .optional()
     .trim()
     .isLength({ max: 100 })
     .withMessage('Búsqueda no puede exceder 100 caracteres'),
-  
+
   query('activo')
     .optional()
     .isBoolean()
@@ -159,7 +159,7 @@ const validarPaginacion = [
  * @desc    Listar sedes con paginación y filtros
  * @access  Private (Read permission)
  */
-router.get('/', 
+router.get('/',
   requirePermission('sedes', 'read'),
   validarPaginacion,
   validate,
@@ -260,12 +260,12 @@ router.get('/:id/inventario',
       .optional()
       .isIn(['disponible', 'en_uso', 'mantenimiento', 'dado_de_baja'])
       .withMessage('Estado debe ser: disponible, en_uso, mantenimiento o dado_de_baja'),
-    
+
     query('tipo_articulo')
       .optional()
       .isInt({ min: 1 })
       .withMessage('Tipo de artículo debe ser un ID válido'),
-    
+
     query('disponible_solo')
       .optional()
       .isBoolean()
@@ -317,7 +317,7 @@ router.post('/:id/servicios',
       .withMessage('Fecha de vencimiento debe ser una fecha válida')
       .custom((value, { req }) => {
         if (value && req.body.fecha_contratacion &&
-            new Date(value) <= new Date(req.body.fecha_contratacion)) {
+          new Date(value) <= new Date(req.body.fecha_contratacion)) {
           throw new Error('Fecha de vencimiento debe ser posterior a la contratación');
         }
         return true;

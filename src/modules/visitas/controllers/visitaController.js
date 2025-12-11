@@ -221,6 +221,27 @@ class VisitaController {
             return error(res, err.message || "Error agregando comentarios", 400);
         }
     }
+
+    async obtenerDashboard(req, res) {
+        try {
+            const filtros = {
+                fecha_desde: req.query.fecha_desde,
+                fecha_hasta: req.query.fecha_hasta,
+                tecnico_ids: req.query.tecnico_ids ? req.query.tecnico_ids.split(',') : undefined,
+                sede_ids: req.query.sede_ids ? req.query.sede_ids.split(',') : undefined,
+                estado: req.query.estado,
+                tipo: req.query.tipo
+            };
+
+            const visitaReportService = require('../services/visitaReportService');
+            const dashboard = await visitaReportService.obtenerDashboard(filtros);
+
+            return success(res, dashboard);
+        } catch (err) {
+            logger.error('Error obteniendo dashboard:', err);
+            return error(res, err.message || 'Error obteniendo dashboard', 500);
+        }
+    }
 }
 
 module.exports = new VisitaController();
