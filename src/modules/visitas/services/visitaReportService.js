@@ -431,7 +431,7 @@ class VisitaReportService {
                     {
                         model: VisitaInforme,
                         as: 'informe',
-                        attributes: ['id', 'fecha_inicio', 'fecha_fin']
+                        attributes: ['id', 'fecha_realizacion']
                     }
                 ],
                 order: [['fecha', 'DESC']]
@@ -449,7 +449,7 @@ class VisitaReportService {
                     : 'No asignado',
                 tecnico_id: v.tecnicoAsignado?.id,
                 tiene_informe: !!v.informe,
-                fecha_informe: v.informe?.fecha_inicio
+                fecha_informe: v.informe?.fecha_realizacion
             }));
         } catch (error) {
             logger.error('Error obteniendo lista de visitas:', error);
