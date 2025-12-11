@@ -141,14 +141,14 @@ class VisitaEmailService {
         <div class="container">
           <div class="header">
             <h1 style="margin:0;">✅ Minuta de Visita de Soporte</h1>
-            <p style="margin:5px 0 0 0;">${fecha} - ${visita.sedePrincipal.nombre}</p>
+            <p style="margin:5px 0 0 0;">${fecha} - ${visita.sedePrincipal.nombre_sede}</p>
           </div>
 
           <div class="section">
             <div class="section-title">📋 Información General</div>
             <table>
               <tr><th width="30%">Fecha:</th><td>${fecha}</td></tr>
-              <tr><th>Sede:</th><td>${visita.sedePrincipal.nombre}</td></tr>
+              <tr><th>Sede:</th><td>${visita.sedePrincipal.nombre_sede}</td></tr>
               <tr><th>Técnico:</th><td>${visita.tecnicoAsignado.nombre} ${visita.tecnicoAsignado.apellido}</td></tr>
               <tr><th>Tipo:</th><td>${visita.tipo}</td></tr>
             </table>
@@ -249,8 +249,15 @@ class VisitaEmailService {
    */
   async enviarMinuta(visita, informe, emailsSede) {
     try {
+      console.log('📧 DEBUG - Datos del informe para email:', {
+        casos_resueltos: informe.casos_resueltos,
+        casos_resueltos_length: informe.casos_resueltos?.length,
+        casos_resueltos_type: typeof informe.casos_resueltos,
+        problemasResueltos: informe.problemasResueltos?.length
+      });
+
       const html = this._generarHTMLMinuta(visita, informe);
-      const asunto = `Minuta de Visita - ${visita.sedePrincipal.nombre} - ${new Date(visita.fecha).toLocaleDateString('es-AR')}`;
+      const asunto = `Minuta de Visita - ${visita.sedePrincipal.nombre_sede} - ${new Date(visita.fecha).toLocaleDateString('es-AR')}`;
 
       const destinatarios = [
         process.env.EMAIL_INFRAESTRUCTURA || 'infraestructura@megatlon.com.ar',

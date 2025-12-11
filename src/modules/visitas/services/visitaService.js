@@ -287,6 +287,12 @@ class VisitaService {
             if (!visita) throw new Error('Visita no encontrada');
             if (visita.estado === 'realizada') throw new Error('La visita ya fue realizada');
 
+            console.log('🔍 DEBUG - Datos recibidos para informe:', {
+                casos_resueltos: datosInforme.casos_resueltos,
+                casos_resueltos_length: datosInforme.casos_resueltos?.length,
+                problemas_resueltos_length: datosInforme.problemas_resueltos?.length
+            });
+
             // 1. Crear informe
             const informe = await VisitaInforme.create({
                 visita_id: id,
@@ -296,6 +302,12 @@ class VisitaService {
                 casos_resueltos: datosInforme.casos_resueltos,
                 observaciones: datosInforme.observaciones
             }, { transaction: t });
+
+            console.log('💾 DEBUG - Informe creado:', {
+                id: informe.id,
+                casos_resueltos: informe.casos_resueltos,
+                casos_resueltos_length: informe.casos_resueltos?.length
+            });
 
             // 2. Crear problemas resueltos
             if (datosInforme.problemas_resueltos && datosInforme.problemas_resueltos.length > 0) {
