@@ -410,6 +410,55 @@ class VisitaReportService {
     }
 
     /**
+     * Obtener lista de visitas con detalles
+     */
+    async obtenerListaVisitas(filtros = {}) {
+        try {
+            const where = this._construirFiltros(filtros);
+
+            const visitas = await Visita.findAll({
+                where,
+                include: [
+                    {
+                        model: Sede,
+                        as: 'sedePrincipal',
+                        attributes: ['id', 'nombre_sede']
+                    },
+                    {
+                        model: Personal,
+                        as: 'tecnicoAsignado',
+                        attributes: ['id', 'nombre', 'apellido']
+                    },
+                    {
+                        model: VisitaInforme,
+                        as: 'informe',
+                        attributes: ['id', 'fecha_inicio', 'fecha_fin']
+                    }
+                ],
+                order: [['fecha', 'DESC']]
+            });
+
+            return visitas.map(v => ({
+                id: v.id,
+                fecha: v.fecha,
+                tipo: v.tipo,
+                estado: v.estado,
+                sede: v.sedePrincipal?.nombre_sede || 'Sin sede',
+                sede_id: v.sedePrincipal?.id,
+                tecnico: v.tecnicoAsignado
+                    ? `${v.tecnicoAsignado.nombre} ${v.tecnicoAsignado.apellido}`
+                    : 'No asignado',
+                tecnico_id: v.tecnicoAsignado?.id,
+                tiene_informe: !!v.informe,
+                fecha_informe: v.informe?.fecha_inicio
+            }));
+        } catch (error) {
+            logger.error('Error obteniendo lista de visitas:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Obtener todas las estadísticas para el dashboard
      */
     async obtenerDashboard(filtros = {}) {
@@ -422,7 +471,8 @@ class VisitaReportService {
                 problemasUsuario,
                 distribucionEstados,
                 distribucionTipos,
-                listaCasos
+                listaCasos,
+                listaVisitas
             ] = await Promise.all([
                 this.obtenerEstadisticasGenerales(filtros),
                 this.obtenerDistribucionPorSede(filtros),
@@ -431,7 +481,8 @@ class VisitaReportService {
                 this.obtenerProblemasUsuario(filtros),
                 this.obtenerDistribucionEstados(filtros),
                 this.obtenerDistribucionTipos(filtros),
-                this.obtenerListaCasosCerrados(filtros)
+                this.obtenerListaCasosCerrados(filtros),
+                this.obtenerListaVisitas(filtros)
             ]);
 
             return {
@@ -444,7 +495,8 @@ class VisitaReportService {
                     estados: distribucionEstados,
                     tipos: distribucionTipos
                 },
-                casos: listaCasos
+                casos: listaCasos,
+                visitas: listaVisitas
             };
         } catch (error) {
             logger.error('Error obteniendo dashboard completo:', error);
