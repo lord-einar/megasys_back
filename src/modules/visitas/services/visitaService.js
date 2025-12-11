@@ -386,6 +386,10 @@ class VisitaService {
             const where = {
                 fecha: {
                     [Op.between]: [fechaInicio, fechaFin]
+                },
+                // Excluir visitas canceladas del calendario
+                estado: {
+                    [Op.ne]: 'cancelada'
                 }
             };
 

@@ -9,6 +9,11 @@ class VisitaReportService {
     _construirFiltros(filtros = {}) {
         const where = {};
 
+        // IMPORTANTE: Siempre excluir visitas canceladas a menos que se soliciten explícitamente
+        if (filtros.estado !== 'cancelada' && !filtros.incluir_canceladas) {
+            where.estado = { [Op.ne]: 'cancelada' };
+        }
+
         if (filtros.fecha_desde && filtros.fecha_hasta) {
             where.fecha = {
                 [Op.between]: [filtros.fecha_desde, filtros.fecha_hasta]
