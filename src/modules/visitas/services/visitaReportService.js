@@ -9,11 +9,6 @@ class VisitaReportService {
     _construirFiltros(filtros = {}) {
         const where = {};
 
-        // IMPORTANTE: Siempre excluir visitas canceladas a menos que se soliciten explícitamente
-        if (filtros.estado !== 'cancelada' && !filtros.incluir_canceladas) {
-            where.estado = { [Op.ne]: 'cancelada' };
-        }
-
         if (filtros.fecha_desde && filtros.fecha_hasta) {
             where.fecha = {
                 [Op.between]: [filtros.fecha_desde, filtros.fecha_hasta]
@@ -32,11 +27,15 @@ class VisitaReportService {
             where.sede_id = { [Op.in]: filtros.sede_ids };
         }
 
-        if (filtros.estado) {
+        // Manejo de estado: si se especifica un estado, usarlo; sino excluir canceladas
+        if (filtros.estado && filtros.estado.trim() !== '') {
             where.estado = filtros.estado;
+        } else if (!filtros.incluir_canceladas) {
+            // Por defecto, excluir visitas canceladas
+            where.estado = { [Op.ne]: 'cancelada' };
         }
 
-        if (filtros.tipo) {
+        if (filtros.tipo && filtros.tipo.trim() !== '') {
             where.tipo = filtros.tipo;
         }
 
