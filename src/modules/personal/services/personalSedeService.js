@@ -212,109 +212,139 @@ class PersonalSedeService {
       fecha_fin
     } = datosAsignacion;
 
-    // Validaciones
-    const { persona, sede, rol } = await this.validarAsignacionDatos(personal_id, sede_id, rol_id);
-    await this.validarAsignacionDuplicada(personal_id, sede_id);
+    const t = await sequelize.transaction();
 
-    // Crear asignación
-    const asignacion = await PersonalSede.create({
-      personal_id,
-      sede_id,
-      rol_id,
-      fecha_inicio: fecha_inicio || new Date(),
-      fecha_fin: fecha_fin || null,
-      activo: true
-    });
+    try {
+      // Validaciones
+      const { persona, sede, rol } = await this.validarAsignacionDatos(personal_id, sede_id, rol_id);
+      await this.validarAsignacionDuplicada(personal_id, sede_id);
 
-    // Obtener asignación completa con relaciones
-    const asignacionCompleta = await PersonalSede.findByPk(asignacion.id, {
-      include: [
-        { model: Personal, as: 'personal' },
-        { model: Sede, as: 'sede' },
-        { model: Rol, as: 'rol' }
-      ]
-    });
+      // Crear asignación
+      const asignacion = await PersonalSede.create({
+        personal_id,
+        sede_id,
+        rol_id,
+        fecha_inicio: fecha_inicio || new Date(),
+        fecha_fin: fecha_fin || null,
+        activo: true
+      }, { transaction: t });
 
-    logger.info('Nueva asignación de personal creada:', {
-      asignacionId: asignacion.id,
-      personal: `${persona.nombre} ${persona.apellido}`,
-      sede: sede.nombre_sede,
-      rol: rol.nombre,
-      creadoPor: usuarioEmail
-    });
+      // Obtener asignación completa con relaciones
+      const asignacionCompleta = await PersonalSede.findByPk(asignacion.id, {
+        include: [
+          { model: Personal, as: 'personal' },
+          { model: Sede, as: 'sede' },
+          { model: Rol, as: 'rol' }
+        ],
+        transaction: t
+      });
 
-    return asignacionCompleta;
+      await t.commit();
+
+      logger.info('Nueva asignación de personal creada:', {
+        asignacionId: asignacion.id,
+        personal: `${persona.nombre} ${persona.apellido}`,
+        sede: sede.nombre_sede,
+        rol: rol.nombre,
+        creadoPor: usuarioEmail
+      });
+
+      return asignacionCompleta;
+    } catch (error) {
+      await t.rollback();
+      throw error;
+    }
   }
 
   /**
    * Actualizar asignación de personal a sede
    */
   async actualizar(asignacionId, datosActualizacion, usuarioEmail) {
-    const asignacion = await PersonalSede.findByPk(asignacionId);
-    if (!asignacion) {
-      throw new Error('Asignación no encontrada');
-    }
+    const t = await sequelize.transaction();
 
-    // Si se cambia el rol, validar que existe
-    if (datosActualizacion.rol_id && datosActualizacion.rol_id !== asignacion.rol_id) {
-      const rol = await Rol.findOne({
-        where: { id: datosActualizacion.rol_id, activo: true }
-      });
-      if (!rol) {
-        throw new Error('Rol no encontrado o inactivo');
+    try {
+      const asignacion = await PersonalSede.findByPk(asignacionId, { transaction: t });
+      if (!asignacion) {
+        throw new Error('Asignación no encontrada');
       }
+
+      // Si se cambia el rol, validar que existe
+      if (datosActualizacion.rol_id && datosActualizacion.rol_id !== asignacion.rol_id) {
+        const rol = await Rol.findOne({
+          where: { id: datosActualizacion.rol_id, activo: true },
+          transaction: t
+        });
+        if (!rol) {
+          throw new Error('Rol no encontrado o inactivo');
+        }
+      }
+
+      const cambios = {};
+      if (datosActualizacion.rol_id && datosActualizacion.rol_id !== asignacion.rol_id) {
+        cambios.rol_id = datosActualizacion.rol_id;
+      }
+      if (datosActualizacion.fecha_fin !== undefined) {
+        cambios.fecha_fin = datosActualizacion.fecha_fin;
+      }
+      if (datosActualizacion.activo !== undefined) {
+        cambios.activo = datosActualizacion.activo;
+      }
+
+      await asignacion.update(cambios, { transaction: t });
+
+      logger.info('Asignación de personal actualizada:', {
+        asignacionId: asignacion.id,
+        cambios: Object.keys(cambios),
+        actualizadoPor: usuarioEmail
+      });
+
+      const asignacionActualizada = await PersonalSede.findByPk(asignacionId, {
+        include: [
+          { model: Personal, as: 'personal' },
+          { model: Sede, as: 'sede' },
+          { model: Rol, as: 'rol' }
+        ],
+        transaction: t
+      });
+
+      await t.commit();
+
+      return asignacionActualizada;
+    } catch (error) {
+      await t.rollback();
+      throw error;
     }
-
-    const cambios = {};
-    if (datosActualizacion.rol_id && datosActualizacion.rol_id !== asignacion.rol_id) {
-      cambios.rol_id = datosActualizacion.rol_id;
-    }
-    if (datosActualizacion.fecha_fin !== undefined) {
-      cambios.fecha_fin = datosActualizacion.fecha_fin;
-    }
-    if (datosActualizacion.activo !== undefined) {
-      cambios.activo = datosActualizacion.activo;
-    }
-
-    await asignacion.update(cambios);
-
-    logger.info('Asignación de personal actualizada:', {
-      asignacionId: asignacion.id,
-      cambios: Object.keys(cambios),
-      actualizadoPor: usuarioEmail
-    });
-
-    const asignacionActualizada = await PersonalSede.findByPk(asignacionId, {
-      include: [
-        { model: Personal, as: 'personal' },
-        { model: Sede, as: 'sede' },
-        { model: Rol, as: 'rol' }
-      ]
-    });
-
-    return asignacionActualizada;
   }
 
   /**
    * Dar de baja una asignación (soft delete)
    */
   async eliminar(asignacionId, usuarioEmail) {
-    const asignacion = await PersonalSede.findByPk(asignacionId);
-    if (!asignacion) {
-      throw new Error('Asignación no encontrada');
+    const t = await sequelize.transaction();
+
+    try {
+      const asignacion = await PersonalSede.findByPk(asignacionId, { transaction: t });
+      if (!asignacion) {
+        throw new Error('Asignación no encontrada');
+      }
+
+      await asignacion.update({
+        activo: false,
+        fecha_fin: new Date()
+      }, { transaction: t });
+
+      await t.commit();
+
+      logger.info('Asignación de personal eliminada:', {
+        asignacionId: asignacion.id,
+        eliminadoPor: usuarioEmail
+      });
+
+      return true;
+    } catch (error) {
+      await t.rollback();
+      throw error;
     }
-
-    await asignacion.update({
-      activo: false,
-      fecha_fin: new Date()
-    });
-
-    logger.info('Asignación de personal eliminada:', {
-      asignacionId: asignacion.id,
-      eliminadoPor: usuarioEmail
-    });
-
-    return true;
   }
 
   /**
