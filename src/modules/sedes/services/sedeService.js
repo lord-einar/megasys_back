@@ -340,110 +340,134 @@ class SedeService {
    * Actualizar sede
    */
   async actualizar(sedeId, datosActualizacion, usuarioEmail) {
-    const sede = await Sede.findByPk(sedeId);
+    const t = await sequelize.transaction();
 
-    if (!sede) {
-      throw new Error('Sede no encontrada');
-    }
+    try {
+      const sede = await Sede.findByPk(sedeId, { transaction: t });
 
-    // Verificar unicidad si se cambia empresa_id o nombre_sede
-    if (datosActualizacion.empresa_id || datosActualizacion.nombre_sede) {
-      const empresaId = datosActualizacion.empresa_id || sede.empresa_id;
-      const nombreSede = datosActualizacion.nombre_sede || sede.nombre_sede;
+      if (!sede) {
+        throw new Error('Sede no encontrada');
+      }
 
-      const sedeExistente = await Sede.findOne({
-        where: {
-          empresa_id: empresaId,
-          nombre_sede: nombreSede.trim(),
-          id: { [Op.ne]: sedeId }
+      // Verificar unicidad si se cambia empresa_id o nombre_sede
+      if (datosActualizacion.empresa_id || datosActualizacion.nombre_sede) {
+        const empresaId = datosActualizacion.empresa_id || sede.empresa_id;
+        const nombreSede = datosActualizacion.nombre_sede || sede.nombre_sede;
+
+        const sedeExistente = await Sede.findOne({
+          where: {
+            empresa_id: empresaId,
+            nombre_sede: nombreSede.trim(),
+            id: { [Op.ne]: sedeId }
+          },
+          transaction: t
+        });
+
+        if (sedeExistente) {
+          throw new Error('Ya existe una sede con este nombre para esta empresa');
+        }
+      }
+
+      // Limpiar datos
+      const datosLimpios = {};
+      Object.keys(datosActualizacion).forEach(key => {
+        if (typeof datosActualizacion[key] === 'string') {
+          datosLimpios[key] = datosActualizacion[key].trim();
+        } else {
+          datosLimpios[key] = datosActualizacion[key];
         }
       });
 
-      if (sedeExistente) {
-        throw new Error('Ya existe una sede con este nombre para esta empresa');
-      }
+      await sede.update(datosLimpios, { transaction: t });
+
+      logger.info('Sede actualizada:', {
+        sedeId: sede.id,
+        cambios: Object.keys(datosLimpios),
+        actualizadoPor: usuarioEmail
+      });
+
+      // Retornar sede actualizada con relaciones
+      const sedeActualizada = await Sede.findByPk(sedeId, {
+        include: [
+          {
+            model: Personal,
+            as: 'personalSede',
+            attributes: ['id', 'nombre', 'apellido', 'email'],
+            where: { activo: true },
+            required: false
+          }
+        ],
+        transaction: t
+      });
+
+      await t.commit();
+
+      return sedeActualizada;
+    } catch (error) {
+      await t.rollback();
+      throw error;
     }
-
-    // Limpiar datos
-    const datosLimpios = {};
-    Object.keys(datosActualizacion).forEach(key => {
-      if (typeof datosActualizacion[key] === 'string') {
-        datosLimpios[key] = datosActualizacion[key].trim();
-      } else {
-        datosLimpios[key] = datosActualizacion[key];
-      }
-    });
-
-    await sede.update(datosLimpios);
-
-    logger.info('Sede actualizada:', {
-      sedeId: sede.id,
-      cambios: Object.keys(datosLimpios),
-      actualizadoPor: usuarioEmail
-    });
-
-    // Retornar sede actualizada con relaciones
-    return Sede.findByPk(sedeId, {
-      include: [
-        {
-          model: Personal,
-          as: 'personalSede',
-          attributes: ['id', 'nombre', 'apellido', 'email'],
-          where: { activo: true },
-          required: false
-        }
-      ]
-    });
   }
 
   /**
    * Eliminar sede (soft delete)
    */
   async eliminar(sedeId, usuarioEmail) {
-    const sede = await Sede.findByPk(sedeId);
+    const t = await sequelize.transaction();
 
-    if (!sede) {
-      throw new Error('Sede no encontrada');
-    }
+    try {
+      const sede = await Sede.findByPk(sedeId, { transaction: t });
 
-    // Verificar si tiene personal activo
-    const personalActivo = await Personal.count({
-      where: {
-        sede_id: sedeId,
-        activo: true
+      if (!sede) {
+        throw new Error('Sede no encontrada');
       }
-    });
 
-    if (personalActivo > 0) {
-      throw new Error(
-        `No se puede eliminar la sede. Tiene ${personalActivo} empleado(s) activo(s)`
-      );
-    }
+      // Verificar si tiene personal activo
+      const personalActivo = await Personal.count({
+        where: {
+          sede_id: sedeId,
+          activo: true
+        },
+        transaction: t
+      });
 
-    // Verificar si tiene inventario activo
-    const inventarioActivo = await Inventario.count({
-      where: {
-        sede_id: sedeId,
-        activo: true
+      if (personalActivo > 0) {
+        throw new Error(
+          `No se puede eliminar la sede. Tiene ${personalActivo} empleado(s) activo(s)`
+        );
       }
-    });
 
-    if (inventarioActivo > 0) {
-      throw new Error(
-        `No se puede eliminar la sede. Tiene ${inventarioActivo} item(s) de inventario activo(s)`
-      );
+      // Verificar si tiene inventario activo
+      const inventarioActivo = await Inventario.count({
+        where: {
+          sede_id: sedeId,
+          activo: true
+        },
+        transaction: t
+      });
+
+      if (inventarioActivo > 0) {
+        throw new Error(
+          `No se puede eliminar la sede. Tiene ${inventarioActivo} item(s) de inventario activo(s)`
+        );
+      }
+
+      await sede.update({ activo: false }, { transaction: t });
+
+      await t.commit();
+
+      logger.info('Sede eliminada (soft delete):', {
+        sedeId: sede.id,
+        empresaId: sede.empresa_id,
+        sede: sede.nombre_sede,
+        eliminadoPor: usuarioEmail
+      });
+
+      return true;
+    } catch (error) {
+      await t.rollback();
+      throw error;
     }
-
-    await sede.update({ activo: false });
-
-    logger.info('Sede eliminada (soft delete):', {
-      sedeId: sede.id,
-      empresaId: sede.empresa_id,
-      sede: sede.nombre_sede,
-      eliminadoPor: usuarioEmail
-    });
-
-    return true;
   }
 
   /**
