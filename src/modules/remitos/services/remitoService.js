@@ -729,172 +729,192 @@ class RemitoService {
    * Solo Infraestructura puede cambiar estados
    */
   async cambiarEstado(remitoId, nuevoEstado, usuarioId, options = {}) {
-    const { transaction, userRoles = [], usuarioEmail = null, userAgent = null, ipAddress = null, privilegioApp = null } = options;
+    const { transaction: externalTransaction, userRoles = [], usuarioEmail = null, userAgent = null, ipAddress = null, privilegioApp = null } = options;
 
-    const estadosValidos = ['preparado', 'en_transito', 'entregado', 'completado', 'devuelto', 'cancelado'];
-    if (!estadosValidos.includes(nuevoEstado)) {
-      throw new Error(`Estado "${nuevoEstado}" no es válido`);
+    // Crear transacción si no se proporciona una externa
+    let t = externalTransaction;
+    let shouldCommit = false;
+    if (!t) {
+      t = await sequelize.transaction();
+      shouldCommit = true;
     }
 
-    const remito = await Remito.findByPk(remitoId);
-    if (!remito) {
-      throw new Error('El remito no existe');
-    }
+    try {
+      const estadosValidos = ['preparado', 'en_transito', 'entregado', 'completado', 'devuelto', 'cancelado'];
+      if (!estadosValidos.includes(nuevoEstado)) {
+        throw new Error(`Estado "${nuevoEstado}" no es válido`);
+      }
 
-    // Validar autorización:
-    // - Infraestructura = Super Administrador (acceso total)
-    // - Sistemas = Acceso administrativo total (para usuarios no-Infraestructura)
-    // - super_admin (privilegio_app) = Acceso total desde Entra ID
-    // - Otros = acceso limitado (solo sus remitos asignados)
-    const esSuperAdministrador =
-      userRoles.includes('Infraestructura') ||
-      userRoles.includes('Sistemas') ||
-      privilegioApp === 'super_admin';
-    const esTecnicoAsignado = remito.tecnico_asignado_id === usuarioId;
+      const remito = await Remito.findByPk(remitoId, { transaction: t });
+      if (!remito) {
+        throw new Error('El remito no existe');
+      }
 
-    if (!esSuperAdministrador && !esTecnicoAsignado) {
-      throw new Error('No tienes permisos para cambiar el estado de este remito. Solo usuarios administrativos o el técnico asignado pueden hacerlo.');
-    }
+      // Validar autorización:
+      // - Infraestructura = Super Administrador (acceso total)
+      // - Sistemas = Acceso administrativo total (para usuarios no-Infraestructura)
+      // - super_admin (privilegio_app) = Acceso total desde Entra ID
+      // - Otros = acceso limitado (solo sus remitos asignados)
+      const esSuperAdministrador =
+        userRoles.includes('Infraestructura') ||
+        userRoles.includes('Sistemas') ||
+        privilegioApp === 'super_admin';
+      const esTecnicoAsignado = remito.tecnico_asignado_id === usuarioId;
 
-    // Validaciones de transiciones de estado
-    const transicionesValidas = {
-      'preparado': ['en_transito', 'cancelado'],
-      'en_transito': ['entregado', 'cancelado'],
-      'entregado': ['completado', 'devuelto', 'cancelado'],
-      'completado': ['devuelto'],
-      'devuelto': [],
-      'cancelado': []
-    };
+      if (!esSuperAdministrador && !esTecnicoAsignado) {
+        throw new Error('No tienes permisos para cambiar el estado de este remito. Solo usuarios administrativos o el técnico asignado pueden hacerlo.');
+      }
 
-    if (!transicionesValidas[remito.estado].includes(nuevoEstado)) {
-      throw new Error(
-        `No se puede cambiar de "${remito.estado}" a "${nuevoEstado}". ` +
-        `Transiciones válidas: ${transicionesValidas[remito.estado].join(', ')}`
+      // Validaciones de transiciones de estado
+      const transicionesValidas = {
+        'preparado': ['en_transito', 'cancelado'],
+        'en_transito': ['entregado', 'cancelado'],
+        'entregado': ['completado', 'devuelto', 'cancelado'],
+        'completado': ['devuelto'],
+        'devuelto': [],
+        'cancelado': []
+      };
+
+      if (!transicionesValidas[remito.estado].includes(nuevoEstado)) {
+        throw new Error(
+          `No se puede cambiar de "${remito.estado}" a "${nuevoEstado}". ` +
+          `Transiciones válidas: ${transicionesValidas[remito.estado].join(', ')}`
+        );
+      }
+
+      // Guardar estado anterior para auditoría
+      const estadoAnterior = remito.estado;
+
+      // Actualizar estado
+      const remitoActualizado = await remito.update(
+        { estado: nuevoEstado },
+        { transaction: t }
       );
-    }
 
-    // Guardar estado anterior para auditoría
-    const estadoAnterior = remito.estado;
-
-    // Actualizar estado
-    const remitoActualizado = await remito.update(
-      { estado: nuevoEstado },
-      { transaction }
-    );
-
-    logger.info('Estado de remito actualizado:', {
-      remitoId,
-      estadoAnterior,
-      estadoNuevo: nuevoEstado,
-      usuarioId
-    });
-
-    // Registrar en auditoría
-    if (usuarioEmail) {
-      AuditService.registrarAccion({
-        usuario_email: usuarioEmail,
-        usuario_id: usuarioId,
-        modulo: 'remitos',
-        accion: 'cambiar_estado',
-        recurso: 'Remito',
-        recurso_id: remitoId,
-        descripcion: `Cambio de estado del remito ${remito.numero_remito} de "${estadoAnterior}" a "${nuevoEstado}"`,
-        valores_anteriores: { estado: estadoAnterior },
-        valores_nuevos: { estado: nuevoEstado },
-        ip_address: ipAddress,
-        user_agent: userAgent,
-        resultado: 'exitoso'
-      }).catch(err => {
-        logger.warn('Error registrando auditoría:', err.message);
+      logger.info('Estado de remito actualizado:', {
+        remitoId,
+        estadoAnterior,
+        estadoNuevo: nuevoEstado,
+        usuarioId
       });
-    }
 
-    // Enviar emails cuando el estado cambia a "en_transito"
-    if (nuevoEstado === 'en_transito' && estadoAnterior === 'preparado') {
-      setImmediate(async () => {
-        try {
-          logger.info('=== ENVÍO DE EMAILS EN ESTADO "EN_TRANSITO" - INICIANDO ===', {
-            remitoId,
-            numeroRemito: remito.numero_remito,
-            estadoAnterior,
-            estadoNuevo: nuevoEstado,
-            timestamp: new Date().toISOString()
-          });
+      // Registrar en auditoría
+      if (usuarioEmail) {
+        AuditService.registrarAccion({
+          usuario_email: usuarioEmail,
+          usuario_id: usuarioId,
+          modulo: 'remitos',
+          accion: 'cambiar_estado',
+          recurso: 'Remito',
+          recurso_id: remitoId,
+          descripcion: `Cambio de estado del remito ${remito.numero_remito} de "${estadoAnterior}" a "${nuevoEstado}"`,
+          valores_anteriores: { estado: estadoAnterior },
+          valores_nuevos: { estado: nuevoEstado },
+          ip_address: ipAddress,
+          user_agent: userAgent,
+          resultado: 'exitoso'
+        }).catch(err => {
+          logger.warn('Error registrando auditoría:', err.message);
+        });
+      }
 
-          // Obtener remito completo con relaciones
-          const remitoCompleto = await this.obtener(remitoId);
+      // Commit de la transacción si fue creada internamente
+      if (shouldCommit) {
+        await t.commit();
+      }
 
-          // Obtener o regenerar PDF
-          const nombreArchivo = pdfService.generarNombreArchivo(remito.numero_remito, false);
-          const rutaArchivo = pdfService.obtenerRutaArchivo(nombreArchivo, false);
+      // Enviar emails cuando el estado cambia a "en_transito" (fuera de la transacción)
+      if (nuevoEstado === 'en_transito' && estadoAnterior === 'preparado') {
+        setImmediate(async () => {
+          try {
+            logger.info('=== ENVÍO DE EMAILS EN ESTADO "EN_TRANSITO" - INICIANDO ===', {
+              remitoId,
+              numeroRemito: remito.numero_remito,
+              estadoAnterior,
+              estadoNuevo: nuevoEstado,
+              timestamp: new Date().toISOString()
+            });
 
-          const fs = require('fs');
-          let rutaPDFParaEmail = rutaArchivo;
+            // Obtener remito completo con relaciones
+            const remitoCompleto = await this.obtener(remitoId);
 
-          if (!fs.existsSync(rutaArchivo)) {
-            logger.warn('⚠️ PDF no encontrado, regenerando para envío de emails...', { rutaArchivo });
-            const remitoJSON = remitoCompleto.toJSON();
-            // Asegurar que el estado en el PDF sea el nuevo estado
-            remitoJSON.estado = nuevoEstado;
-            remitoJSON.es_prestamo = remitoCompleto.detalles && remitoCompleto.detalles.some(d => d.es_prestamo);
-            const resultadoPDF = await pdfService.generarPDF(remitoJSON, { confirmado: false });
-            rutaPDFParaEmail = resultadoPDF.path;
-            logger.info('✓ PDF regenerado para envío', {
-              rutaPDF: resultadoPDF.path,
-              tamaño: resultadoPDF.size,
-              estado: nuevoEstado
+            // Obtener o regenerar PDF
+            const nombreArchivo = pdfService.generarNombreArchivo(remito.numero_remito, false);
+            const rutaArchivo = pdfService.obtenerRutaArchivo(nombreArchivo, false);
+
+            const fs = require('fs');
+            let rutaPDFParaEmail = rutaArchivo;
+
+            if (!fs.existsSync(rutaArchivo)) {
+              logger.warn('⚠️ PDF no encontrado, regenerando para envío de emails...', { rutaArchivo });
+              const remitoJSON = remitoCompleto.toJSON();
+              // Asegurar que el estado en el PDF sea el nuevo estado
+              remitoJSON.estado = nuevoEstado;
+              remitoJSON.es_prestamo = remitoCompleto.detalles && remitoCompleto.detalles.some(d => d.es_prestamo);
+              const resultadoPDF = await pdfService.generarPDF(remitoJSON, { confirmado: false });
+              rutaPDFParaEmail = resultadoPDF.path;
+              logger.info('✓ PDF regenerado para envío', {
+                rutaPDF: resultadoPDF.path,
+                tamaño: resultadoPDF.size,
+                estado: nuevoEstado
+              });
+            }
+
+            // Enviar email a infraestructura
+            logger.info('📧 Enviando email a infraestructura...', {
+              remitoId,
+              numeroRemito: remito.numero_remito
+            });
+            await emailService.enviarAInfraestructura(remitoCompleto, rutaPDFParaEmail);
+            logger.info('✓ EMAIL A INFRAESTRUCTURA ENVIADO', {
+              remitoId,
+              numeroRemito: remito.numero_remito,
+              timestamp: new Date().toISOString()
+            });
+
+            // Enviar email al solicitante con link de confirmación
+            logger.info('📧 Enviando email al solicitante...', {
+              remitoId,
+              numeroRemito: remito.numero_remito,
+              emailSolicitante: remitoCompleto.solicitante?.email
+            });
+            const urlConfirmacion = tokenService.generarUrlConfirmacion(
+              remitoCompleto.id,
+              remitoCompleto.solicitante?.email,
+              process.env.FRONTEND_URL || 'http://localhost:3000'
+            );
+            await emailService.enviarAlSolicitante(remitoCompleto, rutaPDFParaEmail, urlConfirmacion);
+            logger.info('✓ EMAIL AL SOLICITANTE ENVIADO', {
+              remitoId,
+              numeroRemito: remito.numero_remito,
+              emailSolicitante: remitoCompleto.solicitante?.email,
+              timestamp: new Date().toISOString()
+            });
+
+            logger.info('=== ENVÍO DE EMAILS EN ESTADO "EN_TRANSITO" - COMPLETADO EXITOSAMENTE ===', {
+              remitoId,
+              numeroRemito: remito.numero_remito,
+              timestamp: new Date().toISOString()
+            });
+          } catch (emailError) {
+            logger.error('✗ ERROR ENVIANDO EMAILS EN ESTADO "EN_TRANSITO"', {
+              remitoId,
+              numeroRemito: remito.numero_remito,
+              error: emailError.message,
+              stack: emailError.stack,
+              timestamp: new Date().toISOString()
             });
           }
+        });
+      }
 
-          // Enviar email a infraestructura
-          logger.info('📧 Enviando email a infraestructura...', {
-            remitoId,
-            numeroRemito: remito.numero_remito
-          });
-          await emailService.enviarAInfraestructura(remitoCompleto, rutaPDFParaEmail);
-          logger.info('✓ EMAIL A INFRAESTRUCTURA ENVIADO', {
-            remitoId,
-            numeroRemito: remito.numero_remito,
-            timestamp: new Date().toISOString()
-          });
-
-          // Enviar email al solicitante con link de confirmación
-          logger.info('📧 Enviando email al solicitante...', {
-            remitoId,
-            numeroRemito: remito.numero_remito,
-            emailSolicitante: remitoCompleto.solicitante?.email
-          });
-          const urlConfirmacion = tokenService.generarUrlConfirmacion(
-            remitoCompleto.id,
-            remitoCompleto.solicitante?.email,
-            process.env.FRONTEND_URL || 'http://localhost:3000'
-          );
-          await emailService.enviarAlSolicitante(remitoCompleto, rutaPDFParaEmail, urlConfirmacion);
-          logger.info('✓ EMAIL AL SOLICITANTE ENVIADO', {
-            remitoId,
-            numeroRemito: remito.numero_remito,
-            emailSolicitante: remitoCompleto.solicitante?.email,
-            timestamp: new Date().toISOString()
-          });
-
-          logger.info('=== ENVÍO DE EMAILS EN ESTADO "EN_TRANSITO" - COMPLETADO EXITOSAMENTE ===', {
-            remitoId,
-            numeroRemito: remito.numero_remito,
-            timestamp: new Date().toISOString()
-          });
-        } catch (emailError) {
-          logger.error('✗ ERROR ENVIANDO EMAILS EN ESTADO "EN_TRANSITO"', {
-            remitoId,
-            numeroRemito: remito.numero_remito,
-            error: emailError.message,
-            stack: emailError.stack,
-            timestamp: new Date().toISOString()
-          });
-        }
-      });
+      return remitoActualizado;
+    } catch (error) {
+      if (shouldCommit) {
+        await t.rollback();
+      }
+      throw error;
     }
-
-    return remitoActualizado;
   }
 
   /**
