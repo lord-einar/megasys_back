@@ -1,5 +1,5 @@
 // src/modules/sedes/services/sedeAsignacionService.js
-const { SedeAsignacion, Sede, Personal, Rol } = require('../../../models');
+const { SedeAsignacion, Sede, Personal, Rol, sequelize } = require('../../../models');
 const logger = require('../../../shared/utils/logger');
 
 class SedeAsignacionService {
@@ -7,22 +7,25 @@ class SedeAsignacionService {
    * Asignar un técnico de soporte a una sede
    */
   async asignarTecnico(sedeId, personalId, notas = null) {
+    const t = await sequelize.transaction();
+
     try {
       // Validar que la sede existe
-      const sede = await Sede.findByPk(sedeId);
+      const sede = await Sede.findByPk(sedeId, { transaction: t });
       if (!sede) {
         throw new Error('La sede no existe');
       }
 
       // Validar que el personal existe
-      const personal = await Personal.findByPk(personalId);
+      const personal = await Personal.findByPk(personalId, { transaction: t });
       if (!personal) {
         throw new Error('El personal no existe');
       }
 
       // Validar que el personal tiene grupo Soporte
       const personalConRol = await Personal.findByPk(personalId, {
-        include: [{ model: Rol, as: 'rol', attributes: ['nombre'] }]
+        include: [{ model: Rol, as: 'rol', attributes: ['nombre'] }],
+        transaction: t
       });
 
       logger.info('Asignando técnico a sede:', {
@@ -39,7 +42,8 @@ class SedeAsignacionService {
             sede_id: sedeId,
             personal_id: personalId,
             activo: true
-          }
+          },
+          transaction: t
         }
       );
 
@@ -49,7 +53,9 @@ class SedeAsignacionService {
         personal_id: personalId,
         notas,
         activo: true
-      });
+      }, { transaction: t });
+
+      await t.commit();
 
       logger.info('Técnico asignado exitosamente:', {
         asignacionId: asignacion.id,
@@ -59,6 +65,7 @@ class SedeAsignacionService {
 
       return asignacion;
     } catch (error) {
+      await t.rollback();
       logger.error('Error asignando técnico:', error);
       throw error;
     }
@@ -68,6 +75,8 @@ class SedeAsignacionService {
    * Desasignar un técnico de una sede
    */
   async desasignarTecnico(sedeId, personalId) {
+    const t = await sequelize.transaction();
+
     try {
       logger.info('Desasignando técnico de sede:', {
         sedeId,
@@ -79,7 +88,8 @@ class SedeAsignacionService {
           sede_id: sedeId,
           personal_id: personalId,
           activo: true
-        }
+        },
+        transaction: t
       });
 
       if (!asignacion) {
@@ -89,7 +99,9 @@ class SedeAsignacionService {
       await asignacion.update({
         activo: false,
         fecha_fin_asignacion: new Date()
-      });
+      }, { transaction: t });
+
+      await t.commit();
 
       logger.info('Técnico desasignado exitosamente:', {
         asignacionId: asignacion.id,
@@ -99,6 +111,7 @@ class SedeAsignacionService {
 
       return asignacion;
     } catch (error) {
+      await t.rollback();
       logger.error('Error desasignando técnico:', error);
       throw error;
     }
