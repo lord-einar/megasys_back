@@ -13,6 +13,7 @@ const {
 const visitaEmailService = require('./emailService');
 const logger = require('../../../shared/utils/logger');
 const { v4: uuidv4 } = require('uuid');
+const AuditService = require('../../../shared/services/auditService');
 
 class VisitaService {
 
@@ -104,7 +105,8 @@ class VisitaService {
     /**
      * Crear nueva visita (y recurrencia si aplica)
      */
-    async crear(datos, usuarioId) {
+    async crear(datos, usuarioId, options = {}) {
+        const { usuarioEmail = null, ipAddress = null, userAgent = null } = options;
         const t = await sequelize.transaction();
         try {
             const {
@@ -158,6 +160,25 @@ class VisitaService {
             }
 
             await t.commit();
+
+            // Registrar auditoría
+            if (usuarioEmail) {
+                AuditService.registrarAccion({
+                    usuario_email: usuarioEmail,
+                    usuario_id: usuarioId,
+                    modulo: 'visitas',
+                    accion: 'crear',
+                    recurso: 'Visita',
+                    recurso_id: visita.id,
+                    descripcion: `Creó visita ${es_recurrente ? 'recurrente' : ''} para sede ${sede_id} - ${tipo}`,
+                    valores_nuevos: { sede_id, tecnico_asignado_id, fecha, tipo, motivo, es_recurrente },
+                    ip_address: ipAddress,
+                    user_agent: userAgent,
+                    resultado: 'exitoso'
+                }).catch(err => {
+                    logger.warn('Error registrando auditoría:', err.message);
+                });
+            }
 
             return {
                 visita,
@@ -228,11 +249,22 @@ class VisitaService {
      * Actualizar visita
      * Si es recurrente, pregunta si actualizar solo esta o toda la serie (futura)
      */
-    async actualizar(id, datos, usuarioId, actualizarSerie = false) {
+    async actualizar(id, datos, usuarioId, actualizarSerie = false, options = {}) {
+        const { usuarioEmail = null, ipAddress = null, userAgent = null } = options;
         const t = await sequelize.transaction();
         try {
-            const visita = await Visita.findByPk(id);
+            const visita = await Visita.findByPk(id, { transaction: t });
             if (!visita) throw new Error('Visita no encontrada');
+
+            // Guardar valores anteriores para auditoría
+            const valoresAnteriores = {
+                sede_id: visita.sede_id,
+                tecnico_asignado_id: visita.tecnico_asignado_id,
+                fecha: visita.fecha,
+                tipo: visita.tipo,
+                motivo: visita.motivo,
+                estado: visita.estado
+            };
 
             // Actualizar la visita actual
             await visita.update(datos, { transaction: t });
@@ -261,6 +293,27 @@ class VisitaService {
             }
 
             await t.commit();
+
+            // Registrar auditoría
+            if (usuarioEmail) {
+                AuditService.registrarAccion({
+                    usuario_email: usuarioEmail,
+                    usuario_id: usuarioId,
+                    modulo: 'visitas',
+                    accion: 'actualizar',
+                    recurso: 'Visita',
+                    recurso_id: id,
+                    descripcion: `Actualizó visita ${id}${actualizarSerie && visita.recurrencia_id ? ' y serie recurrente' : ''}`,
+                    valores_anteriores: valoresAnteriores,
+                    valores_nuevos: datos,
+                    ip_address: ipAddress,
+                    user_agent: userAgent,
+                    resultado: 'exitoso'
+                }).catch(err => {
+                    logger.warn('Error registrando auditoría:', err.message);
+                });
+            }
+
             return visita;
         } catch (error) {
             await t.rollback();
@@ -272,7 +325,8 @@ class VisitaService {
     /**
      * Marcar visita como realizada y guardar informe
      */
-    async marcarRealizada(id, datosInforme, usuarioId) {
+    async marcarRealizada(id, datosInforme, usuarioId, options = {}) {
+        const { usuarioEmail = null, ipAddress = null, userAgent = null } = options;
         const t = await sequelize.transaction();
         try {
             const visita = await Visita.findByPk(id, {
@@ -343,6 +397,26 @@ class VisitaService {
             await visita.update({ estado: 'realizada' }, { transaction: t });
 
             await t.commit();
+
+            // Registrar auditoría
+            if (usuarioEmail) {
+                AuditService.registrarAccion({
+                    usuario_email: usuarioEmail,
+                    usuario_id: usuarioId,
+                    modulo: 'visitas',
+                    accion: 'marcar_realizada',
+                    recurso: 'Visita',
+                    recurso_id: id,
+                    descripcion: `Marcó visita ${id} como realizada y creó informe`,
+                    valores_anteriores: { estado: 'programada' },
+                    valores_nuevos: { estado: 'realizada', informe_id: informe.id },
+                    ip_address: ipAddress,
+                    user_agent: userAgent,
+                    resultado: 'exitoso'
+                }).catch(err => {
+                    logger.warn('Error registrando auditoría:', err.message);
+                });
+            }
 
             // Preparar objeto informe para el email con todos los datos
             const informeParaEmail = {
@@ -453,20 +527,24 @@ class VisitaService {
     /**
      * Cancelar visita
      */
-    async cancelar(id, motivo, usuarioId) {
+    async cancelar(id, motivo, usuarioId, options = {}) {
+        const { usuarioEmail = null, ipAddress = null, userAgent = null } = options;
         const t = await sequelize.transaction();
         try {
             const visita = await Visita.findByPk(id, {
                 include: [
                     { model: Sede, as: 'sedePrincipal' },
                     { model: Personal, as: 'tecnicoAsignado' }
-                ]
+                ],
+                transaction: t
             });
 
             if (!visita) throw new Error('Visita no encontrada');
             if (visita.estado === 'realizada') {
                 throw new Error('No se puede cancelar una visita que ya fue realizada');
             }
+
+            const estadoAnterior = visita.estado;
 
             await visita.update({
                 estado: 'cancelada',
@@ -475,6 +553,26 @@ class VisitaService {
             }, { transaction: t });
 
             await t.commit();
+
+            // Registrar auditoría
+            if (usuarioEmail) {
+                AuditService.registrarAccion({
+                    usuario_email: usuarioEmail,
+                    usuario_id: usuarioId,
+                    modulo: 'visitas',
+                    accion: 'cancelar',
+                    recurso: 'Visita',
+                    recurso_id: id,
+                    descripcion: `Canceló visita ${id}. Motivo: ${motivo}`,
+                    valores_anteriores: { estado: estadoAnterior },
+                    valores_nuevos: { estado: 'cancelada', motivo_cancelacion: motivo },
+                    ip_address: ipAddress,
+                    user_agent: userAgent,
+                    resultado: 'exitoso'
+                }).catch(err => {
+                    logger.warn('Error registrando auditoría:', err.message);
+                });
+            }
 
             // TODO: Enviar email de notificación de cancelación
             logger.info(`Visita ${id} cancelada por usuario ${usuarioId}`);
@@ -490,14 +588,16 @@ class VisitaService {
     /**
      * Reprogramar visita
      */
-    async reprogramar(id, nuevaFecha, usuarioId) {
+    async reprogramar(id, nuevaFecha, usuarioId, options = {}) {
+        const { usuarioEmail = null, ipAddress = null, userAgent = null } = options;
         const t = await sequelize.transaction();
         try {
             const visita = await Visita.findByPk(id, {
                 include: [
                     { model: Sede, as: 'sedePrincipal' },
                     { model: Personal, as: 'tecnicoAsignado' }
-                ]
+                ],
+                transaction: t
             });
 
             if (!visita) throw new Error('Visita no encontrada');
@@ -516,6 +616,26 @@ class VisitaService {
             }, { transaction: t });
 
             await t.commit();
+
+            // Registrar auditoría
+            if (usuarioEmail) {
+                AuditService.registrarAccion({
+                    usuario_email: usuarioEmail,
+                    usuario_id: usuarioId,
+                    modulo: 'visitas',
+                    accion: 'reprogramar',
+                    recurso: 'Visita',
+                    recurso_id: id,
+                    descripcion: `Reprogramó visita ${id} de ${fechaAnterior} a ${nuevaFecha}`,
+                    valores_anteriores: { fecha: fechaAnterior },
+                    valores_nuevos: { fecha: nuevaFecha, estado: 'programada' },
+                    ip_address: ipAddress,
+                    user_agent: userAgent,
+                    resultado: 'exitoso'
+                }).catch(err => {
+                    logger.warn('Error registrando auditoría:', err.message);
+                });
+            }
 
             // TODO: Enviar email de notificación de reprogramación
             logger.info(`Visita ${id} reprogramada de ${fechaAnterior} a ${nuevaFecha} por usuario ${usuarioId}`);
@@ -656,15 +776,26 @@ class VisitaService {
      * @param {boolean} eliminarSerie Si es true y es recurrente, elimina futuras
      * @param {string} usuarioId ID del usuario que realiza la acción
      */
-    async eliminar(id, eliminarSerie = false, usuarioId) {
+    async eliminar(id, eliminarSerie = false, usuarioId, options = {}) {
+        const { usuarioEmail = null, ipAddress = null, userAgent = null } = options;
         const t = await sequelize.transaction();
         try {
-            const visita = await Visita.findByPk(id);
+            const visita = await Visita.findByPk(id, { transaction: t });
             if (!visita) throw new Error('Visita no encontrada');
 
             if (visita.estado === 'realizada') {
                 throw new Error('No se puede eliminar una visita que ya fue realizada');
             }
+
+            // Guardar datos para auditoría
+            const datosVisita = {
+                sede_id: visita.sede_id,
+                tecnico_asignado_id: visita.tecnico_asignado_id,
+                fecha: visita.fecha,
+                tipo: visita.tipo,
+                estado: visita.estado,
+                es_recurrente: visita.es_recurrente
+            };
 
             // Si se pide eliminar serie y tiene recurrencia
             if (eliminarSerie && visita.recurrencia_id) {
@@ -692,6 +823,26 @@ class VisitaService {
             }
 
             await t.commit();
+
+            // Registrar auditoría
+            if (usuarioEmail) {
+                AuditService.registrarAccion({
+                    usuario_email: usuarioEmail,
+                    usuario_id: usuarioId,
+                    modulo: 'visitas',
+                    accion: 'eliminar',
+                    recurso: 'Visita',
+                    recurso_id: id,
+                    descripcion: `Eliminó visita ${id}${eliminarSerie && visita.recurrencia_id ? ' y serie recurrente' : ''}`,
+                    valores_anteriores: datosVisita,
+                    ip_address: ipAddress,
+                    user_agent: userAgent,
+                    resultado: 'exitoso'
+                }).catch(err => {
+                    logger.warn('Error registrando auditoría:', err.message);
+                });
+            }
+
             logger.info(`Visita ${id} eliminada por usuario ${usuarioId}. Serie: ${eliminarSerie}`);
             return { message: 'Visita eliminada correctamente' };
         } catch (error) {
@@ -774,6 +925,21 @@ class VisitaService {
             });
 
             await t.commit();
+
+            // Registrar auditoría (usando el email de la sede como identificador)
+            const emailSede = visita.sedePrincipal?.email || 'sede@megatlon.com.ar';
+            AuditService.registrarAccion({
+                usuario_email: emailSede,
+                modulo: 'visitas',
+                accion: 'agregar_comentarios_responsable',
+                recurso: 'VisitaInforme',
+                recurso_id: visita.informe?.id,
+                descripcion: `${datos.nombre} agregó comentarios al informe de visita ${visita.id}`,
+                valores_nuevos: { comentarios_responsable_sede: datos.comentarios, comentarios_responsable_nombre: datos.nombre },
+                resultado: 'exitoso'
+            }).catch(err => {
+                logger.warn('Error registrando auditoría:', err.message);
+            });
 
             // Enviar notificaciones (fuera de transacción)
             // Email a infraestructura y técnico asignado
