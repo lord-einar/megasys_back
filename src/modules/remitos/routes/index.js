@@ -2,6 +2,7 @@
 const express = require('express');
 const { authenticate } = require('../../auth/middleware/authMiddleware');
 const { requireDatabaseRole } = require('../../auth/middleware/roleMiddleware');
+const { publicEndpointLimiter } = require('../../../shared/middleware/rateLimiter');
 const remitoController = require('../controllers/remitoController');
 
 const router = express.Router();
@@ -18,6 +19,7 @@ const router = express.Router();
  */
 router.get(
   '/:id/confirmar-recepcion',
+  publicEndpointLimiter,
   remitoController.confirmarRecepcion.bind(remitoController)
 );
 
@@ -26,9 +28,11 @@ router.get(
  * Confirmar recepción del remito mediante token JWT (POST para programmatic access)
  * No requiere autenticación - usa token JWT como parámetro
  * Query: ?token=JWT_TOKEN
+ * Rate limit: 20 requests por IP cada 15 minutos
  */
 router.post(
   '/:id/confirmar-recepcion',
+  publicEndpointLimiter,
   remitoController.confirmarRecepcion.bind(remitoController)
 );
 

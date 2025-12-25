@@ -32,7 +32,7 @@ const getClientIp = (req) => {
 };
 
 /**
- * Rate limiter general - para la mayoría de rutas
+ * Rate limiter general - para la mayoría de rutas autenticadas
  */
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
@@ -50,16 +50,12 @@ const generalLimiter = rateLimit({
   },
   handler: (req, res) => {
     const clientIp = getClientIp(req);
-    logger.warn(`Rate limit excedido para IP: ${clientIp}`);
+    logger.warn(`Rate limit general excedido para IP: ${clientIp} en ruta: ${req.path}`);
     res.status(429).json({
       success: false,
       message: 'Demasiadas peticiones desde esta IP, intenta de nuevo en 15 minutos.',
       timestamp: new Date().toISOString()
     });
-  },
-  skip: (req) => {
-    // No aplicar rate limit a rutas de autenticación y confirmación pública
-    return req.path.startsWith('/api/auth') || req.path.includes('/confirmar-recepcion');
   }
 });
 
@@ -91,7 +87,39 @@ const authLimiter = rateLimit({
   }
 });
 
+/**
+ * Rate limiter específico para endpoints públicos (sin autenticación)
+ * Más restrictivo para prevenir abuso:
+ * - Confirmación de recepción de remitos
+ * - Solicitudes de visitas
+ * - Feedback de visitas
+ */
+const publicEndpointLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: process.env.NODE_ENV === 'development' ? 100 : 20, // desarrollo: 100, producción: 20
+  message: {
+    success: false,
+    message: 'Demasiadas peticiones desde esta IP. Por favor intenta de nuevo en 15 minutos.',
+    timestamp: new Date().toISOString()
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req, res) => {
+    return getClientIp(req);
+  },
+  handler: (req, res) => {
+    const clientIp = getClientIp(req);
+    logger.warn(`Rate limit en endpoint público excedido para IP: ${clientIp} en ruta: ${req.path}`);
+    res.status(429).json({
+      success: false,
+      message: 'Demasiadas peticiones desde esta IP. Por favor intenta de nuevo en 15 minutos.',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 module.exports = {
   generalLimiter,
-  authLimiter
+  authLimiter,
+  publicEndpointLimiter
 };

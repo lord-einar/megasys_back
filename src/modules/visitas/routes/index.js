@@ -3,6 +3,7 @@ const router = express.Router();
 const visitaController = require('../controllers/visitaController');
 const { authenticate } = require('../../auth/middleware/authMiddleware');
 const { requireRole } = require('../../auth/middleware/roleMiddleware');
+const { publicEndpointLimiter } = require('../../../shared/middleware/rateLimiter');
 const { body, param, query } = require('express-validator');
 const validate = require('../../../shared/middleware/validation');
 
@@ -67,10 +68,10 @@ const validarAgregarFeedback = [
   validate
 ];
 
-// Rutas Públicas
-router.post('/solicitudes', validarSolicitudPublica, visitaController.agregarSolicitud);
-router.get('/feedback/:token', validarFeedbackToken, visitaController.obtenerInfoFeedback);
-router.post('/feedback/:token', validarAgregarFeedback, visitaController.agregarFeedback);
+// Rutas Públicas (con rate limiting restrictivo)
+router.post('/solicitudes', publicEndpointLimiter, validarSolicitudPublica, visitaController.agregarSolicitud);
+router.get('/feedback/:token', publicEndpointLimiter, validarFeedbackToken, visitaController.obtenerInfoFeedback);
+router.post('/feedback/:token', publicEndpointLimiter, validarAgregarFeedback, visitaController.agregarFeedback);
 
 // Rutas Protegidas
 router.use(authenticate);
