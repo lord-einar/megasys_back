@@ -422,6 +422,34 @@ class RemitoService {
         articulos: articulos.length
       });
 
+      // Registrar auditoría
+      if (usuarioEmail) {
+        const { usuarioId = null, ipAddress = null, userAgent = null } = options;
+        AuditService.registrarAccion({
+          usuario_email: usuarioEmail,
+          usuario_id: usuarioId,
+          modulo: 'remitos',
+          accion: 'crear',
+          recurso: 'Remito',
+          recurso_id: remito.id,
+          descripcion: `Creó remito ${remito.numero_remito} con ${articulos.length} artículo(s) de sede ${sede_origen_id} a ${sede_destino_id}`,
+          valores_nuevos: {
+            numero_remito: remito.numero_remito,
+            sede_origen_id,
+            sede_destino_id,
+            solicitante_id,
+            tecnico_asignado_id: tecnico_id,
+            estado: 'preparado',
+            articulos_count: articulos.length
+          },
+          ip_address: ipAddress,
+          user_agent: userAgent,
+          resultado: 'exitoso'
+        }).catch(err => {
+          logger.warn('Error registrando auditoría:', err.message);
+        });
+      }
+
       // Obtener remito completo con relaciones para PDF y email
       const remitoCompleto = await this.obtener(remito.id);
 
