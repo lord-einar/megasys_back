@@ -1,5 +1,5 @@
 // src/modules/inventario/services/tipoArticuloService.js
-const { TipoArticulo } = require('../../../models');
+const { TipoArticulo, sequelize } = require('../../../models');
 const logger = require('../../../shared/utils/logger');
 
 class TipoArticuloService {
@@ -79,6 +79,8 @@ class TipoArticuloService {
    * Crear nuevo tipo de artículo
    */
   async crear(datos) {
+    const t = await sequelize.transaction();
+
     try {
       // Validaciones
       if (!datos.nombre || !datos.nombre.trim()) {
@@ -90,7 +92,8 @@ class TipoArticuloService {
         where: {
           nombre: datos.nombre.trim(),
           activo: true
-        }
+        },
+        transaction: t
       });
 
       if (existente) {
@@ -103,7 +106,9 @@ class TipoArticuloService {
         nombre: datos.nombre.trim(),
         descripcion: datos.descripcion ? datos.descripcion.trim() : null,
         activo: true
-      });
+      }, { transaction: t });
+
+      await t.commit();
 
       logger.info(`Tipo de artículo creado: ${tipo.id} - ${tipo.nombre}`);
 
@@ -113,6 +118,7 @@ class TipoArticuloService {
         data: tipo
       };
     } catch (error) {
+      await t.rollback();
       logger.error('Error creando tipo de artículo:', error);
       throw error;
     }
@@ -122,12 +128,14 @@ class TipoArticuloService {
    * Actualizar tipo de artículo
    */
   async actualizar(id, datos) {
+    const t = await sequelize.transaction();
+
     try {
       if (!id) {
         throw new Error('ID de tipo de artículo es requerido');
       }
 
-      const tipo = await TipoArticulo.findByPk(id);
+      const tipo = await TipoArticulo.findByPk(id, { transaction: t });
 
       if (!tipo) {
         const error = new Error('Tipo de artículo no encontrado');
@@ -142,7 +150,8 @@ class TipoArticuloService {
             nombre: datos.nombre.trim(),
             activo: true,
             id: { [require('sequelize').Op.ne]: id }
-          }
+          },
+          transaction: t
         });
 
         if (existente) {
@@ -157,7 +166,9 @@ class TipoArticuloService {
       if (datos.nombre !== undefined) actualizacion.nombre = datos.nombre.trim();
       if (datos.descripcion !== undefined) actualizacion.descripcion = datos.descripcion ? datos.descripcion.trim() : null;
 
-      await tipo.update(actualizacion);
+      await tipo.update(actualizacion, { transaction: t });
+
+      await t.commit();
 
       logger.info(`Tipo de artículo actualizado: ${id}`);
 
@@ -167,6 +178,7 @@ class TipoArticuloService {
         data: tipo
       };
     } catch (error) {
+      await t.rollback();
       logger.error(`Error actualizando tipo de artículo ${id}:`, error);
       throw error;
     }
@@ -176,12 +188,14 @@ class TipoArticuloService {
    * Eliminar (soft delete) un tipo de artículo
    */
   async eliminar(id) {
+    const t = await sequelize.transaction();
+
     try {
       if (!id) {
         throw new Error('ID de tipo de artículo es requerido');
       }
 
-      const tipo = await TipoArticulo.findByPk(id);
+      const tipo = await TipoArticulo.findByPk(id, { transaction: t });
 
       if (!tipo) {
         const error = new Error('Tipo de artículo no encontrado');
@@ -190,7 +204,9 @@ class TipoArticuloService {
       }
 
       // Soft delete: marcar como inactivo
-      await tipo.update({ activo: false });
+      await tipo.update({ activo: false }, { transaction: t });
+
+      await t.commit();
 
       logger.info(`Tipo de artículo eliminado (soft delete): ${id}`);
 
@@ -199,6 +215,7 @@ class TipoArticuloService {
         message: 'Tipo de artículo eliminado exitosamente'
       };
     } catch (error) {
+      await t.rollback();
       logger.error(`Error eliminando tipo de artículo ${id}:`, error);
       throw error;
     }
