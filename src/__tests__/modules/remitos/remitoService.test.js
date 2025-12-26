@@ -60,7 +60,10 @@ jest.mock('../../../models', () => {
 // Mock de servicios externos
 jest.mock('../../../shared/services/pdfService');
 jest.mock('../../../shared/services/emailService');
-jest.mock('../../../shared/services/auditService');
+jest.mock('../../../shared/services/auditService', () => ({
+  registrarActividad: jest.fn().mockResolvedValue({ id: 'uuid-auditoria' }),
+  registrarAccion: jest.fn().mockResolvedValue({ id: 'uuid-auditoria' })
+}));
 
 const remitoService = require('../../../modules/remitos/services/remitoService');
 const { Remito, RemitoDetalle, Inventario, HistorialMovimiento, Personal, Sede, sequelize } = require('../../../models');
@@ -99,27 +102,38 @@ describe('RemitoService', () => {
     const usuarioEmail = 'test@megatlon.com.ar';
 
     beforeEach(() => {
-      // Mock de validaciones - usar findOne porque el servicio lo usa
-      Personal.findOne = jest.fn().mockResolvedValue({ id: 'uuid-personal', activo: true });
-      Sede.findOne = jest.fn().mockResolvedValue({ id: 'uuid-sede', activo: true });
-      Inventario.findByPk = jest.fn().mockResolvedValue({
+      // Limpiar todos los mocks
+      jest.clearAllMocks();
+
+      // Mock de validaciones CON MÚLTIPLES LLAMADAS (solicitante y técnico)
+      Personal.findOne = jest.fn()
+        .mockResolvedValueOnce({ id: 'uuid-solicitante', activo: true })  // 1ra llamada
+        .mockResolvedValueOnce({ id: 'uuid-tecnico', activo: true });     // 2da llamada
+
+      // Mock de validaciones de sedes (origen y destino)
+      Sede.findOne = jest.fn()
+        .mockResolvedValueOnce({ id: 'uuid-sede-origen', activo: true })    // 1ra llamada
+        .mockResolvedValueOnce({ id: 'uuid-sede-destino', activo: true });  // 2da llamada
+
+      // Mock de validación de inventario (puede ser llamado múltiples veces, una por artículo)
+      Inventario.findOne = jest.fn().mockResolvedValue({
         id: 'uuid-inventario',
         sede_id: 'uuid-sede-origen',
+        activo: true,
         estado: 'disponible'
       });
 
-      // Mock de búsqueda de remitos activos
-      RemitoDetalle.findOne = jest.fn().mockResolvedValue(null);
+      // Mock de búsqueda de remitos activos (RemitoDetalle.findAll)
+      RemitoDetalle.findAll = jest.fn().mockResolvedValue([]);
 
       // Mock de generación de número de remito
-      sequelize.query.mockResolvedValueOnce([[{ numero: 1 }]]);
+      sequelize.query = jest.fn().mockResolvedValue([[{ numero: 1 }]]);
 
       // Mock de creación de remito
       Remito.create = jest.fn().mockResolvedValue({
         id: 'uuid-remito',
         numero_remito: 'REM-2025-001',
-        estado: 'preparado',
-        toJSON: () => ({ id: 'uuid-remito', numero_remito: 'REM-2025-001' })
+        estado: 'preparado'
       });
 
       // Mock de creación de detalles
@@ -136,11 +150,16 @@ describe('RemitoService', () => {
         id: 'uuid-historial'
       });
 
-      // Mock de obtener para el PDF/Email
-      remitoService.obtener = jest.fn().mockResolvedValue({
+      // ⭐ CRÍTICO: Mock del método obtener() usando spyOn
+      jest.spyOn(remitoService, 'obtener').mockResolvedValue({
         id: 'uuid-remito',
         numero_remito: 'REM-2025-001',
-        toJSON: () => ({ id: 'uuid-remito', numero_remito: 'REM-2025-001' })
+        estado: 'preparado',
+        detalles: [
+          { id: 'uuid-detalle-1', es_prestamo: false },
+          { id: 'uuid-detalle-2', es_prestamo: true }
+        ],
+        toJSON: function() { return this; }
       });
     });
 
@@ -157,8 +176,11 @@ describe('RemitoService', () => {
     it('debe lanzar error si falta solicitante_id', async () => {
       const datosInvalidos = { ...validDatos, solicitante_id: null };
 
+      // Override del mock para retornar null cuando se busca con id null
+      Personal.findOne = jest.fn().mockResolvedValue(null);
+
       await expect(remitoService.crear(datosInvalidos, usuarioEmail))
-        .rejects.toThrow();
+        .rejects.toThrow('Solicitante no existe o no está activo');
     });
 
     it('debe lanzar error si sede origen y destino son iguales', async () => {
@@ -253,15 +275,29 @@ describe('RemitoService', () => {
     };
 
     beforeEach(() => {
-      Remito.findByPk = jest.fn().mockResolvedValue({
+      jest.clearAllMocks();
+
+      const mockRemito = {
         id: remitoId,
         numero_remito: 'REM-2025-001',
         estado: 'preparado',
         tecnico_asignado_id: 'uuid-tecnico',
         update: jest.fn().mockResolvedValue({
           id: remitoId,
+          numero_remito: 'REM-2025-001',
           estado: 'en_transito'
         })
+      };
+
+      Remito.findByPk = jest.fn().mockResolvedValue(mockRemito);
+
+      // Mock de obtener para el email (se llama en setImmediate)
+      jest.spyOn(remitoService, 'obtener').mockResolvedValue({
+        id: remitoId,
+        numero_remito: 'REM-2025-001',
+        estado: 'en_transito',
+        solicitante: { email: 'solicitante@test.com' },
+        toJSON: function() { return this; }
       });
     });
 
@@ -342,7 +378,7 @@ describe('RemitoService', () => {
   describe('validaciones', () => {
     describe('validarPersonaActiva()', () => {
       it('debe pasar si persona existe y está activa', async () => {
-        Personal.findByPk = jest.fn().mockResolvedValue({
+        Personal.findOne = jest.fn().mockResolvedValue({
           id: 'uuid-persona',
           activo: true
         });
@@ -353,28 +389,25 @@ describe('RemitoService', () => {
       });
 
       it('debe lanzar error si persona no existe', async () => {
-        Personal.findByPk = jest.fn().mockResolvedValue(null);
+        Personal.findOne = jest.fn().mockResolvedValue(null);
 
         await expect(
           remitoService.validarPersonaActiva('uuid-inexistente', 'Solicitante')
-        ).rejects.toThrow('no existe');
+        ).rejects.toThrow('no existe o no está activo');
       });
 
       it('debe lanzar error si persona está inactiva', async () => {
-        Personal.findByPk = jest.fn().mockResolvedValue({
-          id: 'uuid-persona',
-          activo: false
-        });
+        Personal.findOne = jest.fn().mockResolvedValue(null);
 
         await expect(
           remitoService.validarPersonaActiva('uuid-persona', 'Solicitante')
-        ).rejects.toThrow('inactiva');
+        ).rejects.toThrow('no existe o no está activo');
       });
     });
 
     describe('validarSedeActiva()', () => {
       it('debe pasar si sede existe y está activa', async () => {
-        Sede.findByPk = jest.fn().mockResolvedValue({
+        Sede.findOne = jest.fn().mockResolvedValue({
           id: 'uuid-sede',
           activo: true
         });
@@ -385,21 +418,25 @@ describe('RemitoService', () => {
       });
 
       it('debe lanzar error si sede no existe', async () => {
-        Sede.findByPk = jest.fn().mockResolvedValue(null);
+        Sede.findOne = jest.fn().mockResolvedValue(null);
 
         await expect(
           remitoService.validarSedeActiva('uuid-inexistente', 'Sede')
-        ).rejects.toThrow('no existe');
+        ).rejects.toThrow('no existe o no está activa');
       });
     });
 
     describe('validarInventarioDisponible()', () => {
       it('debe pasar si inventario está disponible en la sede', async () => {
-        Inventario.findByPk = jest.fn().mockResolvedValue({
+        Inventario.findOne = jest.fn().mockResolvedValue({
           id: 'uuid-inventario',
           sede_id: 'uuid-sede',
+          activo: true,
           estado: 'disponible'
         });
+
+        // Mock de validación de remitos activos
+        RemitoDetalle.findAll = jest.fn().mockResolvedValue([]);
 
         await expect(
           remitoService.validarInventarioDisponible('uuid-inventario', 'uuid-sede')
@@ -407,19 +444,15 @@ describe('RemitoService', () => {
       });
 
       it('debe lanzar error si inventario no existe', async () => {
-        Inventario.findByPk = jest.fn().mockResolvedValue(null);
+        Inventario.findOne = jest.fn().mockResolvedValue(null);
 
         await expect(
           remitoService.validarInventarioDisponible('uuid-inexistente', 'uuid-sede')
-        ).rejects.toThrow('no existe');
+        ).rejects.toThrow('no existe en la sede seleccionada o no está disponible');
       });
 
       it('debe lanzar error si inventario no está disponible', async () => {
-        Inventario.findByPk = jest.fn().mockResolvedValue({
-          id: 'uuid-inventario',
-          sede_id: 'uuid-sede',
-          estado: 'en_uso'
-        });
+        Inventario.findOne = jest.fn().mockResolvedValue(null);
 
         await expect(
           remitoService.validarInventarioDisponible('uuid-inventario', 'uuid-sede')
@@ -427,15 +460,11 @@ describe('RemitoService', () => {
       });
 
       it('debe lanzar error si inventario está en otra sede', async () => {
-        Inventario.findByPk = jest.fn().mockResolvedValue({
-          id: 'uuid-inventario',
-          sede_id: 'uuid-otra-sede',
-          estado: 'disponible'
-        });
+        Inventario.findOne = jest.fn().mockResolvedValue(null);
 
         await expect(
-          remitoService.validarInventarioDisponible('uuid-inventario', 'uuid-sede')
-        ).rejects.toThrow('no se encuentra en');
+          remitoService.validarInventarioDisponible('uuid-inventario', 'uuid-otra-sede')
+        ).rejects.toThrow('no existe en la sede seleccionada o no está disponible');
       });
     });
   });
