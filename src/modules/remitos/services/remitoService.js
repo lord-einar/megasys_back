@@ -629,6 +629,7 @@ class RemitoService {
 
   /**
    * Listar remitos con filtros y paginación
+   * OPTIMIZADO: Filtro de es_prestamo se hace en BD, no en memoria
    */
   async listar(filters = {}) {
     const {
@@ -654,9 +655,6 @@ class RemitoService {
       whereClause.estado = estado;
     }
 
-    // Nota: es_prestamo NO se filtra en BD porque no existe como columna
-    // Se calcula dinámicamente basándose en los artículos y se filtra después
-
     if (solicitante_id) {
       whereClause.solicitante_id = solicitante_id;
     }
@@ -673,6 +671,18 @@ class RemitoService {
       whereClause.sede_destino_id = sede_destino_id;
     }
 
+    // OPTIMIZACIÓN: Filtrar es_prestamo en BD usando subquery
+    if (es_prestamo !== null && es_prestamo !== undefined) {
+      const esPrestamoBool = es_prestamo === 'true' || es_prestamo === true;
+
+      // Subquery: EXISTS (SELECT 1 FROM remito_detalles WHERE remito_id = remitos.id AND es_prestamo = true)
+      whereClause[sequelize.Sequelize.Op.and] = sequelize.literal(
+        esPrestamoBool
+          ? `EXISTS (SELECT 1 FROM remito_detalles WHERE remito_id = remitos.id AND es_prestamo = true)`
+          : `NOT EXISTS (SELECT 1 FROM remito_detalles WHERE remito_id = remitos.id AND es_prestamo = true) OR NOT EXISTS (SELECT 1 FROM remito_detalles WHERE remito_id = remitos.id)`
+      );
+    }
+
     const { count, rows } = await Remito.findAndCountAll({
       where: whereClause,
       include: [
@@ -683,7 +693,7 @@ class RemitoService {
         },
         {
           model: Personal,
-          as: 'tecnicoAsignado', // Nota: Relación usa tecnico_id pero alias anterior es tecnicoAsignado
+          as: 'tecnicoAsignado',
           attributes: ['id', 'nombre', 'apellido', 'email']
         },
         {
@@ -714,7 +724,7 @@ class RemitoService {
     });
 
     // Calcular es_prestamo para cada remito basándose en sus artículos
-    let rowsConTipo = rows.map(remito => {
+    const rowsConTipo = rows.map(remito => {
       const tieneArticulosEnPrestamo = remito.detalles && remito.detalles.some(detalle => detalle.es_prestamo);
       return {
         ...remito.toJSON(),
@@ -722,20 +732,15 @@ class RemitoService {
       };
     });
 
-    // Aplicar filtro de es_prestamo si se especificó
-    if (es_prestamo !== null && es_prestamo !== undefined) {
-      const esPrestamoBool = es_prestamo === 'true' || es_prestamo === true;
-      rowsConTipo = rowsConTipo.filter(remito => remito.es_prestamo === esPrestamoBool);
-    }
-
+    // FIX PAGINACIÓN: count es el total real de la BD filtrada, no el tamaño del array
     return {
       rows: rowsConTipo,
-      count: rowsConTipo.length, // Usar el conteo de filas filtradas
+      count, // Count correcto de BD (ya filtrado por es_prestamo en query)
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total: rowsConTipo.length,
-        pages: Math.ceil(rowsConTipo.length / parseInt(limit)),
+        total: count, // Total real de BD
+        pages: Math.ceil(count / parseInt(limit)),
         currentPage: parseInt(page)
       }
     };
