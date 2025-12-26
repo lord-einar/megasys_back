@@ -468,4 +468,261 @@ describe('RemitoService', () => {
       });
     });
   });
+
+  describe('obtener()', () => {
+    const remitoId = 'uuid-remito';
+
+    // Clase helper para crear mocks de Sequelize que permiten asignaciones dinámicas
+    class MockSequelizeModel {
+      constructor(data) {
+        Object.assign(this, data);
+      }
+    }
+
+    beforeEach(() => {
+      // Restaurar el spy de obtener() que se creó en tests anteriores
+      if (remitoService.obtener.mockRestore) {
+        remitoService.obtener.mockRestore();
+      }
+      jest.restoreAllMocks();
+    });
+
+    it('debe obtener un remito por ID con todas sus relaciones', async () => {
+      const mockRemito = new MockSequelizeModel({
+        id: remitoId,
+        numero_remito: 'REM-2025-001',
+        estado: 'preparado',
+        solicitante: { id: 'uuid-sol', nombre: 'Juan', apellido: 'Pérez' },
+        tecnicoAsignado: { id: 'uuid-tec', nombre: 'Pedro', apellido: 'García' },
+        sedeOrigen: { id: 'uuid-sede-1', nombre_sede: 'Sede A' },
+        sedeDestino: { id: 'uuid-sede-2', nombre_sede: 'Sede B' },
+        detalles: [
+          { id: 'det-1', es_prestamo: false, inventarioDetalle: { id: 'inv-1' } },
+          { id: 'det-2', es_prestamo: true, inventarioDetalle: { id: 'inv-2' } }
+        ],
+        historialMovimientosRemito: []
+      });
+
+      Remito.findByPk = jest.fn().mockResolvedValue(mockRemito);
+
+      const result = await remitoService.obtener(remitoId);
+
+      expect(result).toBeDefined();
+      expect(result.id).toBe(remitoId);
+      expect(result.es_prestamo).toBe(true); // Tiene al menos un artículo en préstamo
+      expect(Remito.findByPk).toHaveBeenCalledWith(
+        remitoId,
+        expect.objectContaining({
+          include: expect.any(Array)
+        })
+      );
+    });
+
+    it('debe calcular es_prestamo=false cuando no hay artículos en préstamo', async () => {
+      const mockRemito = new MockSequelizeModel({
+        id: remitoId,
+        numero_remito: 'REM-2025-001',
+        detalles: [
+          { id: 'det-1', es_prestamo: false },
+          { id: 'det-2', es_prestamo: false }
+        ]
+      });
+
+      Remito.findByPk = jest.fn().mockResolvedValue(mockRemito);
+
+      const result = await remitoService.obtener(remitoId);
+
+      expect(result.es_prestamo).toBe(false);
+    });
+
+    it('debe lanzar error si el remito no existe', async () => {
+      Remito.findByPk = jest.fn().mockResolvedValue(null);
+
+      await expect(remitoService.obtener('uuid-inexistente'))
+        .rejects.toThrow('El remito no existe');
+    });
+
+    it('debe manejar remito sin detalles', async () => {
+      const mockRemito = new MockSequelizeModel({
+        id: remitoId,
+        numero_remito: 'REM-2025-001',
+        detalles: null
+      });
+
+      Remito.findByPk = jest.fn().mockResolvedValue(mockRemito);
+
+      const result = await remitoService.obtener(remitoId);
+
+      expect(result.es_prestamo).toBeFalsy(); // null o false son valores falsy válidos
+    });
+  });
+
+  describe('listar()', () => {
+    const createMockRemito = (data) => ({
+      ...data,
+      toJSON: function() { return this; }
+    });
+
+    const mockRemitos = [
+      createMockRemito({
+        id: 'rem-1',
+        numero_remito: 'REM-2025-001',
+        estado: 'preparado',
+        solicitante: { id: 'sol-1', nombre: 'Juan' },
+        detalles: []
+      }),
+      createMockRemito({
+        id: 'rem-2',
+        numero_remito: 'REM-2025-002',
+        estado: 'en_transito',
+        solicitante: { id: 'sol-2', nombre: 'María' },
+        detalles: []
+      })
+    ];
+
+    beforeEach(() => {
+      Remito.findAndCountAll = jest.fn().mockResolvedValue({
+        count: mockRemitos.length,
+        rows: mockRemitos
+      });
+    });
+
+    it('debe listar remitos con paginación por defecto', async () => {
+      const result = await remitoService.listar({});
+
+      expect(result).toBeDefined();
+      expect(result.count).toBe(2);
+      expect(result.rows).toHaveLength(2);
+      expect(result.pagination).toBeDefined();
+      expect(result.pagination.page).toBe(1);
+      expect(result.pagination.limit).toBe(10);
+      expect(Remito.findAndCountAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          limit: 10,
+          offset: 0,
+          order: [['created_at', 'DESC']]
+        })
+      );
+    });
+
+    it('debe aplicar paginación personalizada', async () => {
+      await remitoService.listar({ page: 2, limit: 5 });
+
+      expect(Remito.findAndCountAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          limit: 5,
+          offset: 5
+        })
+      );
+    });
+
+    it('debe filtrar por estado', async () => {
+      await remitoService.listar({ estado: 'preparado' });
+
+      expect(Remito.findAndCountAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            estado: 'preparado'
+          })
+        })
+      );
+    });
+
+    it('debe filtrar por solicitante_id', async () => {
+      await remitoService.listar({ solicitante_id: 'uuid-sol' });
+
+      expect(Remito.findAndCountAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            solicitante_id: 'uuid-sol'
+          })
+        })
+      );
+    });
+
+    it('debe filtrar por tecnico_id', async () => {
+      await remitoService.listar({ tecnico_id: 'uuid-tec' });
+
+      expect(Remito.findAndCountAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tecnico_id: 'uuid-tec'
+          })
+        })
+      );
+    });
+
+    it('debe filtrar por sede_origen_id', async () => {
+      await remitoService.listar({ sede_origen_id: 'uuid-sede-1' });
+
+      expect(Remito.findAndCountAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            sede_origen_id: 'uuid-sede-1'
+          })
+        })
+      );
+    });
+
+    it('debe filtrar por sede_destino_id', async () => {
+      await remitoService.listar({ sede_destino_id: 'uuid-sede-2' });
+
+      expect(Remito.findAndCountAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            sede_destino_id: 'uuid-sede-2'
+          })
+        })
+      );
+    });
+
+    it('debe aplicar múltiples filtros simultáneamente', async () => {
+      await remitoService.listar({
+        estado: 'en_transito',
+        solicitante_id: 'uuid-sol',
+        sede_origen_id: 'uuid-sede-1'
+      });
+
+      expect(Remito.findAndCountAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            estado: 'en_transito',
+            solicitante_id: 'uuid-sol',
+            sede_origen_id: 'uuid-sede-1'
+          })
+        })
+      );
+    });
+
+    it('debe incluir todas las relaciones necesarias', async () => {
+      await remitoService.listar({});
+
+      expect(Remito.findAndCountAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.arrayContaining([
+            expect.objectContaining({ as: 'solicitante' }),
+            expect.objectContaining({ as: 'tecnicoAsignado' }),
+            expect.objectContaining({ as: 'sedeOrigen' }),
+            expect.objectContaining({ as: 'sedeDestino' }),
+            expect.objectContaining({ as: 'detalles' })
+          ])
+        })
+      );
+    });
+
+    it('debe retornar estructura correcta con paginación', async () => {
+      const result = await remitoService.listar({ page: 1, limit: 10 });
+
+      expect(result).toHaveProperty('rows');
+      expect(result).toHaveProperty('count');
+      expect(result).toHaveProperty('pagination');
+      expect(result.pagination).toHaveProperty('page');
+      expect(result.pagination).toHaveProperty('limit');
+      expect(result.pagination).toHaveProperty('total');
+      expect(result.pagination).toHaveProperty('pages');
+      expect(result.pagination).toHaveProperty('currentPage');
+      expect(result.pagination.pages).toBe(1);
+      expect(result.pagination.currentPage).toBe(1);
+    });
+  });
 });
