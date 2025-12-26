@@ -725,4 +725,155 @@ describe('RemitoService', () => {
       expect(result.pagination.currentPage).toBe(1);
     });
   });
+
+  describe('generarRemitoDevolucion()', () => {
+    const remitoOriginalId = 'uuid-remito-original';
+    const detalleIds = ['uuid-detalle-1', 'uuid-detalle-2'];
+    const usuarioEmail = 'test@megatlon.com.ar';
+
+    beforeEach(() => {
+      jest.restoreAllMocks();
+
+      // Mock de generarNumeroRemito
+      jest.spyOn(remitoService, 'generarNumeroRemito').mockResolvedValue('REM-2025-DEV-001');
+
+      // Mock del remito original
+      Remito.findByPk = jest.fn().mockResolvedValue({
+        id: remitoOriginalId,
+        numero_remito: 'REM-2025-001',
+        sede_origen_id: 'uuid-sede-1',
+        sede_destino_id: 'uuid-sede-2',
+        solicitante_id: 'uuid-sol',
+        tecnico_asignado_id: 'uuid-tec'
+      });
+
+      // Mock de sede Deposito
+      Sede.findOne = jest.fn().mockResolvedValue({
+        id: 'uuid-deposito',
+        nombre_sede: 'Deposito'
+      });
+
+      // Mock de detalles a devolver
+      RemitoDetalle.findAll = jest.fn().mockResolvedValue([
+        {
+          id: 'uuid-detalle-1',
+          inventario_id: 'uuid-inv-1',
+          es_prestamo: true,
+          devuelto: false,
+          update: jest.fn().mockResolvedValue({ devuelto: true })
+        }
+      ]);
+
+      RemitoDetalle.create = jest.fn().mockResolvedValue({
+        id: 'uuid-detalle-dev',
+        remito_id: 'uuid-remito-dev'
+      });
+
+      Remito.create = jest.fn().mockResolvedValue({
+        id: 'uuid-remito-dev',
+        numero_remito: 'REM-2025-DEV-001'
+      });
+
+      Inventario.update = jest.fn().mockResolvedValue([1]);
+
+      jest.spyOn(remitoService, 'obtener').mockResolvedValue({
+        id: 'uuid-remito-dev',
+        numero_remito: 'REM-2025-DEV-001',
+        toJSON: function() { return this; }
+      });
+    });
+
+    it('debe generar remito de devolución exitosamente', async () => {
+      const result = await remitoService.generarRemitoDevolucion(
+        remitoOriginalId,
+        detalleIds,
+        usuarioEmail
+      );
+
+      expect(result).toBeDefined();
+      expect(Remito.findByPk).toHaveBeenCalledWith(remitoOriginalId);
+      expect(Remito.create).toHaveBeenCalled();
+      expect(RemitoDetalle.create).toHaveBeenCalled();
+      expect(mockTransaction.commit).toHaveBeenCalled();
+    });
+
+    it('debe lanzar error si remito original no existe', async () => {
+      Remito.findByPk = jest.fn().mockResolvedValue(null);
+
+      await expect(
+        remitoService.generarRemitoDevolucion(remitoOriginalId, detalleIds, usuarioEmail)
+      ).rejects.toThrow('El remito original no existe');
+    });
+
+    it('debe lanzar error si no existe sede Deposito', async () => {
+      Sede.findOne = jest.fn().mockResolvedValue(null);
+
+      await expect(
+        remitoService.generarRemitoDevolucion(remitoOriginalId, detalleIds, usuarioEmail)
+      ).rejects.toThrow('No se encontró la sede "Deposito"');
+    });
+
+    it('debe lanzar error si no hay artículos válidos para devolver', async () => {
+      RemitoDetalle.findAll = jest.fn().mockResolvedValue([]);
+
+      await expect(
+        remitoService.generarRemitoDevolucion(remitoOriginalId, detalleIds, usuarioEmail)
+      ).rejects.toThrow('No hay artículos válidos para devolver');
+    });
+
+    it('debe actualizar estado de inventario a disponible', async () => {
+      await remitoService.generarRemitoDevolucion(
+        remitoOriginalId,
+        detalleIds,
+        usuarioEmail
+      );
+
+      expect(Inventario.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          estado: 'disponible',
+          sede_id: 'uuid-deposito'
+        }),
+        expect.any(Object)
+      );
+    });
+
+    it('debe invertir sedes (origen <-> destino)', async () => {
+      await remitoService.generarRemitoDevolucion(
+        remitoOriginalId,
+        detalleIds,
+        usuarioEmail
+      );
+
+      expect(Remito.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sede_origen_id: 'uuid-sede-2', // Invertido
+          sede_destino_id: 'uuid-sede-1'  // Invertido
+        }),
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe('validarArticuloNoEnTransito()', () => {
+    it('debe pasar si artículo no está en tránsito', async () => {
+      RemitoDetalle.findOne = jest.fn().mockResolvedValue(null);
+
+      await expect(
+        remitoService.validarArticuloNoEnTransito('uuid-inv')
+      ).resolves.not.toThrow();
+    });
+
+    it('debe lanzar error si artículo está en tránsito', async () => {
+      RemitoDetalle.findOne = jest.fn().mockResolvedValue({
+        remito: {
+          numero_remito: 'REM-2025-001',
+          estado: 'en_transito'
+        }
+      });
+
+      await expect(
+        remitoService.validarArticuloNoEnTransito('uuid-inv')
+      ).rejects.toThrow('ya está en el remito');
+    });
+  });
 });
