@@ -214,6 +214,66 @@ class RemitoService {
   }
 
   /**
+   * OPTIMIZACIÓN: Validar múltiples artículos en batch (reduce N+1 queries)
+   * Valida inventarios disponibles y que no estén en remitos activos
+   */
+  async validarArticulosBatch(articulos, sedeOrigenId) {
+    const { Remito } = require('../../../models');
+    const { Op } = require('sequelize');
+    const inventarioIds = articulos.map(a => a.inventario_id);
+
+    logger.info('validarArticulosBatch - Iniciando validación batch:', {
+      cantidadArticulos: inventarioIds.length,
+      sedeOrigenId
+    });
+
+    // 1. Verificar que todos los inventarios existen y están disponibles en la sede (UNA query)
+    const inventariosDisponibles = await Inventario.findAll({
+      where: {
+        id: { [Op.in]: inventarioIds },
+        sede_id: sedeOrigenId,
+        activo: true,
+        estado: { [Op.notIn]: ['en_uso', 'en_prestamo'] }
+      },
+      attributes: ['id', 'marca', 'modelo', 'numero_serie', 'estado']
+    });
+
+    const idsEncontrados = inventariosDisponibles.map(inv => inv.id);
+    const idsFaltantes = inventarioIds.filter(id => !idsEncontrados.includes(id));
+
+    if (idsFaltantes.length > 0) {
+      throw new Error(
+        `Los siguientes artículos no existen en la sede seleccionada o no están disponibles: ${idsFaltantes.join(', ')}`
+      );
+    }
+
+    // 2. Verificar que ninguno esté en remito activo (UNA query)
+    const detallesActivos = await RemitoDetalle.findAll({
+      where: { inventario_id: { [Op.in]: inventarioIds } },
+      include: [{
+        model: Remito,
+        as: 'remito',
+        where: {
+          estado: { [Op.in]: ['preparado', 'en_transito'] }
+        },
+        attributes: ['id', 'numero_remito', 'estado'],
+        required: true
+      }],
+      attributes: ['id', 'inventario_id']
+    });
+
+    if (detallesActivos.length > 0) {
+      const conflictos = detallesActivos.map(d =>
+        `Artículo ${d.inventario_id} en remito ${d.remito.numero_remito} (${d.remito.estado})`
+      ).join('; ');
+      throw new Error(`Los siguientes artículos ya están en remitos activos: ${conflictos}`);
+    }
+
+    logger.info('validarArticulosBatch - Validación completada exitosamente');
+    return inventariosDisponibles;
+  }
+
+  /**
    * Crear nuevo remito con detalles - TRANSACCIÓN ATÓMICA
    *
    * Proceso:
@@ -280,30 +340,20 @@ class RemitoService {
     }));
     logger.info('crear - Artículos normalizados');
 
-    // Validar cada artículo normalizado
+    // OPTIMIZACIÓN: Validar todos los artículos en batch (reduce N+1 queries)
     try {
+      // Validar inventarios disponibles y no en remitos activos (2 queries en lugar de N*2)
+      await this.validarArticulosBatch(articulosNormalizados, sede_origen_id);
+      logger.info('crear - Artículos validados en batch exitosamente');
+
+      // Validar campos específicos de cada artículo
       for (let i = 0; i < articulosNormalizados.length; i++) {
         const articulo = articulosNormalizados[i];
-        logger.info(`crear - Validando artículo [${i}]`, {
-          inventario_id: articulo.inventario_id,
-          sede_origen_id: sede_origen_id,
-          es_prestamo: articulo.es_prestamo
-        });
-
-        // Validar que el artículo existe y está disponible en la sede
-        await this.validarInventarioDisponible(articulo.inventario_id, sede_origen_id);
-        logger.info(`crear - Artículo [${i}] disponible`);
-
-        // Validar que el artículo NO está en otro remito activo
-        await this.validarArticuloNoEnTransito(articulo.inventario_id);
-        logger.info(`crear - Artículo [${i}] no está en otro remito activo`);
 
         // Si es préstamo, fecha_devolucion_esperada es requerida
         if (articulo.es_prestamo && !articulo.fecha_devolucion_esperada) {
           throw new Error('La fecha de devolución es requerida para préstamos');
         }
-
-        logger.info(`crear - Artículo [${i}] validado correctamente`);
       }
 
       logger.info('crear - Validación de artículos completada');

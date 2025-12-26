@@ -146,6 +146,24 @@ describe('RemitoService', () => {
         estado: 'disponible'
       });
 
+      // Mock de validación batch de inventarios (OPTIMIZACIÓN - nuevo método)
+      Inventario.findAll = jest.fn().mockResolvedValue([
+        {
+          id: 'uuid-inventario-1',
+          marca: 'Dell',
+          modelo: 'Latitude',
+          numero_serie: 'SN001',
+          estado: 'disponible'
+        },
+        {
+          id: 'uuid-inventario-2',
+          marca: 'HP',
+          modelo: 'EliteBook',
+          numero_serie: 'SN002',
+          estado: 'disponible'
+        }
+      ]);
+
       // Mock de búsqueda de remitos activos (RemitoDetalle.findAll)
       RemitoDetalle.findAll = jest.fn().mockResolvedValue([]);
 
@@ -227,7 +245,7 @@ describe('RemitoService', () => {
       const datosInvalidos = {
         ...validDatos,
         articulos: [
-          { inventario_id: 'uuid-inv', es_prestamo: true }
+          { inventario_id: 'uuid-inventario-1', es_prestamo: true }
         ]
       };
 
