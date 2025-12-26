@@ -59,8 +59,30 @@ jest.mock('../../../models', () => {
 });
 
 // Mock de servicios externos
-jest.mock('../../../shared/services/pdfService');
-jest.mock('../../../shared/services/emailService');
+jest.mock('../../../shared/services/pdfService', () => ({
+  generarPDF: jest.fn().mockResolvedValue({
+    path: '/tmp/remito.pdf',
+    buffer: Buffer.from('pdf-content')
+  }),
+  generarPDFRemito: jest.fn().mockResolvedValue({
+    path: '/tmp/remito.pdf',
+    buffer: Buffer.from('pdf-content')
+  })
+}));
+
+jest.mock('../../../shared/services/emailService', () => ({
+  enviarEmailConAdjuntos: jest.fn().mockResolvedValue(true),
+  enviarEmail: jest.fn().mockResolvedValue(true),
+  enviarAlReceptor: jest.fn().mockResolvedValue(true),
+  enviarAlSolicitante: jest.fn().mockResolvedValue(true)
+}));
+
+jest.mock('../../../shared/services/tokenService', () => ({
+  generarTokenConfirmacion: jest.fn().mockReturnValue('mock-confirmation-token'),
+  generarUrlConfirmacion: jest.fn().mockReturnValue('https://megasys.com/confirmar/mock-token'),
+  validarTokenConfirmacion: jest.fn()
+}));
+
 jest.mock('../../../shared/services/auditService', () => ({
   registrarActividad: jest.fn().mockResolvedValue({ id: 'uuid-auditoria' }),
   registrarAccion: jest.fn().mockResolvedValue({ id: 'uuid-auditoria' })
@@ -885,7 +907,7 @@ describe('RemitoService', () => {
     const usuarioEmail = 'admin@megatlon.com.ar';
 
     beforeEach(() => {
-      jest.restoreAllMocks();
+      jest.clearAllMocks();
 
       Remito.findByPk = jest.fn().mockResolvedValue({
         id: remitoId,
@@ -930,7 +952,7 @@ describe('RemitoService', () => {
 
       await expect(
         remitoService.asignarReceptor(remitoId, receptorNombre, receptorEmail, usuarioEmail)
-      ).rejects.toThrow('solo puede asignarse');
+      ).rejects.toThrow('Solo se puede asignar receptor a remitos en estado "en_transito"');
     });
   });
 
@@ -939,7 +961,7 @@ describe('RemitoService', () => {
     const validToken = 'valid-jwt-token';
 
     beforeEach(() => {
-      jest.restoreAllMocks();
+      jest.clearAllMocks();
 
       // Mock tokenService
       const tokenService = require('../../../shared/services/tokenService');
@@ -952,8 +974,13 @@ describe('RemitoService', () => {
         id: remitoId,
         numero_remito: 'REM-2025-001',
         estado: 'en_transito',
+        receptor_email: 'receptor@test.com', // Email que coincide con el token
+        solicitante: { email: 'solicitante@test.com' },
+        sedeOrigen: { nombre_sede: 'Sede A' },
+        sedeDestino: { nombre_sede: 'Sede B' },
         save: jest.fn().mockResolvedValue(true),
-        detalles: []
+        detalles: [],
+        toJSON: function() { return this; }
       });
     });
 
@@ -1016,7 +1043,8 @@ describe('RemitoService', () => {
       const result = await remitoService.obtenerPrestamosProximosAVencer(7);
 
       expect(result).toBeDefined();
-      expect(result.prestamos).toHaveLength(2);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(2);
     });
 
     it('debe retornar array vacío si no hay préstamos próximos', async () => {
@@ -1024,7 +1052,8 @@ describe('RemitoService', () => {
 
       const result = await remitoService.obtenerPrestamosProximosAVencer(7);
 
-      expect(result.prestamos).toHaveLength(0);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(0);
     });
 
     it('debe usar parámetro de días correctamente', async () => {
@@ -1050,7 +1079,8 @@ describe('RemitoService', () => {
       const result = await remitoService.obtenerPrestamosVencidos();
 
       expect(result).toBeDefined();
-      expect(result.prestamos).toHaveLength(1);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(1);
     });
 
     it('debe retornar array vacío si no hay préstamos vencidos', async () => {
@@ -1058,7 +1088,8 @@ describe('RemitoService', () => {
 
       const result = await remitoService.obtenerPrestamosVencidos();
 
-      expect(result.prestamos).toHaveLength(0);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(0);
     });
   });
 
