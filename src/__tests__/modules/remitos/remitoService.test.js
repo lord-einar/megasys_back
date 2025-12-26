@@ -30,7 +30,8 @@ jest.mock('../../../models', () => {
       create: jest.fn(),
       findByPk: jest.fn(),
       findOne: jest.fn(),
-      findAll: jest.fn()
+      findAll: jest.fn(),
+      count: jest.fn()
     },
     Inventario: {
       create: jest.fn(),
@@ -874,6 +875,220 @@ describe('RemitoService', () => {
       await expect(
         remitoService.validarArticuloNoEnTransito('uuid-inv')
       ).rejects.toThrow('ya está en el remito');
+    });
+  });
+
+  describe('asignarReceptor()', () => {
+    const remitoId = 'uuid-remito';
+    const receptorNombre = 'Juan Pérez';
+    const receptorEmail = 'juan@example.com';
+    const usuarioEmail = 'admin@megatlon.com.ar';
+
+    beforeEach(() => {
+      jest.restoreAllMocks();
+
+      Remito.findByPk = jest.fn().mockResolvedValue({
+        id: remitoId,
+        numero_remito: 'REM-2025-001',
+        estado: 'en_transito',
+        receptor_nombre: null,
+        receptor_email: null,
+        detalles: [],
+        update: jest.fn().mockResolvedValue(true),
+        save: jest.fn().mockResolvedValue(true),
+        toJSON: function() { return this; },
+        solicitante: { email: 'solicitante@test.com' },
+        sedeDestino: { nombre_sede: 'Sede B' }
+      });
+    });
+
+    it('debe asignar receptor exitosamente', async () => {
+      const result = await remitoService.asignarReceptor(
+        remitoId,
+        receptorNombre,
+        receptorEmail,
+        usuarioEmail
+      );
+
+      expect(result).toBeDefined();
+      expect(Remito.findByPk).toHaveBeenCalledWith(remitoId, expect.any(Object));
+    });
+
+    it('debe lanzar error si remito no existe', async () => {
+      Remito.findByPk = jest.fn().mockResolvedValue(null);
+
+      await expect(
+        remitoService.asignarReceptor(remitoId, receptorNombre, receptorEmail, usuarioEmail)
+      ).rejects.toThrow('El remito no existe');
+    });
+
+    it('debe lanzar error si remito no está en tránsito', async () => {
+      Remito.findByPk = jest.fn().mockResolvedValue({
+        id: remitoId,
+        estado: 'preparado'
+      });
+
+      await expect(
+        remitoService.asignarReceptor(remitoId, receptorNombre, receptorEmail, usuarioEmail)
+      ).rejects.toThrow('solo puede asignarse');
+    });
+  });
+
+  describe('confirmarRecepcion()', () => {
+    const remitoId = 'uuid-remito';
+    const validToken = 'valid-jwt-token';
+
+    beforeEach(() => {
+      jest.restoreAllMocks();
+
+      // Mock tokenService
+      const tokenService = require('../../../shared/services/tokenService');
+      tokenService.validarTokenConfirmacion = jest.fn().mockReturnValue({
+        remitoId: remitoId,
+        email: 'receptor@test.com'
+      });
+
+      Remito.findByPk = jest.fn().mockResolvedValue({
+        id: remitoId,
+        numero_remito: 'REM-2025-001',
+        estado: 'en_transito',
+        save: jest.fn().mockResolvedValue(true),
+        detalles: []
+      });
+    });
+
+    it('debe confirmar recepción con token válido', async () => {
+      const result = await remitoService.confirmarRecepcion(remitoId, validToken);
+
+      expect(result).toBeDefined();
+      expect(mockTransaction.commit).toHaveBeenCalled();
+    });
+
+    it('debe lanzar error con token inválido', async () => {
+      const tokenService = require('../../../shared/services/tokenService');
+      tokenService.validarTokenConfirmacion = jest.fn().mockImplementation(() => {
+        throw new Error('inválido o expirado');
+      });
+
+      await expect(
+        remitoService.confirmarRecepcion(remitoId, 'invalid-token')
+      ).rejects.toThrow('Token de confirmación');
+    });
+
+    it('debe lanzar error si token no corresponde al remito', async () => {
+      const tokenService = require('../../../shared/services/tokenService');
+      tokenService.validarTokenConfirmacion = jest.fn().mockReturnValue({
+        remitoId: 'otro-uuid',
+        email: 'receptor@test.com'
+      });
+
+      await expect(
+        remitoService.confirmarRecepcion(remitoId, validToken)
+      ).rejects.toThrow('no corresponde a este remito');
+    });
+
+    it('debe lanzar error si remito no existe', async () => {
+      Remito.findByPk = jest.fn().mockResolvedValue(null);
+
+      await expect(
+        remitoService.confirmarRecepcion(remitoId, validToken)
+      ).rejects.toThrow('no existe');
+    });
+  });
+
+  describe('obtenerPrestamosProximosAVencer()', () => {
+    it('debe obtener préstamos próximos a vencer', async () => {
+      RemitoDetalle.findAll = jest.fn().mockResolvedValue([
+        {
+          id: 'det-1',
+          es_prestamo: true,
+          devuelto: false,
+          fecha_devolucion_esperada: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
+        },
+        {
+          id: 'det-2',
+          es_prestamo: true,
+          devuelto: false,
+          fecha_devolucion_esperada: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
+        }
+      ]);
+
+      const result = await remitoService.obtenerPrestamosProximosAVencer(7);
+
+      expect(result).toBeDefined();
+      expect(result.prestamos).toHaveLength(2);
+    });
+
+    it('debe retornar array vacío si no hay préstamos próximos', async () => {
+      RemitoDetalle.findAll = jest.fn().mockResolvedValue([]);
+
+      const result = await remitoService.obtenerPrestamosProximosAVencer(7);
+
+      expect(result.prestamos).toHaveLength(0);
+    });
+
+    it('debe usar parámetro de días correctamente', async () => {
+      RemitoDetalle.findAll = jest.fn().mockResolvedValue([]);
+
+      await remitoService.obtenerPrestamosProximosAVencer(14);
+
+      expect(RemitoDetalle.findAll).toHaveBeenCalled();
+    });
+  });
+
+  describe('obtenerPrestamosVencidos()', () => {
+    it('debe obtener préstamos vencidos', async () => {
+      RemitoDetalle.findAll = jest.fn().mockResolvedValue([
+        {
+          id: 'det-1',
+          es_prestamo: true,
+          devuelto: false,
+          fecha_devolucion_esperada: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+        }
+      ]);
+
+      const result = await remitoService.obtenerPrestamosVencidos();
+
+      expect(result).toBeDefined();
+      expect(result.prestamos).toHaveLength(1);
+    });
+
+    it('debe retornar array vacío si no hay préstamos vencidos', async () => {
+      RemitoDetalle.findAll = jest.fn().mockResolvedValue([]);
+
+      const result = await remitoService.obtenerPrestamosVencidos();
+
+      expect(result.prestamos).toHaveLength(0);
+    });
+  });
+
+  describe('obtenerResumenPrestamos()', () => {
+    it('debe obtener resumen de préstamos completo', async () => {
+      // Mock para count (3 llamadas: próximos a vencer, vencidos, total activos)
+      RemitoDetalle.count = jest.fn()
+        .mockResolvedValueOnce(1) // Próximos a vencer
+        .mockResolvedValueOnce(1) // Vencidos
+        .mockResolvedValueOnce(2); // Total activos
+
+      const result = await remitoService.obtenerResumenPrestamos();
+
+      expect(result).toBeDefined();
+      expect(result.totalActivos).toBe(2);
+      expect(result.proximosAVencer).toBe(1);
+      expect(result.vencidos).toBe(1);
+    });
+
+    it('debe manejar caso sin préstamos', async () => {
+      RemitoDetalle.count = jest.fn()
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0);
+
+      const result = await remitoService.obtenerResumenPrestamos();
+
+      expect(result.totalActivos).toBe(0);
+      expect(result.proximosAVencer).toBe(0);
+      expect(result.vencidos).toBe(0);
     });
   });
 });
