@@ -41,12 +41,16 @@ const corsOptions = {
       }
     }
 
-    // En producción, usar CORS_ORIGIN del .env
-    const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
-    if (origin === allowedOrigin) {
+    // En producción, usar lista de orígenes permitidos (separados por coma)
+    const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+      .split(',')
+      .map(o => o.trim());
+
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
+    logger.warn('Origen bloqueado por CORS:', { origin, allowedOrigins });
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
@@ -84,25 +88,10 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Servir archivos estáticos (PDFs generados)
-const storageRemitosPath = path.join(__dirname, '..', 'storage', 'remitos');
-const storageConfirmacionesPath = path.join(__dirname, '..', 'storage', 'confirmaciones');
-
-// Asegurar que los directorios existan
-[storageRemitosPath, storageConfirmacionesPath].forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-    logger.info(`Directorio de almacenamiento creado: ${dir}`);
-  }
-});
-
-// Servir PDFs de remitos
-app.use('/storage/remitos', express.static(storageRemitosPath));
-
-// Servir PDFs de confirmaciones
-app.use('/storage/confirmaciones', express.static(storageConfirmacionesPath));
-
-logger.info('✅ Almacenamiento de archivos estáticos configurado');
+// Nota: Los PDFs ahora se almacenan en Cloudflare R2, no localmente
+// Las rutas /storage/* ya no se sirven desde el servidor
+// Los PDFs se acceden directamente desde R2 via URLs públicas
+logger.info('✅ Storage configurado: PDFs en Cloudflare R2');
 
 // Función para cargar rutas de forma segura
 const loadRoutes = (routePath, mountPath) => {

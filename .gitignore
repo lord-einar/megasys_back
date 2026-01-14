@@ -1,5 +1,9 @@
-ode_modules/
+node_modules/
 .env
+.env.local
+.env.production
+.env.staging
+.env.*.local
 *.log
 logs/
 coverage/
@@ -10,3 +14,24 @@ build/
 *.tmp
 *.temp
 package-lock.json
+
+# Archivos de configuración con credenciales
+config/config.json
+
+# Storage local (ya no se usa, PDFs van a Cloudflare R2)
+storage/
+
+# Archivos de backup
+*_backup/
+*.backup
+backups/
+
+# Archivos temporales de deployment
+.railway/
+.vercel/
+
+# Secrets y keys
+*.pem
+*.key
+*.cert
+secrets/

@@ -33,25 +33,28 @@ const logger = winston.createLogger({
   ]
 });
 
-// En desarrollo, también mostrar en consola
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.colorize(),
-      winston.format.simple(),
-      winston.format.printf(({ timestamp, level, message, service, ...meta }) => {
-        let output = `${timestamp} [${level}]: ${message}`;
-        
-        // Agregar información adicional si existe
-        if (Object.keys(meta).length > 0) {
-          output += `\n${JSON.stringify(meta, null, 2)}`;
-        }
-        
-        return output;
-      })
-    )
-  }));
-}
+// SIEMPRE mostrar en consola (Railway captura logs desde stdout/stderr)
+logger.add(new winston.transports.Console({
+  format: winston.format.combine(
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    process.env.NODE_ENV === 'production'
+      ? winston.format.json()  // JSON en producción para Railway
+      : winston.format.combine(
+          winston.format.colorize(),
+          winston.format.simple(),
+          winston.format.printf(({ timestamp, level, message, service, ...meta }) => {
+            let output = `${timestamp} [${level}]: ${message}`;
+
+            // Agregar información adicional si existe
+            if (Object.keys(meta).length > 0) {
+              output += `\n${JSON.stringify(meta, null, 2)}`;
+            }
+
+            return output;
+          })
+        )
+  )
+}));
 
 // Manejo de excepciones no capturadas
 logger.exceptions.handle(

@@ -6,24 +6,12 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 const logger = require('../utils/logger');
+const storageService = require('./storageService');
 
 class PDFService {
   constructor() {
-    this.storagePath = process.env.PDF_STORAGE_PATH ||
-      path.join(__dirname, '../../..', 'storage/remitos');
-    this.confirmacionPath = process.env.PDF_CONFIRMACION_PATH ||
-      path.join(__dirname, '../../..', 'storage/confirmaciones');
+    // Los PDFs ahora se almacenan en Cloudflare R2, no localmente
     this.logoPath = path.join(__dirname, '../assets/image17.png');
-    this.ensureDirectoriesExist();
-  }
-
-  ensureDirectoriesExist() {
-    [this.storagePath, this.confirmacionPath].forEach(dir => {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-        logger.info(`Directorio PDF creado: ${dir}`);
-      }
-    });
   }
 
   generarNombreArchivo(numeroRemito, confirmado = false) {
@@ -33,43 +21,52 @@ class PDFService {
     return `${yyyymmdd}_${numeroRemito}${sufijo}.pdf`;
   }
 
-  obtenerRutaArchivo(nombreArchivo, confirmado = false) {
-    const dir = confirmado ? this.confirmacionPath : this.storagePath;
-    return path.join(dir, nombreArchivo);
-  }
-
   async generarPDF(remito, options = {}) {
     try {
       const nombreArchivo = this.generarNombreArchivo(remito.numero_remito, options.confirmado);
-      const rutaArchivo = this.obtenerRutaArchivo(nombreArchivo, options.confirmado);
+      const folder = options.confirmado ? 'confirmaciones' : 'remitos';
 
       const doc = new PDFDocument({
         size: 'A4',
         margin: 20
       });
 
-      const stream = fs.createWriteStream(rutaArchivo);
-      doc.pipe(stream);
+      // Generar PDF en memoria (buffer)
+      const chunks = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => {});
 
       await this.dibujarPDF(doc, remito, options);
 
       doc.end();
 
       return new Promise((resolve, reject) => {
-        stream.on('finish', () => {
-          logger.info('PDF generado exitosamente:', {
-            remito: remito.numero_remito,
-            archivo: nombreArchivo,
-            tamaño: fs.statSync(rutaArchivo).size
-          });
-          resolve({
-            success: true,
-            path: rutaArchivo,
-            filename: nombreArchivo,
-            size: fs.statSync(rutaArchivo).size
-          });
+        doc.on('end', async () => {
+          try {
+            const pdfBuffer = Buffer.concat(chunks);
+
+            // Subir a Azure Blob Storage
+            const url = await storageService.uploadPDF(pdfBuffer, nombreArchivo, folder);
+
+            logger.info('PDF generado y subido exitosamente:', {
+              remito: remito.numero_remito,
+              archivo: nombreArchivo,
+              tamaño: pdfBuffer.length,
+              url: url
+            });
+
+            resolve({
+              success: true,
+              url: url,
+              filename: nombreArchivo,
+              size: pdfBuffer.length
+            });
+          } catch (error) {
+            reject(error);
+          }
         });
-        stream.on('error', reject);
+
+        doc.on('error', reject);
       });
     } catch (error) {
       logger.error('Error generando PDF:', { error: error.message, remito: remito.numero_remito });
@@ -322,20 +319,24 @@ class PDFService {
     doc.restore();
   }
 
-  obtenerArchivoPDF(numeroRemito, confirmado = false) {
+  async obtenerArchivoPDF(numeroRemito, confirmado = false) {
     try {
       const nombreArchivo = this.generarNombreArchivo(numeroRemito, confirmado);
-      const rutaArchivo = this.obtenerRutaArchivo(nombreArchivo, confirmado);
+      const folder = confirmado ? 'confirmaciones' : 'remitos';
 
-      if (!fs.existsSync(rutaArchivo)) {
+      // Verificar si existe en Azure Blob
+      const exists = await storageService.existsPDF(nombreArchivo, folder);
+
+      if (!exists) {
         throw new Error(`Archivo PDF no encontrado: ${nombreArchivo}`);
       }
 
+      const url = storageService.getPDFUrl(nombreArchivo, folder);
+
       return {
         success: true,
-        path: rutaArchivo,
-        filename: nombreArchivo,
-        size: fs.statSync(rutaArchivo).size
+        url: url,
+        filename: nombreArchivo
       };
     } catch (error) {
       logger.error('Error obteniendo PDF:', { error: error.message });
