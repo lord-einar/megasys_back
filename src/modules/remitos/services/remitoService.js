@@ -1432,7 +1432,7 @@ class RemitoService {
         logger.info('✓ PDF CONFIRMADO GENERADO EXITOSAMENTE', {
           remitoId,
           numeroRemito: remito.numero_remito,
-          rutaPDF: resultadoPDFConfirmado.path,
+          rutaPDF: resultadoPDFConfirmado.url,
           tamaño: resultadoPDFConfirmado.size,
           estado: remitoCompleto.estado,
           timestamp: new Date().toISOString()
@@ -1476,7 +1476,7 @@ class RemitoService {
         try {
           await emailService.enviarConfirmacionRecepcion(
             remitoCompleto,
-            resultadoPDFConfirmado.path,
+            resultadoPDFConfirmado.url,
             tokenPayload.email,
             fechaConfirmacion
           );
@@ -1489,9 +1489,8 @@ class RemitoService {
         }
       });
 
-      // Extraer solo el nombre del archivo para que el cliente pueda descargarlo vía /storage/confirmaciones
-      const nombreArchivoConfirmacion = resultadoPDFConfirmado.path.split('/').pop();
-      const rutaPDFParaCliente = `/storage/confirmaciones/${nombreArchivoConfirmacion}`;
+      // Extraer solo el nombre del archivo para que el cliente pueda descargarlo
+      const rutaPDFParaCliente = resultadoPDFConfirmado.url;
 
       return {
         success: true,
