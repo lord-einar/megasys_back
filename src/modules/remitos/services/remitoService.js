@@ -524,63 +524,63 @@ class RemitoService {
         // Enviar emails SOLO cuando el estado es "en_transito" (asincrónico, en background)
         // Los emails se enviarán cuando el estado cambie a "en_transito" via cambiarEstado()
         if (remito.estado === 'en_transito') {
-        setImmediate(async () => {
-          try {
-            logger.info('=== ENVÍO DE EMAILS - INICIANDO ===', {
-              remitoId: remito.id,
-              numeroRemito: remitoCompleto.numero_remito,
-              timestamp: new Date().toISOString()
-            });
+          setImmediate(async () => {
+            try {
+              logger.info('=== ENVÍO DE EMAILS - INICIANDO ===', {
+                remitoId: remito.id,
+                numeroRemito: remitoCompleto.numero_remito,
+                timestamp: new Date().toISOString()
+              });
 
-            // Email a infraestructura
-            logger.info('📧 Enviando email a infraestructura...', {
-              remitoId: remito.id,
-              numeroRemito: remitoCompleto.numero_remito,
-              destinatario: 'infraestructura@megatlon.com.ar'
-            });
-            await emailService.enviarAInfraestructura(remitoCompleto, resultadoPDF.path);
-            logger.info('✓ EMAIL A INFRAESTRUCTURA ENVIADO', {
-              remitoId: remito.id,
-              numeroRemito: remitoCompleto.numero_remito,
-              destinatario: 'infraestructura@megatlon.com.ar',
-              timestamp: new Date().toISOString()
-            });
+              // Email a infraestructura
+              logger.info('📧 Enviando email a infraestructura...', {
+                remitoId: remito.id,
+                numeroRemito: remitoCompleto.numero_remito,
+                destinatario: 'infraestructura@megatlon.com.ar'
+              });
+              await emailService.enviarAInfraestructura(remitoCompleto, resultadoPDF.path);
+              logger.info('✓ EMAIL A INFRAESTRUCTURA ENVIADO', {
+                remitoId: remito.id,
+                numeroRemito: remitoCompleto.numero_remito,
+                destinatario: 'infraestructura@megatlon.com.ar',
+                timestamp: new Date().toISOString()
+              });
 
-            // Email al solicitante con link de confirmación
-            logger.info('📧 Enviando email al solicitante...', {
-              remitoId: remito.id,
-              numeroRemito: remitoCompleto.numero_remito,
-              destinatario: remitoCompleto.solicitante?.email
-            });
-            const urlConfirmacion = tokenService.generarUrlConfirmacion(
-              remitoCompleto.id,
-              remitoCompleto.solicitante?.email,
-              process.env.FRONTEND_URL || 'http://localhost:3000'
-            );
-            await emailService.enviarAlSolicitante(remitoCompleto, resultadoPDF.path, urlConfirmacion);
-            logger.info('✓ EMAIL AL SOLICITANTE ENVIADO', {
-              remitoId: remito.id,
-              numeroRemito: remitoCompleto.numero_remito,
-              destinatario: remitoCompleto.solicitante?.email,
-              timestamp: new Date().toISOString()
-            });
+              // Email al solicitante con link de confirmación
+              logger.info('📧 Enviando email al solicitante...', {
+                remitoId: remito.id,
+                numeroRemito: remitoCompleto.numero_remito,
+                destinatario: remitoCompleto.solicitante?.email
+              });
+              const urlConfirmacion = tokenService.generarUrlConfirmacion(
+                remitoCompleto.id,
+                remitoCompleto.solicitante?.email,
+                process.env.FRONTEND_URL || 'http://localhost:3000'
+              );
+              await emailService.enviarAlSolicitante(remitoCompleto, resultadoPDF.path, urlConfirmacion);
+              logger.info('✓ EMAIL AL SOLICITANTE ENVIADO', {
+                remitoId: remito.id,
+                numeroRemito: remitoCompleto.numero_remito,
+                destinatario: remitoCompleto.solicitante?.email,
+                timestamp: new Date().toISOString()
+              });
 
-            logger.info('=== ENVÍO DE EMAILS - COMPLETADO EXITOSAMENTE ===', {
-              remitoId: remito.id,
-              numeroRemito: remitoCompleto.numero_remito,
-              timestamp: new Date().toISOString()
-            });
-          } catch (emailError) {
-            logger.error('✗ ERROR ENVIANDO EMAILS', {
-              remitoId: remito.id,
-              numeroRemito: remitoCompleto.numero_remito,
-              error: emailError.message,
-              stack: emailError.stack,
-              timestamp: new Date().toISOString()
-            });
-            // No lanzar el error para no afectar la creación del remito
-          }
-        });
+              logger.info('=== ENVÍO DE EMAILS - COMPLETADO EXITOSAMENTE ===', {
+                remitoId: remito.id,
+                numeroRemito: remitoCompleto.numero_remito,
+                timestamp: new Date().toISOString()
+              });
+            } catch (emailError) {
+              logger.error('✗ ERROR ENVIANDO EMAILS', {
+                remitoId: remito.id,
+                numeroRemito: remitoCompleto.numero_remito,
+                error: emailError.message,
+                stack: emailError.stack,
+                timestamp: new Date().toISOString()
+              });
+              // No lanzar el error para no afectar la creación del remito
+            }
+          });
         } else {
           logger.info('⏭️ Envío de emails será realizado cuando el estado cambie a "en_transito"', {
             remitoId: remito.id,
@@ -922,22 +922,27 @@ class RemitoService {
             const remitoCompleto = await this.obtener(remitoId);
 
             // Obtener o regenerar PDF
+            // Obtener o regenerar PDF
             const nombreArchivo = pdfService.generarNombreArchivo(remito.numero_remito, false);
-            const rutaArchivo = pdfService.obtenerRutaArchivo(nombreArchivo, false);
+            let rutaPDFParaEmail;
 
-            const fs = require('fs');
-            let rutaPDFParaEmail = rutaArchivo;
+            try {
+              const infoPDF = await pdfService.obtenerArchivoPDF(remito.numero_remito, false);
+              rutaPDFParaEmail = infoPDF.url;
+              logger.info('✓ PDF encontrado en Storage', { url: rutaPDFParaEmail });
+            } catch (error) {
+              logger.warn('⚠️ PDF no encontrado en Storage, regenerando para envío de emails...');
 
-            if (!fs.existsSync(rutaArchivo)) {
-              logger.warn('⚠️ PDF no encontrado, regenerando para envío de emails...', { rutaArchivo });
               const remitoJSON = remitoCompleto.toJSON();
               // Asegurar que el estado en el PDF sea el nuevo estado
               remitoJSON.estado = nuevoEstado;
               remitoJSON.es_prestamo = remitoCompleto.detalles && remitoCompleto.detalles.some(d => d.es_prestamo);
+
               const resultadoPDF = await pdfService.generarPDF(remitoJSON, { confirmado: false });
-              rutaPDFParaEmail = resultadoPDF.path;
-              logger.info('✓ PDF regenerado para envío', {
-                rutaPDF: resultadoPDF.path,
+              rutaPDFParaEmail = resultadoPDF.url;
+
+              logger.info('✓ PDF regenerado y subido para envío', {
+                url: resultadoPDF.url,
                 tamaño: resultadoPDF.size,
                 estado: nuevoEstado
               });
@@ -1579,27 +1584,31 @@ class RemitoService {
       });
 
       // 2. Verificar si el PDF existe
+      // 2. Verificar si el PDF existe en Storage
       const nombreArchivo = pdfService.generarNombreArchivo(remito.numero_remito, false);
-      const rutaArchivo = pdfService.obtenerRutaArchivo(nombreArchivo, false);
+      let rutaArchivo;
 
-      const fs = require('fs');
-      if (!fs.existsSync(rutaArchivo)) {
-        logger.warn('⚠ PDF no encontrado, regenerando...', { rutaArchivo });
+      try {
+        const infoPDF = await pdfService.obtenerArchivoPDF(remito.numero_remito, false);
+        rutaArchivo = infoPDF.url;
+        logger.info('✓ PDF encontrado en Storage', {
+          remitoId,
+          url: rutaArchivo
+        });
+      } catch (error) {
+        logger.warn('⚠ PDF no encontrado en Storage, regenerando...');
+
         // Regenerar PDF
-        const remitoCompleto = remito.toJSON();
-        remitoCompleto.es_prestamo = remito.detalles && remito.detalles.some(d => d.es_prestamo);
-        const resultadoPDF = await pdfService.generarPDF(remitoCompleto, { confirmado: false });
+        const remitoCompletoJSON = remito.toJSON();
+        remitoCompletoJSON.es_prestamo = remito.detalles && remito.detalles.some(d => d.es_prestamo);
+
+        const resultadoPDF = await pdfService.generarPDF(remitoCompletoJSON, { confirmado: false });
+        rutaArchivo = resultadoPDF.url;
+
         logger.info('✓ PDF regenerado exitosamente', {
           remitoId,
-          rutaPDF: resultadoPDF.path,
+          url: resultadoPDF.url,
           tamaño: resultadoPDF.size
-        });
-        rutaArchivo = resultadoPDF.path;
-      } else {
-        logger.info('✓ PDF encontrado', {
-          remitoId,
-          rutaPDF: rutaArchivo,
-          tamaño: fs.statSync(rutaArchivo).size
         });
       }
 

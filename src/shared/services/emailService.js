@@ -195,7 +195,7 @@ class EmailService {
         remito: remito.numero_remito,
         to: EMAIL_INFRAESTRUCTURA,
         from: EMAIL_FROM,
-        pdfExists: require('fs').existsSync(rutaPDF)
+        pdfUrl: rutaPDF
       });
 
       const html = this.generarHTMLInfraestructura(remito);
@@ -210,7 +210,7 @@ class EmailService {
         },
         attachments: [
           {
-            filename: require('path').basename(rutaPDF),
+            filename: `Remito_${remito.numero_remito}.pdf`,
             path: rutaPDF
           }
         ]
@@ -341,7 +341,7 @@ class EmailService {
       logger.info('📧 [SOLICITANTE] Iniciando envío...', {
         remito: remito.numero_remito,
         email: remito.solicitante?.email,
-        pdfExists: require('fs').existsSync(rutaPDF),
+        pdfUrl: rutaPDF,
         urlConfirmacionLength: urlConfirmacion?.length || 0,
         remitoKeys: Object.keys(remito),
         solicitanteObject: remito.solicitante
@@ -383,7 +383,7 @@ class EmailService {
         },
         attachments: [
           {
-            filename: require('path').basename(rutaPDF),
+            filename: `Remito_${remito.numero_remito}.pdf`,
             path: rutaPDF
           }
         ]
@@ -536,7 +536,7 @@ class EmailService {
         },
         attachments: [
           {
-            filename: require('path').basename(rutaPDF),
+            filename: `Remito_${remito.numero_remito}_Confirmado.pdf`,
             path: rutaPDF
           }
         ]
