@@ -1642,89 +1642,77 @@ class RemitoService {
       const remitoCompleto = await this.obtener(remitoId);
 
       // Ejecutar envío de emails en segundo plano para evitar timeouts
-      setImmediate(async () => {
+      // 3. Reenviar email a infraestructura
+      try {
+        logger.info('📧 Enviando email a infraestructura...', {
+          remitoId,
+          numeroRemito: remitoCompleto.numero_remito,
+          emailInfraestructura: process.env.EMAIL_INFRAESTRUCTURA || 'infraestructura@megatlon.com.ar'
+        });
+        // Descargar el PDF como buffer para enviar (si no se obtuvo antes al generar)
+        let pdfBuffer = null;
         try {
-          // 3. Reenviar email a infraestructura
-          try {
-            logger.info('📧 Enviando email a infraestructura...', {
-              remitoId,
-              numeroRemito: remitoCompleto.numero_remito,
-              emailInfraestructura: process.env.EMAIL_INFRAESTRUCTURA || 'infraestructura@megatlon.com.ar'
-            });
-            // Descargar el PDF como buffer para enviar (si no se obtuvo antes al generar)
-            let pdfBuffer = null;
-            try {
-              const res = await pdfService.downloadArchivoPDF(remitoCompleto.numero_remito, false);
-              pdfBuffer = res.buffer;
-            } catch (err) {
-              logger.warn('Error descargando PDF para reenvío, se intentará con URL:', err.message);
-            }
-
-            await emailService.enviarAInfraestructura(remitoCompleto, rutaArchivo, pdfBuffer);
-            logger.info('✓ Email a infraestructura enviado exitosamente', {
-              remitoId,
-              numeroRemito: remitoCompleto.numero_remito,
-              timestamp: new Date().toISOString()
-            });
-          } catch (emailError) {
-            logger.error('✗ Error enviando email a infraestructura', {
-              remitoId,
-              numeroRemito: remitoCompleto.numero_remito,
-              error: emailError.message,
-              timestamp: new Date().toISOString()
-            });
-            // No hacemos throw aquí para intentar enviar al solicitante
-          }
-
-          // 4. Reenviar email al solicitante con link de confirmación
-          try {
-            logger.info('📧 Enviando email al solicitante...', {
-              remitoId,
-              numeroRemito: remitoCompleto.numero_remito,
-              emailSolicitante: remitoCompleto.solicitante?.email,
-              solicitanteName: `${remitoCompleto.solicitante?.nombre} ${remitoCompleto.solicitante?.apellido}`
-            });
-            const urlConfirmacion = tokenService.generarUrlConfirmacion(
-              remitoCompleto.id,
-              remitoCompleto.solicitante?.email,
-              process.env.FRONTEND_URL || 'http://localhost:3000'
-            );
-
-            // Descargar el PDF como buffer para enviar de nuevo si es necesario (o reusar si se pudiera refactorizar)
-            // Simplemente llamamos con null si no lo tenemos, o intentamos descargar de nuevo.
-            // Para simplicidad y robustez, intentamos descargar de nuevo si no lo tenemos.
-            // O mejor: usar el mismo buffer si ya lo descargamos arriba.
-            // Pero como esta en sub-scope, mejor lo re-descargamos o lo movemos arriba.
-            // Vamos a re-descargar para simplificar el cambio de scope.
-            let pdfBufferSolicitante = null;
-            try {
-              // Optimización: Si ya descargamos arriba, podríamos guardarlo.
-              // Pero como es async background, no importa tanto la latencia extra.
-              const res = await pdfService.downloadArchivoPDF(remitoCompleto.numero_remito, false);
-              pdfBufferSolicitante = res.buffer;
-            } catch (err) { }
-
-            await emailService.enviarAlSolicitante(remitoCompleto, rutaArchivo, urlConfirmacion, pdfBufferSolicitante);
-
-            logger.info('✓ Email al solicitante enviado exitosamente', {
-              remitoId,
-              numeroRemito: remitoCompleto.numero_remito,
-              emailSolicitante: remitoCompleto.solicitante?.email,
-              timestamp: new Date().toISOString()
-            });
-          } catch (emailError) {
-            logger.error('✗ Error enviando email al solicitante', {
-              remitoId,
-              numeroRemito: remitoCompleto.numero_remito,
-              emailSolicitante: remitoCompleto.solicitante?.email,
-              error: emailError.message,
-              timestamp: new Date().toISOString()
-            });
-          }
-        } catch (backgroundError) {
-          logger.error('Error general en background process de reenvío:', backgroundError);
+          const res = await pdfService.downloadArchivoPDF(remitoCompleto.numero_remito, false);
+          pdfBuffer = res.buffer;
+        } catch (err) {
+          logger.warn('Error descargando PDF para reenvío, se intentará con URL:', err.message);
         }
-      });
+
+        await emailService.enviarAInfraestructura(remitoCompleto, rutaArchivo, pdfBuffer);
+        logger.info('✓ Email a infraestructura enviado exitosamente', {
+          remitoId,
+          numeroRemito: remitoCompleto.numero_remito,
+          timestamp: new Date().toISOString()
+        });
+      } catch (emailError) {
+        logger.error('✗ Error enviando email a infraestructura', {
+          remitoId,
+          numeroRemito: remitoCompleto.numero_remito,
+          error: emailError.message,
+          timestamp: new Date().toISOString()
+        });
+        throw new Error(`Error enviando email a infraestructura: ${emailError.message}`);
+      }
+
+      // 4. Reenviar email al solicitante con link de confirmación
+      try {
+        logger.info('📧 Enviando email al solicitante...', {
+          remitoId,
+          numeroRemito: remitoCompleto.numero_remito,
+          emailSolicitante: remitoCompleto.solicitante?.email,
+          solicitanteName: `${remitoCompleto.solicitante?.nombre} ${remitoCompleto.solicitante?.apellido}`
+        });
+        const urlConfirmacion = tokenService.generarUrlConfirmacion(
+          remitoCompleto.id,
+          remitoCompleto.solicitante?.email,
+          process.env.FRONTEND_URL || 'http://localhost:3000'
+        );
+
+        // Descargar el PDF como buffer para enviar de nuevo si es necesario
+        let pdfBufferSolicitante = null;
+        try {
+          const res = await pdfService.downloadArchivoPDF(remitoCompleto.numero_remito, false);
+          pdfBufferSolicitante = res.buffer;
+        } catch (err) { }
+
+        await emailService.enviarAlSolicitante(remitoCompleto, rutaArchivo, urlConfirmacion, pdfBufferSolicitante);
+
+        logger.info('✓ Email al solicitante enviado exitosamente', {
+          remitoId,
+          numeroRemito: remitoCompleto.numero_remito,
+          emailSolicitante: remitoCompleto.solicitante?.email,
+          timestamp: new Date().toISOString()
+        });
+      } catch (emailError) {
+        logger.error('✗ Error enviando email al solicitante', {
+          remitoId,
+          numeroRemito: remitoCompleto.numero_remito,
+          emailSolicitante: remitoCompleto.solicitante?.email,
+          error: emailError.message,
+          timestamp: new Date().toISOString()
+        });
+        throw new Error(`Error enviando email al solicitante: ${emailError.message}`);
+      }
 
       logger.info('=== REENVÍO DE EMAILS - COMPLETADO EXITOSAMENTE ===', {
         remitoId,
