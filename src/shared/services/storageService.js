@@ -37,6 +37,11 @@ class StorageService {
         accessKeyId: this.accessKeyId,
         secretAccessKey: this.secretAccessKey,
       },
+      // Timeouts para evitar bloqueos en cloud environments
+      requestHandler: {
+        requestTimeout: 30000, // 30 segundos timeout para requests
+        connectionTimeout: 10000, // 10 segundos para establecer conexión
+      },
     });
 
     this.enabled = true;
@@ -197,6 +202,8 @@ class StorageService {
       const { GetObjectCommand } = require('@aws-sdk/client-s3');
       const key = `${folder}/${filename}`;
 
+      logger.info('Descargando PDF de R2:', { key, bucket: this.bucketName });
+
       const command = new GetObjectCommand({
         Bucket: this.bucketName,
         Key: key,
@@ -204,16 +211,40 @@ class StorageService {
 
       const response = await this.s3Client.send(command);
 
-      // Convertir stream a buffer
-      const streamToBuffer = (stream) =>
+      // Convertir stream a buffer con timeout de 30 segundos
+      const streamToBuffer = (stream, timeoutMs = 30000) =>
         new Promise((resolve, reject) => {
           const chunks = [];
+          let completed = false;
+
+          const timeout = setTimeout(() => {
+            if (!completed) {
+              completed = true;
+              stream.destroy();
+              reject(new Error(`Timeout descargando PDF después de ${timeoutMs}ms`));
+            }
+          }, timeoutMs);
+
           stream.on('data', (chunk) => chunks.push(chunk));
-          stream.on('error', reject);
-          stream.on('end', () => resolve(Buffer.concat(chunks)));
+          stream.on('error', (err) => {
+            if (!completed) {
+              completed = true;
+              clearTimeout(timeout);
+              reject(err);
+            }
+          });
+          stream.on('end', () => {
+            if (!completed) {
+              completed = true;
+              clearTimeout(timeout);
+              resolve(Buffer.concat(chunks));
+            }
+          });
         });
 
-      return streamToBuffer(response.Body);
+      const buffer = await streamToBuffer(response.Body);
+      logger.info('PDF descargado exitosamente de R2:', { key, size: buffer.length });
+      return buffer;
     } catch (error) {
       logger.error('Error descargando PDF de R2:', {
         error: error.message,
