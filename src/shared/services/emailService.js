@@ -15,10 +15,18 @@ const SMTP_CONFIG = {
     pass: process.env.SMTP_PASSWORD
   },
   tls: {
-    ciphers: 'SSLv3',
+    minVersion: 'TLSv1.2',
     rejectUnauthorized: false
   },
-  requireTLS: true
+  requireTLS: true,
+  // Timeouts para evitar bloqueos en Railway/cloud environments
+  connectionTimeout: 30000, // 30 segundos para establecer conexión
+  greetingTimeout: 30000,   // 30 segundos para el greeting del servidor
+  socketTimeout: 60000,     // 60 segundos para operaciones de socket
+  // Pool de conexiones para mejor rendimiento
+  pool: true,
+  maxConnections: 3,
+  maxMessages: 100
 };
 
 const EMAIL_FROM = process.env.SMTP_FROM || 'remitos@megatlon.com.ar';
