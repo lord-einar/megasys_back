@@ -34,7 +34,7 @@ class PDFService {
       // Generar PDF en memoria (buffer)
       const chunks = [];
       doc.on('data', (chunk) => chunks.push(chunk));
-      doc.on('end', () => {});
+      doc.on('end', () => { });
 
       await this.dibujarPDF(doc, remito, options);
 
@@ -59,7 +59,8 @@ class PDFService {
               success: true,
               url: url,
               filename: nombreArchivo,
-              size: pdfBuffer.length
+              size: pdfBuffer.length,
+              buffer: pdfBuffer
             });
           } catch (error) {
             reject(error);
@@ -324,7 +325,7 @@ class PDFService {
       const nombreArchivo = this.generarNombreArchivo(numeroRemito, confirmado);
       const folder = confirmado ? 'confirmaciones' : 'remitos';
 
-      // Verificar si existe en Azure Blob
+      // Verificar si existe en Azure Blob (R2)
       const exists = await storageService.existsPDF(nombreArchivo, folder);
 
       if (!exists) {
@@ -340,6 +341,24 @@ class PDFService {
       };
     } catch (error) {
       logger.error('Error obteniendo PDF:', { error: error.message });
+      throw error;
+    }
+  }
+
+  async downloadArchivoPDF(numeroRemito, confirmado = false) {
+    try {
+      const nombreArchivo = this.generarNombreArchivo(numeroRemito, confirmado);
+      const folder = confirmado ? 'confirmaciones' : 'remitos';
+
+      const buffer = await storageService.downloadPDF(nombreArchivo, folder);
+
+      return {
+        success: true,
+        buffer: buffer,
+        filename: nombreArchivo
+      };
+    } catch (error) {
+      logger.error('Error descargando PDF:', { error: error.message });
       throw error;
     }
   }

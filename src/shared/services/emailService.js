@@ -189,16 +189,27 @@ class EmailService {
    * @param {string} rutaPDF - Ruta del archivo PDF
    * @returns {Promise<object>} Resultado del envío
    */
-  async enviarAInfraestructura(remito, rutaPDF) {
+  async enviarAInfraestructura(remito, rutaPDF, pdfBuffer = null) {
     try {
       logger.info('📧 [INFRAESTRUCTURA] Iniciando envío...', {
         remito: remito.numero_remito,
         to: EMAIL_INFRAESTRUCTURA,
         from: EMAIL_FROM,
-        pdfUrl: rutaPDF
+        pdfUrl: rutaPDF,
+        hasBuffer: !!pdfBuffer
       });
 
       const html = this.generarHTMLInfraestructura(remito);
+
+      const attachment = {
+        filename: `Remito_${remito.numero_remito}.pdf`,
+      };
+
+      if (pdfBuffer) {
+        attachment.content = pdfBuffer;
+      } else {
+        attachment.path = rutaPDF;
+      }
 
       const opciones = {
         from: EMAIL_FROM,
@@ -208,12 +219,7 @@ class EmailService {
         headers: {
           'Content-Type': 'text/html; charset=UTF-8'
         },
-        attachments: [
-          {
-            filename: `Remito_${remito.numero_remito}.pdf`,
-            path: rutaPDF
-          }
-        ]
+        attachments: [attachment]
       };
 
       logger.info('📧 [INFRAESTRUCTURA] Enviando...');
@@ -336,12 +342,13 @@ class EmailService {
    * @param {string} urlConfirmacion - URL de confirmación con token
    * @returns {Promise<object>} Resultado del envío
    */
-  async enviarAlSolicitante(remito, rutaPDF, urlConfirmacion) {
+  async enviarAlSolicitante(remito, rutaPDF, urlConfirmacion, pdfBuffer = null) {
     try {
       logger.info('📧 [SOLICITANTE] Iniciando envío...', {
         remito: remito.numero_remito,
         email: remito.solicitante?.email,
         pdfUrl: rutaPDF,
+        hasBuffer: !!pdfBuffer,
         urlConfirmacionLength: urlConfirmacion?.length || 0,
         remitoKeys: Object.keys(remito),
         solicitanteObject: remito.solicitante
@@ -373,6 +380,16 @@ class EmailService {
         remito: remito.numero_remito
       });
 
+      const attachment = {
+        filename: `Remito_${remito.numero_remito}.pdf`,
+      };
+
+      if (pdfBuffer) {
+        attachment.content = pdfBuffer;
+      } else {
+        attachment.path = rutaPDF;
+      }
+
       const opciones = {
         from: EMAIL_FROM,
         to: emailSolicitante,
@@ -381,12 +398,7 @@ class EmailService {
         headers: {
           'Content-Type': 'text/html; charset=UTF-8'
         },
-        attachments: [
-          {
-            filename: `Remito_${remito.numero_remito}.pdf`,
-            path: rutaPDF
-          }
-        ]
+        attachments: [attachment]
       };
 
       logger.info('📧 [SOLICITANTE] Opciones de email preparadas', {
@@ -515,16 +527,27 @@ class EmailService {
    * @param {Date} fechaConfirmacion - Fecha de confirmación
    * @returns {Promise<object>} Resultado del envío
    */
-  async enviarConfirmacionRecepcion(remito, rutaPDF, emailSolicitante, fechaConfirmacion) {
+  async enviarConfirmacionRecepcion(remito, rutaPDF, emailSolicitante, fechaConfirmacion, pdfBuffer = null) {
     try {
       logger.info('📧 INICIANDO ENVÍO DE EMAIL DE CONFIRMACIÓN', {
         remito: remito.numero_remito,
         email: emailSolicitante,
         from: EMAIL_FROM,
-        rutaPDF: rutaPDF
+        rutaPDF: rutaPDF,
+        hasBuffer: !!pdfBuffer
       });
 
       const html = this.generarHTMLConfirmacion(remito, emailSolicitante, fechaConfirmacion);
+
+      const attachment = {
+        filename: `Remito_${remito.numero_remito}_Confirmado.pdf`,
+      };
+
+      if (pdfBuffer) {
+        attachment.content = pdfBuffer;
+      } else {
+        attachment.path = rutaPDF;
+      }
 
       const opciones = {
         from: EMAIL_FROM,
@@ -534,12 +557,7 @@ class EmailService {
         headers: {
           'Content-Type': 'text/html; charset=UTF-8'
         },
-        attachments: [
-          {
-            filename: `Remito_${remito.numero_remito}_Confirmado.pdf`,
-            path: rutaPDF
-          }
-        ]
+        attachments: [attachment]
       };
 
       logger.info('📧 Opciones de email preparadas:', {
@@ -582,7 +600,7 @@ class EmailService {
    * @param {string} urlConfirmacion - URL de confirmación con token
    * @returns {Promise<object>} Resultado del envío
    */
-  async reenviarEmails(remito, rutaPDF, urlConfirmacion) {
+  async reenviarEmails(remito, rutaPDF, urlConfirmacion, pdfBuffer = null) {
     try {
       logger.info('📧 INICIANDO REENVÍO DE EMAILS', {
         remito: remito.numero_remito,
@@ -594,13 +612,13 @@ class EmailService {
 
       // Enviar a infraestructura
       logger.info('📧 Reenviando email a INFRAESTRUCTURA...');
-      const resultInfra = await this.enviarAInfraestructura(remito, rutaPDF);
+      const resultInfra = await this.enviarAInfraestructura(remito, rutaPDF, pdfBuffer);
       resultados.push(resultInfra);
       logger.info('✓ Email a infraestructura reenviado');
 
       // Enviar al solicitante
       logger.info('📧 Reenviando email al SOLICITANTE...');
-      const resultSolicitante = await this.enviarAlSolicitante(remito, rutaPDF, urlConfirmacion);
+      const resultSolicitante = await this.enviarAlSolicitante(remito, rutaPDF, urlConfirmacion, pdfBuffer);
       resultados.push(resultSolicitante);
       logger.info('✓ Email al solicitante reenviado');
 
@@ -687,7 +705,7 @@ class EmailService {
    * @param {string} receptorEmail - Email del receptor
    * @returns {Promise<object>} Resultado del envío
    */
-  async enviarAlReceptor(remito, rutaPDF, urlConfirmacion, receptorNombre, receptorEmail) {
+  async enviarAlReceptor(remito, rutaPDF, urlConfirmacion, receptorNombre, receptorEmail, pdfBuffer = null) {
     try {
       logger.info('📧 Enviando email al receptor:', {
         remito: remito.numero_remito,
@@ -758,15 +776,22 @@ class EmailService {
 </html>
       `;
 
+      const attachment = {
+        filename: `Remito_${remito.numero_remito}.pdf`,
+      };
+
+      if (pdfBuffer) {
+        attachment.content = pdfBuffer;
+      } else {
+        attachment.path = rutaPDF;
+      }
+
       const opciones = {
         from: EMAIL_FROM,
         to: receptorEmail,
         subject: asunto,
         html: contenidoHTML,
-        attachments: [{
-          filename: `Remito_${remito.numero_remito}.pdf`,
-          path: rutaPDF
-        }]
+        attachments: [attachment]
       };
 
       const info = await this.transporter.sendMail(opciones);

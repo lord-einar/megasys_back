@@ -953,7 +953,16 @@ class RemitoService {
               remitoId,
               numeroRemito: remito.numero_remito
             });
-            await emailService.enviarAInfraestructura(remitoCompleto, rutaPDFParaEmail);
+            // NOTA: pdfBufferEnvio aun no esta definido aqui.
+            // Deberíamos definirlo antes.
+            // Simplified logic: justo descarga de nuevo si no lo tienes.
+            let pdfBufferInfra = null;
+            try {
+              const res = await pdfService.downloadArchivoPDF(remito.numero_remito, false);
+              pdfBufferInfra = res.buffer;
+            } catch (e) { }
+
+            await emailService.enviarAInfraestructura(remitoCompleto, rutaPDFParaEmail, pdfBufferInfra);
             logger.info('✓ EMAIL A INFRAESTRUCTURA ENVIADO', {
               remitoId,
               numeroRemito: remito.numero_remito,
@@ -971,7 +980,24 @@ class RemitoService {
               remitoCompleto.solicitante?.email,
               process.env.FRONTEND_URL || 'http://localhost:3000'
             );
-            await emailService.enviarAlSolicitante(remitoCompleto, rutaPDFParaEmail, urlConfirmacion);
+            // Descargar buffer si rutaPDFParaEmail es URL y no se regeneró (si se regeneró, obtener buffer de resultado)
+            // En este bloque, si se entra al catch, resultadoPDF tiene buffer.
+            // Si entra al try, infoPDF solo tiene URL. Deberíamos descargar.
+
+            let pdfBufferEnvio = null;
+            if (rutaPDFParaEmail) {
+              try {
+                // Si acabamos de generarlo, resultadoPDF ya tiene el buffer?
+                // No podemos acceder a resultadoPDF aqui fuera del catch block facilmente sin refactorizar.
+                // Pero podemos intentar descargar si es necesario.
+                const res = await pdfService.downloadArchivoPDF(remitoCompleto.numero_remito, false);
+                pdfBufferEnvio = res.buffer;
+              } catch (e) {
+                logger.warn('No se pudo descargar buffer PDF en transito:', e.message);
+              }
+            }
+
+            await emailService.enviarAlSolicitante(remitoCompleto, rutaPDFParaEmail, urlConfirmacion, pdfBufferEnvio);
             logger.info('✓ EMAIL AL SOLICITANTE ENVIADO', {
               remitoId,
               numeroRemito: remito.numero_remito,
@@ -1478,7 +1504,8 @@ class RemitoService {
             remitoCompleto,
             resultadoPDFConfirmado.url,
             tokenPayload.email,
-            fechaConfirmacion
+            fechaConfirmacion,
+            resultadoPDFConfirmado.buffer
           );
           logger.info('Email de confirmación enviado');
         } catch (emailError) {
@@ -1621,7 +1648,16 @@ class RemitoService {
           numeroRemito: remitoCompleto.numero_remito,
           emailInfraestructura: process.env.EMAIL_INFRAESTRUCTURA || 'infraestructura@megatlon.com.ar'
         });
-        await emailService.enviarAInfraestructura(remitoCompleto, rutaArchivo);
+        // Descargar el PDF como buffer para enviar (si no se obtuvo antes al generar)
+        let pdfBuffer = null;
+        try {
+          const res = await pdfService.downloadArchivoPDF(remitoCompleto.numero_remito, false);
+          pdfBuffer = res.buffer;
+        } catch (err) {
+          logger.warn('Error descargando PDF para reenvío, se intentará con URL:', err.message);
+        }
+
+        await emailService.enviarAInfraestructura(remitoCompleto, rutaArchivo, pdfBuffer);
         logger.info('✓ Email a infraestructura enviado exitosamente', {
           remitoId,
           numeroRemito: remitoCompleto.numero_remito,
@@ -1650,7 +1686,9 @@ class RemitoService {
           remitoCompleto.solicitante?.email,
           process.env.FRONTEND_URL || 'http://localhost:3000'
         );
-        await emailService.enviarAlSolicitante(remitoCompleto, rutaArchivo, urlConfirmacion);
+
+        await emailService.enviarAlSolicitante(remitoCompleto, rutaArchivo, urlConfirmacion, pdfBuffer);
+
         logger.info('✓ Email al solicitante enviado exitosamente', {
           remitoId,
           numeroRemito: remitoCompleto.numero_remito,

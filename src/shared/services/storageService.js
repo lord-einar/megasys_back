@@ -181,6 +181,48 @@ class StorageService {
       return false;
     }
   }
+
+  /**
+   * Descarga un PDF como Buffer
+   * @param {string} filename - Nombre del archivo
+   * @param {string} folder - Carpeta
+   * @returns {Promise<Buffer>} Contenido del archivo
+   */
+  async downloadPDF(filename, folder = 'remitos') {
+    if (!this.enabled) {
+      throw new Error('Storage service no está habilitado');
+    }
+
+    try {
+      const { GetObjectCommand } = require('@aws-sdk/client-s3');
+      const key = `${folder}/${filename}`;
+
+      const command = new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+      });
+
+      const response = await this.s3Client.send(command);
+
+      // Convertir stream a buffer
+      const streamToBuffer = (stream) =>
+        new Promise((resolve, reject) => {
+          const chunks = [];
+          stream.on('data', (chunk) => chunks.push(chunk));
+          stream.on('error', reject);
+          stream.on('end', () => resolve(Buffer.concat(chunks)));
+        });
+
+      return streamToBuffer(response.Body);
+    } catch (error) {
+      logger.error('Error descargando PDF de R2:', {
+        error: error.message,
+        filename,
+        folder
+      });
+      throw error;
+    }
+  }
 }
 
 module.exports = new StorageService();
