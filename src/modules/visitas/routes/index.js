@@ -80,7 +80,7 @@ router.use(authenticate);
 router.get('/calendario', requireRole('helpdesk'), visitaController.obtenerCalendario);
 router.get('/checklist-items', requireRole('helpdesk'), visitaController.obtenerChecklistItems);
 router.get('/estadisticas', requireRole('support'), visitaController.obtenerEstadisticas);
-router.get('/reportes/dashboard', requireRole('super_admin'), visitaController.obtenerDashboard);
+router.get('/reportes/dashboard', requireRole('super_admin', 'support', 'helpdesk'), visitaController.obtenerDashboard);
 router.get('/', requireRole('helpdesk'), visitaController.listar);
 
 // CRUD Visitas
