@@ -9,15 +9,16 @@ const logger = require('../utils/logger');
 const SMTP_CONFIG = {
   host: process.env.SMTP_HOST || 'smtp.office365.com',
   port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: process.env.SMTP_SECURE === 'true' ? true : false, // false para port 587 (STARTTLS), true para 465
+  secure: process.env.SMTP_SECURE === 'true', // false para port 587 (STARTTLS), true para 465
   auth: {
     user: process.env.SMTP_USER || 'remitos@megatlon.com.ar',
-    pass: process.env.SMTP_PASSWORD || 'Infra123!'
+    pass: process.env.SMTP_PASSWORD
   },
   tls: {
     ciphers: 'SSLv3',
     rejectUnauthorized: false
-  }
+  },
+  requireTLS: true
 };
 
 const EMAIL_FROM = process.env.SMTP_FROM || 'remitos@megatlon.com.ar';
