@@ -6,23 +6,25 @@ const nodemailer = require('nodemailer');
 const logger = require('../utils/logger');
 
 // Configuración SMTP para Office365
+// Railway y otros servicios cloud suelen bloquear el puerto 587
+// Usamos puerto 465 con SSL directo que es más compatible
 const SMTP_CONFIG = {
   host: process.env.SMTP_HOST || 'smtp.office365.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: process.env.SMTP_SECURE === 'true', // false para port 587 (STARTTLS), true para 465
+  port: parseInt(process.env.SMTP_PORT || '465'), // Puerto 465 para SSL directo
+  secure: process.env.SMTP_SECURE !== 'false', // true para port 465 (SSL directo), false para 587
   auth: {
     user: process.env.SMTP_USER || 'remitos@megatlon.com.ar',
     pass: process.env.SMTP_PASSWORD
   },
   tls: {
     minVersion: 'TLSv1.2',
-    rejectUnauthorized: false
+    rejectUnauthorized: false,
+    ciphers: 'SSLv3' // Compatible con Office365
   },
-  requireTLS: true,
   // Timeouts para evitar bloqueos en Railway/cloud environments
-  connectionTimeout: 30000, // 30 segundos para establecer conexión
+  connectionTimeout: 60000, // 60 segundos para establecer conexión
   greetingTimeout: 30000,   // 30 segundos para el greeting del servidor
-  socketTimeout: 60000,     // 60 segundos para operaciones de socket
+  socketTimeout: 90000,     // 90 segundos para operaciones de socket
   // Pool de conexiones para mejor rendimiento
   pool: true,
   maxConnections: 3,
