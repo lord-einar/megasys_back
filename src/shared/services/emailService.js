@@ -4,6 +4,8 @@
 
 import nodemailer from 'nodemailer';
 import logger from '../utils/logger.js';
+import axios from 'axios';
+import { msalInstance } from '../../modules/auth/config/msalConfig.js';
 
 // Configuración SMTP para Office365
 // Railway y otros servicios cloud suelen bloquear el puerto 587
@@ -34,11 +36,18 @@ const SMTP_CONFIG = {
 const EMAIL_FROM = process.env.SMTP_FROM || 'remitos@megatlon.com.ar';
 const EMAIL_INFRAESTRUCTURA = process.env.EMAIL_INFRAESTRUCTURA || 'infraestructura@megatlon.com.ar';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+// Activar Graph API en producción o si se fuerza explícitamente
+const USE_GRAPH_API = process.env.USE_GRAPH_API === 'true' || process.env.NODE_ENV === 'production';
 
 class EmailService {
   constructor() {
     this.transporter = null;
-    this.inicializarTransporter();
+    // Solo inicializamos SMTP si NO vamos a usar Graph API exclusivamente, o como fallback
+    if (!USE_GRAPH_API) {
+      this.inicializarTransporter();
+    } else {
+      logger.info('📧 EmailService configurado para usar Microsoft Graph API');
+    }
   }
 
   inicializarTransporter() {
@@ -54,6 +63,22 @@ class EmailService {
       logger.info('✓ Email transporter inicializado correctamente');
     } catch (error) {
       logger.error('✗ Error inicializando email transporter:', { error: error.message, stack: error.stack });
+      // No lanzamos error para permitir que la app inicie y se intente usar Graph API si falla SMTP
+    }
+  }
+
+  /**
+   * Obtener Token de acceso para Graph API (Client Credentials)
+   */
+  async getGraphToken() {
+    try {
+      const tokenRequest = {
+        scopes: ['https://graph.microsoft.com/.default'],
+      };
+      const response = await msalInstance.acquireTokenByClientCredential(tokenRequest);
+      return response.accessToken;
+    } catch (error) {
+      logger.error('❌ Error obteniendo token Graph API:', error);
       throw error;
     }
   }
@@ -671,17 +696,7 @@ class EmailService {
         from: EMAIL_FROM
       });
 
-      const opciones = {
-        from: EMAIL_FROM,
-        to: destinatario,
-        subject: asunto,
-        html: contenidoHTML,
-        headers: {
-          'Content-Type': 'text/html; charset=UTF-8'
-        }
-      };
-
-      const info = await this.transporter.sendMail(opciones);
+      const info = await this.enviarEmail(destinatario, asunto, contenidoHTML);
 
       logger.info('✓ Email HTML enviado exitosamente:', {
         destinatario,
