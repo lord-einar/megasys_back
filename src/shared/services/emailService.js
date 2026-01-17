@@ -1,15 +1,14 @@
 /**
- * Email Service - Envío de correos para remitos vía Office365 SMTP
+ * Email Service - Envío de correos para remitos vía Office365 SMTP y Graph API
  */
 
 import nodemailer from 'nodemailer';
 import logger from '../utils/logger.js';
 import axios from 'axios';
+import fs from 'fs';
 import { msalInstance } from '../../modules/auth/config/msalConfig.js';
 
 // Configuración SMTP para Office365
-// Railway y otros servicios cloud suelen bloquear el puerto 587
-// Usamos puerto 465 con SSL directo que es más compatible
 const SMTP_CONFIG = {
   host: process.env.SMTP_HOST || 'smtp.office365.com',
   port: parseInt(process.env.SMTP_PORT || '465'), // Puerto 465 para SSL directo
@@ -23,11 +22,9 @@ const SMTP_CONFIG = {
     rejectUnauthorized: false,
     ciphers: 'SSLv3' // Compatible con Office365
   },
-  // Timeouts para evitar bloqueos en Railway/cloud environments
-  connectionTimeout: 60000, // 60 segundos para establecer conexión
-  greetingTimeout: 30000,   // 30 segundos para el greeting del servidor
-  socketTimeout: 90000,     // 90 segundos para operaciones de socket
-  // Pool de conexiones para mejor rendimiento
+  connectionTimeout: 60000,
+  greetingTimeout: 30000,
+  socketTimeout: 90000,
   pool: true,
   maxConnections: 3,
   maxMessages: 100
@@ -63,7 +60,6 @@ class EmailService {
       logger.info('✓ Email transporter inicializado correctamente');
     } catch (error) {
       logger.error('✗ Error inicializando email transporter:', { error: error.message, stack: error.stack });
-      // No lanzamos error para permitir que la app inicie y se intente usar Graph API si falla SMTP
     }
   }
 
@@ -84,10 +80,119 @@ class EmailService {
   }
 
   /**
-   * Generar HTML del email para infraestructura
-   * @param {object} remito - Datos del remito
-   * @returns {string} HTML del email
+ * Enviar email usando Graph API
+ */
+  async enviarPorGraphApi(mailOptions) {
+    const token = await this.getGraphToken();
+    if (!token) throw new Error('No se pudo obtener token para Graph API');
+
+    // Convertir adjuntos a formato Graph
+    const attachments = [];
+    if (mailOptions.attachments && mailOptions.attachments.length > 0) {
+      for (const att of mailOptions.attachments) {
+        let contentBytes;
+        if (att.content) {
+          contentBytes = att.content.toString('base64');
+        } else if (att.path) {
+          try {
+            const fileBuffer = fs.readFileSync(att.path);
+            contentBytes = fileBuffer.toString('base64');
+          } catch (err) {
+            logger.error(`Error leyendo adjunto ${att.path}:`, err);
+            continue; // Omitir adjunto fallido
+          }
+        } else {
+          continue;
+        }
+
+        attachments.push({
+          '@odata.type': '#microsoft.graph.fileAttachment',
+          name: att.filename,
+          contentBytes: contentBytes,
+          contentType: att.contentType || 'application/pdf'
+        });
+      }
+    }
+
+    const message = {
+      message: {
+        subject: mailOptions.subject,
+        body: {
+          contentType: 'HTML',
+          content: mailOptions.html
+        },
+        toRecipients: [
+          {
+            emailAddress: {
+              address: mailOptions.to
+            }
+          }
+        ],
+        attachments: attachments.length > 0 ? attachments : undefined
+      },
+      saveToSentItems: false
+    };
+
+    // Si hay CC
+    if (mailOptions.cc) {
+      const ccList = Array.isArray(mailOptions.cc) ? mailOptions.cc : mailOptions.cc.split(',');
+      message.message.ccRecipients = ccList.map(email => ({
+        emailAddress: { address: email.trim() }
+      }));
+    }
+
+    try {
+      const userId = SMTP_CONFIG.auth.user; // El remitente
+      await axios.post(
+        `https://graph.microsoft.com/v1.0/users/${userId}/sendMail`,
+        message,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      logger.info(`✅ Email enviado vía Graph API a: ${mailOptions.to}`);
+      return { messageId: 'GraphAPI-' + Date.now() };
+    } catch (error) {
+      logger.error('❌ Error enviando email vía Graph API:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Enviar correo electrónico genérico (Wrapper principal)
    */
+  async enviarEmail(to, subject, html, attachments = [], cc = null) {
+    const mailOptions = {
+      from: EMAIL_FROM,
+      to,
+      subject,
+      html,
+      attachments,
+      cc
+    };
+
+    try {
+      if (USE_GRAPH_API) {
+        return await this.enviarPorGraphApi(mailOptions);
+      }
+
+      // Fallback a SMTP
+      if (!this.transporter) {
+        this.inicializarTransporter();
+      }
+
+      const info = await this.transporter.sendMail(mailOptions);
+      logger.info(`📧 Email enviado vía SMTP: ${info.messageId}`);
+      return info;
+    } catch (error) {
+      logger.error('❌ Error enviando email:', error);
+      throw error;
+    }
+  }
+
   generarHTMLInfraestructura(remito) {
     const articulosHTML = remito.detalles && remito.detalles.length > 0
       ? remito.detalles.map((detalle, idx) => {
@@ -219,12 +324,6 @@ class EmailService {
     `;
   }
 
-  /**
-   * Enviar email a infraestructura
-   * @param {object} remito - Datos del remito
-   * @param {string} rutaPDF - Ruta del archivo PDF
-   * @returns {Promise<object>} Resultado del envío
-   */
   async enviarAInfraestructura(remito, rutaPDF, pdfBuffer = null) {
     try {
       logger.info('📧 [INFRAESTRUCTURA] Iniciando envío...', {
@@ -247,19 +346,13 @@ class EmailService {
         attachment.path = rutaPDF;
       }
 
-      const opciones = {
-        from: EMAIL_FROM,
-        to: EMAIL_INFRAESTRUCTURA,
-        subject: `Nuevo remito creado - ${remito.numero_remito}`,
-        html: html,
-        headers: {
-          'Content-Type': 'text/html; charset=UTF-8'
-        },
-        attachments: [attachment]
-      };
-
       logger.info('📧 [INFRAESTRUCTURA] Enviando...');
-      const info = await this.transporter.sendMail(opciones);
+      const info = await this.enviarEmail(
+        EMAIL_INFRAESTRUCTURA,
+        `Nuevo remito creado - ${remito.numero_remito}`,
+        html,
+        [attachment]
+      );
 
       logger.info('✓ [INFRAESTRUCTURA] Email enviado exitosamente:', {
         remito: remito.numero_remito,
@@ -276,23 +369,13 @@ class EmailService {
     } catch (error) {
       logger.error('✗ [INFRAESTRUCTURA] Error enviando email:', {
         error: error.message,
-        errorCode: error.code,
-        errorResponse: error.response,
         remito: remito.numero_remito,
-        email: EMAIL_INFRAESTRUCTURA,
-        timestamp: new Date().toISOString(),
-        stack: error.stack
+        email: EMAIL_INFRAESTRUCTURA
       });
       throw error;
     }
   }
 
-  /**
-   * Generar HTML del email para el solicitante
-   * @param {object} remito - Datos del remito
-   * @param {string} urlConfirmacion - URL de confirmación con token
-   * @returns {string} HTML del email
-   */
   generarHTMLSolicitante(remito, urlConfirmacion) {
     return `
       <!DOCTYPE html>
@@ -371,50 +454,19 @@ class EmailService {
     `;
   }
 
-  /**
-   * Enviar email al solicitante con link de confirmación
-   * @param {object} remito - Datos del remito
-   * @param {string} rutaPDF - Ruta del archivo PDF
-   * @param {string} urlConfirmacion - URL de confirmación con token
-   * @returns {Promise<object>} Resultado del envío
-   */
   async enviarAlSolicitante(remito, rutaPDF, urlConfirmacion, pdfBuffer = null) {
     try {
       logger.info('📧 [SOLICITANTE] Iniciando envío...', {
         remito: remito.numero_remito,
-        email: remito.solicitante?.email,
-        pdfUrl: rutaPDF,
-        hasBuffer: !!pdfBuffer,
-        urlConfirmacionLength: urlConfirmacion?.length || 0,
-        remitoKeys: Object.keys(remito),
-        solicitanteObject: remito.solicitante
+        email: remito.solicitante?.email
       });
 
       const html = this.generarHTMLSolicitante(remito, urlConfirmacion);
       const emailSolicitante = remito.solicitante?.email;
 
-      logger.info('📧 [SOLICITANTE] Después de extraer email', {
-        email: emailSolicitante,
-        emailType: typeof emailSolicitante,
-        emailIsNull: emailSolicitante === null,
-        emailIsUndefined: emailSolicitante === undefined,
-        solicitanteType: typeof remito.solicitante,
-        solicitanteData: remito.solicitante
-      });
-
       if (!emailSolicitante) {
-        logger.error('✗ [SOLICITANTE] Email del solicitante no disponible', {
-          remito: remito.numero_remito,
-          solicitanteData: remito.solicitante,
-          solicitanteKeys: remito.solicitante ? Object.keys(remito.solicitante) : 'null'
-        });
         throw new Error('Email del solicitante no disponible');
       }
-
-      logger.info('📧 [SOLICITANTE] Email del solicitante válido:', {
-        email: emailSolicitante,
-        remito: remito.numero_remito
-      });
 
       const attachment = {
         filename: `Remito_${remito.numero_remito}.pdf`,
@@ -426,33 +478,18 @@ class EmailService {
         attachment.path = rutaPDF;
       }
 
-      const opciones = {
-        from: EMAIL_FROM,
-        to: emailSolicitante,
-        subject: `Confirmación requerida - Remito ${remito.numero_remito}`,
-        html: html,
-        headers: {
-          'Content-Type': 'text/html; charset=UTF-8'
-        },
-        attachments: [attachment]
-      };
-
-      logger.info('📧 [SOLICITANTE] Opciones de email preparadas', {
-        to: opciones.to,
-        from: opciones.from,
-        subject: opciones.subject,
-        attachmentPath: opciones.attachments?.[0]?.path
-      });
-
-      logger.info('📧 [SOLICITANTE] Enviando email via SMTP...');
-      const info = await this.transporter.sendMail(opciones);
+      logger.info('📧 [SOLICITANTE] Enviando email...');
+      const info = await this.enviarEmail(
+        emailSolicitante,
+        `Confirmación requerida - Remito ${remito.numero_remito}`,
+        html,
+        [attachment]
+      );
 
       logger.info('✓ [SOLICITANTE] Email enviado exitosamente:', {
         remito: remito.numero_remito,
         messageId: info.messageId,
-        email: emailSolicitante,
-        response: info.response,
-        timestamp: new Date().toISOString()
+        email: emailSolicitante
       });
 
       return {
@@ -463,26 +500,13 @@ class EmailService {
     } catch (error) {
       logger.error('✗ [SOLICITANTE] Error enviando email:', {
         error: error.message,
-        errorCode: error.code,
-        errorResponse: error.response,
-        errorCommand: error.command,
         remito: remito.numero_remito,
-        email: remito.solicitante?.email,
-        timestamp: new Date().toISOString(),
-        stack: error.stack
+        email: remito.solicitante?.email
       });
       throw error;
     }
   }
 
-  /**
-   * Generar HTML del email para confirmación de recepción
-   * @param {object} remito - Datos del remito
-   * @param {string} rutaPDF - Ruta del archivo PDF
-   * @param {string} emailSolicitante - Email a notificar
-   * @param {Date} fechaConfirmacion - Fecha de confirmación
-   * @returns {string} HTML del email
-   */
   generarHTMLConfirmacion(remito, emailSolicitante, fechaConfirmacion) {
     return `
       <!DOCTYPE html>
@@ -555,22 +579,11 @@ class EmailService {
     `;
   }
 
-  /**
-   * Enviar email de confirmación de recepción
-   * @param {object} remito - Datos del remito
-   * @param {string} rutaPDF - Ruta del archivo PDF confirmado
-   * @param {string} emailSolicitante - Email del solicitante
-   * @param {Date} fechaConfirmacion - Fecha de confirmación
-   * @returns {Promise<object>} Resultado del envío
-   */
   async enviarConfirmacionRecepcion(remito, rutaPDF, emailSolicitante, fechaConfirmacion, pdfBuffer = null) {
     try {
       logger.info('📧 INICIANDO ENVÍO DE EMAIL DE CONFIRMACIÓN', {
         remito: remito.numero_remito,
-        email: emailSolicitante,
-        from: EMAIL_FROM,
-        rutaPDF: rutaPDF,
-        hasBuffer: !!pdfBuffer
+        email: emailSolicitante
       });
 
       const html = this.generarHTMLConfirmacion(remito, emailSolicitante, fechaConfirmacion);
@@ -585,32 +598,12 @@ class EmailService {
         attachment.path = rutaPDF;
       }
 
-      const opciones = {
-        from: EMAIL_FROM,
-        to: emailSolicitante,
-        subject: `Remito Confirmado - ${remito.numero_remito}`,
-        html: html,
-        headers: {
-          'Content-Type': 'text/html; charset=UTF-8'
-        },
-        attachments: [attachment]
-      };
-
-      logger.info('📧 Opciones de email preparadas:', {
-        to: opciones.to,
-        from: opciones.from,
-        subject: opciones.subject,
-        attachmentCount: opciones.attachments.length
-      });
-
-      const info = await this.transporter.sendMail(opciones);
-
-      logger.info('✓ Email de confirmación enviado exitosamente:', {
-        remito: remito.numero_remito,
-        messageId: info.messageId,
-        email: emailSolicitante,
-        response: info.response
-      });
+      const info = await this.enviarEmail(
+        emailSolicitante,
+        `Remito Confirmado - ${remito.numero_remito}`,
+        html,
+        [attachment]
+      );
 
       return {
         success: true,
@@ -620,49 +613,28 @@ class EmailService {
     } catch (error) {
       logger.error('✗ Error enviando email de confirmación:', {
         error: error.message,
-        code: error.code,
         remito: remito.numero_remito,
-        email: emailSolicitante,
-        stack: error.stack
+        email: emailSolicitante
       });
       throw error;
     }
   }
 
-  /**
-   * Reenviar los emails del remito (para remitos ya creados)
-   * @param {object} remito - Datos del remito
-   * @param {string} rutaPDF - Ruta del archivo PDF
-   * @param {string} urlConfirmacion - URL de confirmación con token
-   * @returns {Promise<object>} Resultado del envío
-   */
   async reenviarEmails(remito, rutaPDF, urlConfirmacion, pdfBuffer = null) {
     try {
       logger.info('📧 INICIANDO REENVÍO DE EMAILS', {
-        remito: remito.numero_remito,
-        rutaPDF: rutaPDF,
-        urlConfirmacion: !!urlConfirmacion
+        remito: remito.numero_remito
       });
 
       const resultados = [];
 
-      // Enviar a infraestructura
       logger.info('📧 Reenviando email a INFRAESTRUCTURA...');
       const resultInfra = await this.enviarAInfraestructura(remito, rutaPDF, pdfBuffer);
       resultados.push(resultInfra);
-      logger.info('✓ Email a infraestructura reenviado');
 
-      // Enviar al solicitante
       logger.info('📧 Reenviando email al SOLICITANTE...');
       const resultSolicitante = await this.enviarAlSolicitante(remito, rutaPDF, urlConfirmacion, pdfBuffer);
       resultados.push(resultSolicitante);
-      logger.info('✓ Email al solicitante reenviado');
-
-      logger.info('✓ Todos los emails reenviados exitosamente:', {
-        remito: remito.numero_remito,
-        emails: resultados.map(r => r.email),
-        timestamp: new Date().toISOString()
-      });
 
       return {
         success: true,
@@ -671,39 +643,20 @@ class EmailService {
     } catch (error) {
       logger.error('✗ Error reenviando emails:', {
         error: error.message,
-        code: error.code,
-        remito: remito.numero_remito,
-        timestamp: new Date().toISOString(),
-        stack: error.stack
+        remito: remito.numero_remito
       });
       throw error;
     }
   }
 
-  /**
-   * Enviar email genérico con contenido HTML (sin PDF)
-   * Útil para notificaciones, recordatorios, etc.
-   * @param {string} destinatario - Email del destinatario
-   * @param {string} asunto - Asunto del email
-   * @param {string} contenidoHTML - Contenido HTML del email
-   * @returns {Promise<object>} Resultado del envío
-   */
   async enviarEmailHTML(destinatario, asunto, contenidoHTML) {
     try {
       logger.info('📧 Enviando email HTML:', {
         to: destinatario,
-        subject: asunto,
-        from: EMAIL_FROM
+        subject: asunto
       });
 
       const info = await this.enviarEmail(destinatario, asunto, contenidoHTML);
-
-      logger.info('✓ Email HTML enviado exitosamente:', {
-        destinatario,
-        asunto,
-        messageId: info.messageId,
-        timestamp: new Date().toISOString()
-      });
 
       return {
         success: true,
@@ -711,26 +664,11 @@ class EmailService {
         email: destinatario
       };
     } catch (error) {
-      logger.error('✗ Error enviando email HTML:', {
-        error: error.message,
-        destinatario,
-        asunto,
-        errorCode: error.code,
-        stack: error.stack
-      });
+      logger.error('✗ Error enviando email HTML:', error);
       throw error;
     }
   }
 
-  /**
-   * Enviar email al receptor alternativo con link de confirmación
-   * @param {object} remito - Datos completos del remito
-   * @param {string} rutaPDF - Ruta al archivo PDF
-   * @param {string} urlConfirmacion - URL con token de confirmación
-   * @param {string} receptorNombre - Nombre del receptor
-   * @param {string} receptorEmail - Email del receptor
-   * @returns {Promise<object>} Resultado del envío
-   */
   async enviarAlReceptor(remito, rutaPDF, urlConfirmacion, receptorNombre, receptorEmail, pdfBuffer = null) {
     try {
       logger.info('📧 Enviando email al receptor:', {
@@ -812,21 +750,12 @@ class EmailService {
         attachment.path = rutaPDF;
       }
 
-      const opciones = {
-        from: EMAIL_FROM,
-        to: receptorEmail,
-        subject: asunto,
-        html: contenidoHTML,
-        attachments: [attachment]
-      };
-
-      const info = await this.transporter.sendMail(opciones);
-
-      logger.info('✓ Email al receptor enviado exitosamente:', {
-        remito: remito.numero_remito,
+      const info = await this.enviarEmail(
         receptorEmail,
-        messageId: info.messageId
-      });
+        asunto,
+        contenidoHTML,
+        [attachment]
+      );
 
       return {
         success: true,
@@ -843,15 +772,6 @@ class EmailService {
     }
   }
 
-  /**
-   * Enviar notificación al solicitante original sobre cambio de receptor
-   * @param {object} remito - Datos completos del remito
-   * @param {string} rutaPDF - Ruta al archivo PDF
-   * @param {string} solicitanteEmail - Email del solicitante original
-   * @param {string} receptorNombre - Nombre del receptor asignado
-   * @param {string} receptorEmail - Email del receptor asignado
-   * @returns {Promise<object>} Resultado del envío
-   */
   async enviarNotificacionCambioReceptor(remito, rutaPDF, solicitanteEmail, receptorNombre, receptorEmail) {
     try {
       logger.info('📧 Enviando notificación de cambio de receptor al solicitante:', {
@@ -922,24 +842,17 @@ class EmailService {
 </html>
       `;
 
-      const opciones = {
-        from: EMAIL_FROM,
-        to: solicitanteEmail,
-        subject: asunto,
-        html: contenidoHTML,
-        attachments: [{
-          filename: `Remito_${remito.numero_remito}.pdf`,
-          path: rutaPDF
-        }]
+      const attachment = {
+        filename: `Remito_${remito.numero_remito}.pdf`,
+        path: rutaPDF
       };
 
-      const info = await this.transporter.sendMail(opciones);
-
-      logger.info('✓ Notificación al solicitante enviada exitosamente:', {
-        remito: remito.numero_remito,
+      const info = await this.enviarEmail(
         solicitanteEmail,
-        messageId: info.messageId
-      });
+        asunto,
+        contenidoHTML,
+        [attachment]
+      );
 
       return {
         success: true,
