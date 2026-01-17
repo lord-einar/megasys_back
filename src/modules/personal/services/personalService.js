@@ -2,7 +2,7 @@
 import { Personal, Sede, Rol, PersonalSede, Remito, sequelize } from '../../../models/index.js';
 import logger from '../../../shared/utils/logger.js';
 import { Op } from 'sequelize';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'node:crypto';
 import { assignSistemasRoleIfAuthorized } from '../../../shared/utils/sistemasRoleAssignment.js';
 
 class PersonalService {

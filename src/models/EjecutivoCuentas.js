@@ -1,7 +1,7 @@
 // src/models/EjecutivoCuentas.js
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../shared/utils/database.js';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'node:crypto';
 
 const EjecutivoCuentas = sequelize.define('EjecutivoCuentas', {
   id: {

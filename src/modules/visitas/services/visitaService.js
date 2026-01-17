@@ -12,7 +12,7 @@ import {
 } from '../../../models/index.js';
 import visitaEmailService from './emailService.js';
 import logger from '../../../shared/utils/logger.js';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'node:crypto';
 import AuditService from '../../../shared/services/auditService.js';
 
 class VisitaService {

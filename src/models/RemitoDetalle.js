@@ -1,7 +1,7 @@
 // src/models/RemitoDetalle.js
 import { DataTypes, Op, Sequelize } from 'sequelize';
 import { sequelize } from '../shared/utils/database.js';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'node:crypto';
 
 const RemitoDetalle = sequelize.define('RemitoDetalle', {
   id: {

@@ -1,7 +1,7 @@
 // src/models/Inventario.js
 import { DataTypes, Op } from 'sequelize';
 import { sequelize } from '../shared/utils/database.js';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'node:crypto';
 import { VALID_STATES } from '../shared/constants/inventoryStates.js';
 
 const Inventario = sequelize.define('Inventario', {
