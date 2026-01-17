@@ -1,6 +1,6 @@
 // src/shared/utils/logger.js
-const winston = require('winston');
-const path = require('path');
+import winston from 'winston';
+import path from 'path';
 
 // Configuración del logger
 const logger = winston.createLogger({
@@ -12,20 +12,20 @@ const logger = winston.createLogger({
     winston.format.errors({ stack: true }),
     winston.format.json()
   ),
-  defaultMeta: { 
+  defaultMeta: {
     service: 'sistema-gestion-backend',
     environment: process.env.NODE_ENV || 'development'
   },
   transports: [
     // Archivo para errores
-    new winston.transports.File({ 
-      filename: path.join('logs', 'error.log'), 
+    new winston.transports.File({
+      filename: path.join('logs', 'error.log'),
       level: 'error',
       maxsize: 5242880, // 5MB
       maxFiles: 5
     }),
     // Archivo para todos los logs
-    new winston.transports.File({ 
+    new winston.transports.File({
       filename: path.join('logs', 'combined.log'),
       maxsize: 5242880, // 5MB
       maxFiles: 5
@@ -66,4 +66,4 @@ logger.rejections.handle(
   new winston.transports.File({ filename: path.join('logs', 'rejections.log') })
 );
 
-module.exports = logger;
+export default logger;

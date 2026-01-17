@@ -4,7 +4,7 @@
  * Cumple con Open/Closed Principle: agregar nuevos estados sin modificar código existente
  */
 
-const INVENTORY_STATES = {
+export const INVENTORY_STATES = {
   DISPONIBLE: 'disponible',
   EN_USO: 'en_uso',
   EN_PRESTAMO: 'en_prestamo',
@@ -13,10 +13,10 @@ const INVENTORY_STATES = {
 };
 
 // Array de valores válidos para validación
-const VALID_STATES = Object.values(INVENTORY_STATES);
+export const VALID_STATES = Object.values(INVENTORY_STATES);
 
 // Descripciones legibles para la UI
-const STATE_DESCRIPTIONS = {
+export const STATE_DESCRIPTIONS = {
   [INVENTORY_STATES.DISPONIBLE]: 'El artículo está disponible para usar',
   [INVENTORY_STATES.EN_USO]: 'El artículo se encuentra en uso actualmente',
   [INVENTORY_STATES.EN_PRESTAMO]: 'El artículo está siendo prestado',
@@ -25,7 +25,7 @@ const STATE_DESCRIPTIONS = {
 };
 
 // Transiciones permitidas entre estados (validación de lógica de negocio)
-const STATE_TRANSITIONS = {
+export const STATE_TRANSITIONS = {
   [INVENTORY_STATES.DISPONIBLE]: [
     INVENTORY_STATES.EN_USO,
     INVENTORY_STATES.EN_PRESTAMO,
@@ -47,11 +47,4 @@ const STATE_TRANSITIONS = {
     INVENTORY_STATES.DADO_DE_BAJA
   ],
   [INVENTORY_STATES.DADO_DE_BAJA]: [] // No se puede salir de este estado
-};
-
-module.exports = {
-  INVENTORY_STATES,
-  VALID_STATES,
-  STATE_DESCRIPTIONS,
-  STATE_TRANSITIONS
 };

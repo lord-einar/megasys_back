@@ -1,12 +1,11 @@
 // src/shared/utils/runMigrations.js
-const { execSync } = require('child_process');
-const path = require('path');
-const logger = require('./logger');
+import { execSync } from 'child_process';
+import logger from './logger.js';
 
 /**
  * Run Sequelize migrations with enhanced debugging
  */
-const runMigrations = async () => {
+export const runMigrations = async () => {
   if (process.env.NODE_ENV !== 'production') {
     logger.info('⏭️  Migraciones deshabilitadas en ambiente no-producción');
     return;
@@ -61,5 +60,3 @@ const runMigrations = async () => {
     // No hacer throw aquí para que el servidor continúe
   }
 };
-
-module.exports = { runMigrations };

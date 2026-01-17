@@ -2,7 +2,7 @@
 /**
  * Respuesta exitosa estándar
  */
-const success = (res, data = null, message = 'Operación exitosa', statusCode = 200) => {
+export const success = (res, data = null, message = 'Operación exitosa', statusCode = 200) => {
   return res.status(statusCode).json({
     success: true,
     message,
@@ -14,7 +14,7 @@ const success = (res, data = null, message = 'Operación exitosa', statusCode = 
 /**
  * Respuesta de error estándar
  */
-const error = (res, message = 'Error interno del servidor', statusCode = 500, errors = null) => {
+export const error = (res, message = 'Error interno del servidor', statusCode = 500, errors = null) => {
   return res.status(statusCode).json({
     success: false,
     message,
@@ -26,7 +26,7 @@ const error = (res, message = 'Error interno del servidor', statusCode = 500, er
 /**
  * Respuesta paginada
  */
-const paginated = (res, data, pagination, message = 'Datos obtenidos correctamente') => {
+export const paginated = (res, data, pagination, message = 'Datos obtenidos correctamente') => {
   return res.status(200).json({
     success: true,
     message,
@@ -39,10 +39,4 @@ const paginated = (res, data, pagination, message = 'Datos obtenidos correctamen
     },
     timestamp: new Date().toISOString()
   });
-};
-
-module.exports = {
-  success,
-  error,
-  paginated
 };

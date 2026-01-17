@@ -1,9 +1,9 @@
 // src/shared/utils/database.js
-const { Sequelize } = require('sequelize');
-const logger = require('./logger');
-const { runMigrations } = require('./runMigrations');
+import { Sequelize } from 'sequelize';
+import logger from './logger.js';
+import { runMigrations } from './runMigrations.js';
 
-const sequelize = new Sequelize({
+export const sequelize = new Sequelize({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
   database: process.env.DB_NAME,
@@ -33,13 +33,13 @@ const sequelize = new Sequelize({
 /**
  * Función para conectar a la base de datos
  */
-const connectDatabase = async () => {
+export const connectDatabase = async () => {
   try {
     await sequelize.authenticate();
     logger.info('✅ Conexión a la base de datos establecida correctamente');
 
-    // Importar modelos
-    require('../../models');
+    // Importar modelos dinámicamente
+    await import('../../models/index.js');
 
     // Ejecutar migraciones en production y staging
     if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
@@ -56,9 +56,4 @@ const connectDatabase = async () => {
     logger.warn('⚠️ El servidor continuará sin BD. Intenta reconectar más adelante.');
     // NO hacer process.exit(1) para permitir que el servidor continúe
   }
-};
-
-module.exports = {
-  sequelize,
-  connectDatabase
 };

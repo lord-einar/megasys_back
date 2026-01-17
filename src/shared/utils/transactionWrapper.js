@@ -1,6 +1,6 @@
 // src/shared/utils/transactionWrapper.js - UTILIDAD DE TRANSACCIONES CON AUDITORÍA
-const { sequelize } = require('./database');
-const AuditService = require('../services/auditService');
+import { sequelize } from './database.js';
+import AuditService from '../services/auditService.js';
 
 /**
  * Wrapper para ejecutar operaciones dentro de transacciones automáticas
@@ -236,4 +236,4 @@ class TransactionWrapper {
   }
 }
 
-module.exports = TransactionWrapper;
+export default TransactionWrapper;

@@ -8,4 +8,4 @@ const asyncHandler = (fn) => {
   };
 };
 
-module.exports = asyncHandler;
+export default asyncHandler;
