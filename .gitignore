@@ -34,3 +34,4 @@ backups/
 *.key
 *.cert
 secrets/
+railway-env-backup.txt
