@@ -1,7 +1,7 @@
 // src/models/Empresa.js
-const { DataTypes, Op } = require('sequelize');
-const { sequelize } = require('../shared/utils/database');
-const { v4: uuidv4 } = require('uuid');
+import { DataTypes, Op } from 'sequelize';
+import { sequelize } from '../shared/utils/database.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const Empresa = sequelize.define('Empresa', {
   id: {
@@ -127,4 +127,4 @@ Empresa.findActivas = function() {
   return this.scope('activas').findAll();
 };
 
-module.exports = Empresa;
+export default Empresa;

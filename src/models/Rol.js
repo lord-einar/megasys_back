@@ -1,7 +1,7 @@
 // src/models/Rol.js
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../shared/utils/database');
-const { v4: uuidv4 } = require('uuid');
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../shared/utils/database.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const Rol = sequelize.define('Rol', {
   id: {
@@ -74,4 +74,4 @@ Rol.ROLES_DEFAULT = [
   { nombre: 'Empleado', descripcion: 'Empleado general', nivel_jerarquia: 1 }
 ];
 
-module.exports = Rol;
+export default Rol;

@@ -1,11 +1,11 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const visitaController = require('../controllers/visitaController');
-const { authenticate } = require('../../auth/middleware/authMiddleware');
-const { requireRole } = require('../../auth/middleware/roleMiddleware');
-const { publicEndpointLimiter } = require('../../../shared/middleware/rateLimiter');
-const { body, param, query } = require('express-validator');
-const validate = require('../../../shared/middleware/validation');
+import visitaController from '../controllers/visitaController.js';
+import { authenticate } from '../../auth/middleware/authMiddleware.js';
+import { requireRole } from '../../auth/middleware/roleMiddleware.js';
+import { publicEndpointLimiter } from '../../../shared/middleware/rateLimiter.js';
+import { body, param, query } from 'express-validator';
+import validate from '../../../shared/middleware/validation.js';
 
 // Validaciones
 const validarCrearVisita = [
@@ -95,4 +95,4 @@ router.post('/:id/cancelar', requireRole('support'), validarCancelar, visitaCont
 router.post('/:id/reprogramar', requireRole('support'), validarReprogramar, visitaController.reprogramar);
 router.post('/:id/aviso', requireRole('support'), param('id').isUUID(), validate, visitaController.enviarAviso);
 
-module.exports = router;
+export default router;

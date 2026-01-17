@@ -1,7 +1,8 @@
-const visitaService = require('../services/visitaService');
-const { VisitaChecklistItem } = require('../../../models');
-const { success, error } = require('../../../shared/utils/response');
-const logger = require('../../../shared/utils/logger');
+import visitaService from '../services/visitaService.js';
+import visitaReportService from '../services/visitaReportService.js';
+import { VisitaChecklistItem } from '../../../models/index.js';
+import { success, error } from '../../../shared/utils/response.js';
+import logger from '../../../shared/utils/logger.js';
 
 class VisitaController {
 
@@ -233,7 +234,7 @@ class VisitaController {
                 tipo: req.query.tipo
             };
 
-            const visitaReportService = require('../services/visitaReportService');
+            // visitaReportService ya importado al inicio del archivo
             const dashboard = await visitaReportService.obtenerDashboard(filtros);
 
             return success(res, dashboard);
@@ -244,4 +245,4 @@ class VisitaController {
     }
 }
 
-module.exports = new VisitaController();
+export default new VisitaController();

@@ -1,6 +1,6 @@
 // src/shared/middleware/validation.js
-const { validationResult } = require('express-validator');
-const { error } = require('../utils/response');
+import { validationResult } from 'express-validator';
+import { error } from '../utils/response.js';
 
 /**
  * Middleware para validar los resultados de express-validator
@@ -21,4 +21,4 @@ const validate = (req, res, next) => {
   next();
 };
 
-module.exports = validate;
+export default validate;

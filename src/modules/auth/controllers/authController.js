@@ -1,12 +1,13 @@
 // src/modules/auth/controllers/authController.js - REFACTORIZADO PARA SOLID
-const authService = require('../services/authService');
-const tokenCacheService = require('../services/tokenCacheService');
-const authResponseFormatter = require('../services/authResponseFormatter');
-const roleService = require('../services/roleService');
-const personalService = require('../../personal/services/personalService');
-const { success, error } = require('../../../shared/utils/response');
-const asyncHandler = require('../../../shared/utils/asyncHandler');
-const logger = require('../../../shared/utils/logger');
+import authService from '../services/authService.js';
+import tokenCacheService from '../services/tokenCacheService.js';
+import authResponseFormatter from '../services/authResponseFormatter.js';
+import roleService from '../services/roleService.js';
+import personalService from '../../personal/services/personalService.js';
+import { success, error } from '../../../shared/utils/response.js';
+import asyncHandler from '../../../shared/utils/asyncHandler.js';
+import logger from '../../../shared/utils/logger.js';
+import Personal from '../../../models/Personal.js';
 
 class AuthController {
   /**
@@ -91,7 +92,7 @@ class AuthController {
         await personalService.autoProvisionarPersonal(result.user, roleInfo);
 
         // Obtener el privilegio_app y el ID del registro Personal creado/actualizado
-        const { Personal } = require('../../../models');
+        // Personal ya importado al inicio del archivo
         const personalRecord = await Personal.findOne({
           where: { email: result.user.email.toLowerCase() }
         });
@@ -392,4 +393,4 @@ class AuthController {
   });
 }
 
-module.exports = new AuthController();
+export default new AuthController();

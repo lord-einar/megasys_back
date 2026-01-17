@@ -1,9 +1,9 @@
 // src/modules/personal/services/personalService.js
-const { Personal, Sede, Rol, PersonalSede, Remito, sequelize } = require('../../../models');
-const logger = require('../../../shared/utils/logger');
-const { Op } = require('sequelize');
-const { v4: uuidv4 } = require('uuid');
-const { assignSistemasRoleIfAuthorized } = require('../../../shared/utils/sistemasRoleAssignment');
+import { Personal, Sede, Rol, PersonalSede, Remito, sequelize } from '../../../models/index.js';
+import logger from '../../../shared/utils/logger.js';
+import { Op } from 'sequelize';
+import { v4 as uuidv4 } from 'uuid';
+import { assignSistemasRoleIfAuthorized } from '../../../shared/utils/sistemasRoleAssignment.js';
 
 class PersonalService {
   /**
@@ -815,4 +815,4 @@ class PersonalService {
   }
 }
 
-module.exports = new PersonalService();
+export default new PersonalService();

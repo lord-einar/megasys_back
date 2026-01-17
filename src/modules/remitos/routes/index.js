@@ -1,9 +1,9 @@
 // src/modules/remitos/routes/index.js
-const express = require('express');
-const { authenticate } = require('../../auth/middleware/authMiddleware');
-const { requireDatabaseRole } = require('../../auth/middleware/roleMiddleware');
-const { publicEndpointLimiter } = require('../../../shared/middleware/rateLimiter');
-const remitoController = require('../controllers/remitoController');
+import express from 'express';
+import { authenticate } from '../../auth/middleware/authMiddleware.js';
+import { requireDatabaseRole } from '../../auth/middleware/roleMiddleware.js';
+import { publicEndpointLimiter } from '../../../shared/middleware/rateLimiter.js';
+import remitoController from '../controllers/remitoController.js';
 
 const router = express.Router();
 
@@ -162,4 +162,4 @@ router.patch(
   remitoController.asignarReceptor.bind(remitoController)
 );
 
-module.exports = router;
+export default router;

@@ -1,10 +1,15 @@
-// src/app.js - CORREGIDO
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const fs = require('fs');
-const path = require('path');
+// src/app.js
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// ES Modules: obtener __dirname equivalente
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Crear directorio de logs si no existe
 const logsDir = path.join(__dirname, '..', 'logs');
@@ -12,10 +17,10 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-const logger = require('./shared/utils/logger');
-const errorHandler = require('./shared/middleware/errorHandler');
-const notFoundHandler = require('./shared/middleware/notFoundHandler');
-const { generalLimiter, authLimiter } = require('./shared/middleware/rateLimiter');
+import logger from './shared/utils/logger.js';
+import errorHandler from './shared/middleware/errorHandler.js';
+import notFoundHandler from './shared/middleware/notFoundHandler.js';
+import { generalLimiter, authLimiter } from './shared/middleware/rateLimiter.js';
 
 const app = express();
 
@@ -93,11 +98,12 @@ app.get('/health', (req, res) => {
 // Los PDFs se acceden directamente desde R2 via URLs públicas
 logger.info('✅ Storage configurado: PDFs en Cloudflare R2');
 
-// Función para cargar rutas de forma segura
-const loadRoutes = (routePath, mountPath) => {
+// Función para cargar rutas de forma segura (async para ES Modules)
+const loadRoutes = async (routePath, mountPath) => {
   try {
     logger.info(`🔄 Cargando rutas: ${routePath} -> ${mountPath}`);
-    const routes = require(routePath);
+    const routeModule = await import(routePath);
+    const routes = routeModule.default || routeModule;
     app.use(mountPath, routes);
     logger.info(`✅ Rutas cargadas exitosamente: ${mountPath}`);
   } catch (error) {
@@ -118,40 +124,45 @@ const loadRoutes = (routePath, mountPath) => {
   }
 };
 
-// Cargar todas las rutas de la API
-logger.info('🚀 Iniciando carga de rutas...');
+// Cargar todas las rutas de la API (async)
+const initializeRoutes = async () => {
+  logger.info('🚀 Iniciando carga de rutas...');
 
-// Rutas de autenticación (CRÍTICAS)
-loadRoutes('./modules/auth/routes', '/api/auth');
+  // Rutas de autenticación (CRÍTICAS)
+  await loadRoutes('./modules/auth/routes/index.js', '/api/auth');
 
-// Rutas de empresas
-loadRoutes('./modules/empresas/routes', '/api/empresas');
+  // Rutas de empresas
+  await loadRoutes('./modules/empresas/routes/index.js', '/api/empresas');
 
-// Rutas de roles
-loadRoutes('./modules/roles/routes', '/api/roles');
+  // Rutas de roles
+  await loadRoutes('./modules/roles/routes/index.js', '/api/roles');
 
-// Rutas de personal
-loadRoutes('./modules/personal/routes', '/api/personal');
+  // Rutas de personal
+  await loadRoutes('./modules/personal/routes/index.js', '/api/personal');
 
-// Rutas de inventario (ANTES que sedes para que /:id/estado no colisione)
-loadRoutes('./modules/inventario/routes', '/api/inventario');
+  // Rutas de inventario (ANTES que sedes para que /:id/estado no colisione)
+  await loadRoutes('./modules/inventario/routes/index.js', '/api/inventario');
 
-// Rutas de sedes
-loadRoutes('./modules/sedes/routes', '/api/sedes');
+  // Rutas de sedes
+  await loadRoutes('./modules/sedes/routes/index.js', '/api/sedes');
 
-// Rutas de tipos de artículos
-loadRoutes('./modules/inventario/routes/tipoArticuloRoutes', '/api/tipo-articulo');
+  // Rutas de tipos de artículos
+  await loadRoutes('./modules/inventario/routes/tipoArticuloRoutes.js', '/api/tipo-articulo');
 
-// Rutas de remitos
-loadRoutes('./modules/remitos/routes', '/api/remitos');
+  // Rutas de remitos
+  await loadRoutes('./modules/remitos/routes/index.js', '/api/remitos');
 
-// Rutas de proveedores
-loadRoutes('./modules/proveedores/routes', '/api/proveedores');
+  // Rutas de proveedores
+  await loadRoutes('./modules/proveedores/routes/index.js', '/api/proveedores');
 
-// Rutas de visitas
-loadRoutes('./modules/visitas/routes', '/api/visitas');
+  // Rutas de visitas
+  await loadRoutes('./modules/visitas/routes/index.js', '/api/visitas');
 
-logger.info('✅ Todas las rutas han sido procesadas');
+  logger.info('✅ Todas las rutas han sido procesadas');
+};
+
+// Inicializar rutas
+await initializeRoutes();
 
 // Test endpoint para verificar que la app funciona
 app.get('/api/test', (req, res) => {
@@ -168,4 +179,4 @@ app.get('/api/test', (req, res) => {
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-module.exports = app;
+export default app;

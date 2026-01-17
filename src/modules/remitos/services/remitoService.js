@@ -1,5 +1,5 @@
 // src/modules/remitos/services/remitoService.js
-const {
+import {
   Remito,
   RemitoDetalle,
   Inventario,
@@ -8,13 +8,13 @@ const {
   Sede,
   TipoArticulo,
   sequelize
-} = require('../../../models');
-const logger = require('../../../shared/utils/logger');
-const { Op, Sequelize } = require('sequelize');
-const AuditService = require('../../../shared/services/auditService');
-const pdfService = require('../../../shared/services/pdfService');
-const emailService = require('../../../shared/services/emailService');
-const tokenService = require('../../../shared/services/tokenService');
+} from '../../../models/index.js';
+import logger from '../../../shared/utils/logger.js';
+import { Op, Sequelize } from 'sequelize';
+import AuditService from '../../../shared/services/auditService.js';
+import pdfService from '../../../shared/services/pdfService.js';
+import emailService from '../../../shared/services/emailService.js';
+import tokenService from '../../../shared/services/tokenService.js';
 
 class RemitoService {
   /**
@@ -179,7 +179,7 @@ class RemitoService {
    */
   async validarArticuloNoEnTransito(inventarioId) {
     try {
-      const { Remito } = require('../../../models');
+      // Remito ya importado al inicio del archivo
 
       // Buscar si existe un RemitoDetalle con este inventario en un remito activo
       const detalleExistente = await RemitoDetalle.findOne({
@@ -189,7 +189,7 @@ class RemitoService {
           as: 'remito',
           where: {
             estado: {
-              [require('sequelize').Op.in]: ['preparado', 'en_transito', 'entregado']
+              [Op.in]: ['preparado', 'en_transito', 'entregado']
             }
           }
         }]
@@ -218,8 +218,7 @@ class RemitoService {
    * Valida inventarios disponibles y que no estén en remitos activos
    */
   async validarArticulosBatch(articulos, sedeOrigenId) {
-    const { Remito } = require('../../../models');
-    const { Op } = require('sequelize');
+    // Remito y Op ya importados al inicio del archivo
     const inventarioIds = articulos.map(a => a.inventario_id);
 
     logger.info('validarArticulosBatch - Iniciando validación batch:', {
@@ -2098,4 +2097,4 @@ class RemitoService {
   }
 }
 
-module.exports = new RemitoService();
+export default new RemitoService();

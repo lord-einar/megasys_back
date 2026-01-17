@@ -1,5 +1,5 @@
 // src/modules/auth/services/tokenCacheService.js
-const logger = require('../../../shared/utils/logger');
+import logger from '../../../shared/utils/logger.js';
 
 class TokenCacheService {
   /**
@@ -147,4 +147,4 @@ class TokenCacheService {
   }
 }
 
-module.exports = new TokenCacheService();
+export default new TokenCacheService();

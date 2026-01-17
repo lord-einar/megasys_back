@@ -1,6 +1,7 @@
 // src/modules/empresas/services/empresaService.js
-const { Empresa } = require('../../../models');
-const logger = require('../../../shared/utils/logger');
+import { Op } from 'sequelize';
+import Empresa from '../../../models/Empresa.js';
+import logger from '../../../shared/utils/logger.js';
 
 class EmpresaService {
   /**
@@ -12,7 +13,7 @@ class EmpresaService {
 
       if (filtros.nombre) {
         where.nombre_empresa = {
-          [require('sequelize').Op.iLike]: `%${filtros.nombre}%`
+          [Op.iLike]: `%${filtros.nombre}%`
         };
       }
 
@@ -38,7 +39,7 @@ class EmpresaService {
 
       if (filtros.nombre) {
         where.nombre_empresa = {
-          [require('sequelize').Op.iLike]: `%${filtros.nombre}%`
+          [Op.iLike]: `%${filtros.nombre}%`
         };
       }
 
@@ -157,4 +158,4 @@ class EmpresaService {
   }
 }
 
-module.exports = new EmpresaService();
+export default new EmpresaService();

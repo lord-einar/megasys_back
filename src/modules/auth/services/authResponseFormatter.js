@@ -1,5 +1,5 @@
 // src/modules/auth/services/authResponseFormatter.js
-const logger = require('../../../shared/utils/logger');
+import logger from '../../../shared/utils/logger.js';
 
 class AuthResponseFormatter {
   /**
@@ -174,4 +174,4 @@ class AuthResponseFormatter {
   }
 }
 
-module.exports = new AuthResponseFormatter();
+export default new AuthResponseFormatter();

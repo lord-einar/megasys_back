@@ -1,7 +1,7 @@
 // src/models/VisitaInforme.js
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../shared/utils/database');
-const { v4: uuidv4 } = require('uuid');
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../shared/utils/database.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const VisitaInforme = sequelize.define('VisitaInforme', {
     id: {
@@ -74,4 +74,4 @@ const VisitaInforme = sequelize.define('VisitaInforme', {
     ]
 });
 
-module.exports = VisitaInforme;
+export default VisitaInforme;

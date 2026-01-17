@@ -1,7 +1,7 @@
 // src/models/HistorialMovimiento.js
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../shared/utils/database');
-const { v4: uuidv4 } = require('uuid');
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../shared/utils/database.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const HistorialMovimiento = sequelize.define('HistorialMovimiento', {
   id: {
@@ -89,4 +89,4 @@ const HistorialMovimiento = sequelize.define('HistorialMovimiento', {
   ]
 });
 
-module.exports = HistorialMovimiento
+export default HistorialMovimiento;

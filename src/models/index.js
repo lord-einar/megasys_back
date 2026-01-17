@@ -1,33 +1,33 @@
 // src/models/index.js - COMPLETO CON RELACIONES
-const { Sequelize } = require('sequelize');
-const { sequelize } = require('../shared/utils/database');
-const logger = require('../shared/utils/logger');
+import { Sequelize } from 'sequelize';
+import { sequelize } from '../shared/utils/database.js';
+import logger from '../shared/utils/logger.js';
 
 // Importar todos los modelos
-const Empresa = require('./Empresa');
-const Sede = require('./Sede');
-const Personal = require('./Personal');
-const PersonalSede = require('./PersonalSede');
-const SedeAsignacion = require('./SedeAsignacion');
-const TipoArticulo = require('./TipoArticulo');
-const Rol = require('./Rol');
-const Inventario = require('./Inventario');
-const Proveedor = require('./Proveedor');
-const EjecutivoCuentas = require('./EjecutivoCuentas');
-const TipoServicio = require('./TipoServicio');
-const Servicio = require('./Servicio');
-const SoporteNivel = require('./SoporteNivel');
-const Remito = require('./Remito');
-const RemitoDetalle = require('./RemitoDetalle');
-const HistorialMovimiento = require('./HistorialMovimiento');
-const HistoricoInventario = require('./HistoricoInventario');
-const Auditoria = require('./Auditoria');
-const Visita = require('./Visita');
-const VisitaRecurrencia = require('./VisitaRecurrencia');
-const VisitaSolicitudPrevia = require('./VisitaSolicitudPrevia');
-const VisitaInforme = require('./VisitaInforme');
-const VisitaProblemaResuelto = require('./VisitaProblemaResuelto');
-const VisitaChecklistItem = require('./VisitaChecklistItem');
+import Empresa from './Empresa.js';
+import Sede from './Sede.js';
+import Personal from './Personal.js';
+import PersonalSede from './PersonalSede.js';
+import SedeAsignacion from './SedeAsignacion.js';
+import TipoArticulo from './TipoArticulo.js';
+import Rol from './Rol.js';
+import Inventario from './Inventario.js';
+import Proveedor from './Proveedor.js';
+import EjecutivoCuentas from './EjecutivoCuentas.js';
+import TipoServicio from './TipoServicio.js';
+import Servicio from './Servicio.js';
+import SoporteNivel from './SoporteNivel.js';
+import Remito from './Remito.js';
+import RemitoDetalle from './RemitoDetalle.js';
+import HistorialMovimiento from './HistorialMovimiento.js';
+import HistoricoInventario from './HistoricoInventario.js';
+import Auditoria from './Auditoria.js';
+import Visita from './Visita.js';
+import VisitaRecurrencia from './VisitaRecurrencia.js';
+import VisitaSolicitudPrevia from './VisitaSolicitudPrevia.js';
+import VisitaInforme from './VisitaInforme.js';
+import VisitaProblemaResuelto from './VisitaProblemaResuelto.js';
+import VisitaChecklistItem from './VisitaChecklistItem.js';
 
 // =====================================================
 // DEFINICIÓN DE RELACIONES
@@ -603,4 +603,35 @@ models.syncDatabase = async (force = false) => {
   }
 };
 
-module.exports = models;
+export default models;
+
+// Named exports para imports destructurados
+export {
+  sequelize,
+  Sequelize,
+  Empresa,
+  Sede,
+  Personal,
+  PersonalSede,
+  SedeAsignacion,
+  TipoArticulo,
+  Rol,
+  Inventario,
+  Proveedor,
+  EjecutivoCuentas,
+  TipoServicio,
+  Servicio,
+  SoporteNivel,
+  Remito,
+  RemitoDetalle,
+  HistorialMovimiento,
+  HistoricoInventario,
+  Auditoria,
+  SedeServicio,
+  Visita,
+  VisitaRecurrencia,
+  VisitaSolicitudPrevia,
+  VisitaInforme,
+  VisitaProblemaResuelto,
+  VisitaChecklistItem
+};

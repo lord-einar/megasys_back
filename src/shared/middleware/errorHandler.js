@@ -1,6 +1,6 @@
 // src/shared/middleware/errorHandler.js
-const logger = require('../utils/logger');
-const { error } = require('../utils/response');
+import logger from '../utils/logger.js';
+import { error } from '../utils/response.js';
 
 /**
  * Middleware global para manejo de errores
@@ -59,4 +59,4 @@ const errorHandler = (err, req, res, next) => {
   return error(res, 'Error interno del servidor', 500);
 };
 
-module.exports = errorHandler;
+export default errorHandler;

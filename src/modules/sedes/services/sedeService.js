@@ -1,7 +1,7 @@
 // src/modules/sedes/services/sedeService.js
-const { Sede, Personal, Inventario, Servicio, Empresa, sequelize } = require('../../../models');
-const logger = require('../../../shared/utils/logger');
-const { Op } = require('sequelize');
+import { Sede, Personal, Inventario, Servicio, Empresa, sequelize, Remito, RemitoDetalle, TipoArticulo, SoporteNivel } from '../../../models/index.js';
+import logger from '../../../shared/utils/logger.js';
+import { Op } from 'sequelize';
 
 class SedeService {
   /**
@@ -164,7 +164,7 @@ class SedeService {
     }
 
     // Buscar artículos en préstamo EN esta sede
-    const { Remito, RemitoDetalle } = require('../../../models');
+    // Remito y RemitoDetalle ya importados al inicio del archivo
 
     logger.info('🔍 Buscando préstamos para sede:', { sedeId });
 
@@ -196,7 +196,7 @@ class SedeService {
           as: 'inventarioDetalle',
           include: [
             {
-              model: require('../../../models').TipoArticulo,
+              model: TipoArticulo,
               as: 'tipoArticulo',
               attributes: ['id', 'nombre']
             }
@@ -544,7 +544,7 @@ class SedeService {
     });
 
     // Buscar artículos en préstamo EN esta sede (aunque no sean parte del inventario propio)
-    const { Remito, RemitoDetalle } = require('../../../models');
+    // Remito y RemitoDetalle ya importados al inicio del archivo
     const prestamosEnSede = await RemitoDetalle.findAll({
       where: {
         es_prestamo: true,
@@ -573,7 +573,7 @@ class SedeService {
           as: 'inventarioDetalle',
           include: [
             {
-              model: require('../../../models').TipoArticulo,
+              model: TipoArticulo,
               as: 'tipoArticulo',
               attributes: ['id', 'nombre']
             }
@@ -636,7 +636,7 @@ class SedeService {
         'proveedor',
         'tipoServicio',
         {
-          model: require('../../../models').SoporteNivel,
+          model: SoporteNivel,
           as: 'nivelessoporte',
           where: { activo: true },
           required: false
@@ -792,4 +792,4 @@ class SedeService {
   }
 }
 
-module.exports = new SedeService();
+export default new SedeService();

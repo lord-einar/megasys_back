@@ -1,7 +1,7 @@
 // src/modules/personal/services/personalSedeService.js
-const { PersonalSede, Personal, Sede, Rol, Empresa, sequelize } = require('../../../models');
-const logger = require('../../../shared/utils/logger');
-const { Op } = require('sequelize');
+import { PersonalSede, Personal, Sede, Rol, Empresa, sequelize } from '../../../models/index.js';
+import logger from '../../../shared/utils/logger.js';
+import { Op } from 'sequelize';
 
 class PersonalSedeService {
   /**
@@ -395,4 +395,4 @@ class PersonalSedeService {
   }
 }
 
-module.exports = new PersonalSedeService();
+export default new PersonalSedeService();

@@ -1,6 +1,6 @@
-const { Visita, VisitaInforme, VisitaProblemaResuelto, Sede, Personal, sequelize } = require('../../../models');
-const { Op } = require('sequelize');
-const logger = require('../../../shared/utils/logger');
+import { Visita, VisitaInforme, VisitaProblemaResuelto, Sede, Personal, sequelize } from '../../../models/index.js';
+import { Op } from 'sequelize';
+import logger from '../../../shared/utils/logger.js';
 
 class VisitaReportService {
     /**
@@ -504,4 +504,4 @@ class VisitaReportService {
     }
 }
 
-module.exports = new VisitaReportService();
+export default new VisitaReportService();

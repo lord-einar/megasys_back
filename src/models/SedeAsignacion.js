@@ -1,7 +1,7 @@
 // src/models/SedeAsignacion.js
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../shared/utils/database');
-const { v4: uuidv4 } = require('uuid');
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../shared/utils/database.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const SedeAsignacion = sequelize.define('SedeAsignacion', {
   id: {
@@ -84,4 +84,4 @@ const SedeAsignacion = sequelize.define('SedeAsignacion', {
   ]
 });
 
-module.exports = SedeAsignacion;
+export default SedeAsignacion;

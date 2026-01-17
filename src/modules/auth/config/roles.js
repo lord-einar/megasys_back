@@ -29,7 +29,7 @@ const PERMISSIONS = {
     update: ['super_admin'],
     delete: ['super_admin']
   },
-  
+
   // Permisos para Personal
   personal: {
     read: ['super_admin', 'helpdesk', 'support'],
@@ -37,7 +37,7 @@ const PERMISSIONS = {
     update: ['super_admin', 'helpdesk'],
     delete: ['super_admin', 'helpdesk']
   },
-  
+
   // Permisos para Inventario
   inventario: {
     read: ['super_admin', 'helpdesk', 'support'],
@@ -45,7 +45,7 @@ const PERMISSIONS = {
     update: ['super_admin', 'support'],
     delete: ['super_admin', 'support']
   },
-  
+
   // Permisos para Remitos
   remitos: {
     read: ['super_admin', 'helpdesk', 'support'],
@@ -53,7 +53,7 @@ const PERMISSIONS = {
     update: ['super_admin', 'support'],
     delete: ['super_admin', 'support']
   },
-  
+
   // Permisos para Proveedores
   proveedores: {
     read: ['super_admin', 'helpdesk', 'support'],
@@ -61,7 +61,7 @@ const PERMISSIONS = {
     update: ['super_admin'],
     delete: ['super_admin']
   },
-  
+
   // Permisos administrativos
   admin: {
     system_settings: ['super_admin'],
@@ -103,7 +103,15 @@ const ROLES = {
   }
 };
 
-module.exports = {
+export {
+  GUID_TO_GROUP_MAP,
+  GROUP_TO_ROLE_MAP,
+  ROLE_HIERARCHY,
+  PERMISSIONS,
+  ROLES
+};
+
+export default {
   GUID_TO_GROUP_MAP,
   GROUP_TO_ROLE_MAP,
   ROLE_HIERARCHY,

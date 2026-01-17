@@ -1,7 +1,8 @@
 // src/modules/auth/middleware/roleMiddleware.js - Versión jerárquica actualizada
-const roleService = require('../services/roleService');
-const { error } = require('../../../shared/utils/response');
-const logger = require('../../../shared/utils/logger');
+import roleService from '../services/roleService.js';
+import { error } from '../../../shared/utils/response.js';
+import logger from '../../../shared/utils/logger.js';
+import { Personal, Rol } from '../../../models/index.js';
 
 /**
  * Middleware para verificar permisos específicos
@@ -15,15 +16,15 @@ const requirePermission = (resource, action) => {
 
       // Obtener rol del usuario (siempre el más alto por jerarquía)
       const userRole = roleService.getUserRole(req.user.groups || []);
-      
+
       // Agregar información del rol al objeto user
       req.user.role = userRole;
       req.user.roleInfo = roleService.getRoleInfo(userRole);
       req.user.availableRoles = roleService.getUserAvailableRoles(userRole);
-      
+
       // Verificar permiso
       const hasPermission = roleService.hasPermission(userRole, resource, action);
-      
+
       if (!hasPermission) {
         logger.warn('Acceso denegado por falta de permisos:', {
           userId: req.user.id,
@@ -33,17 +34,17 @@ const requirePermission = (resource, action) => {
           action,
           groups: req.user.groups?.slice(0, 5) // Solo primeros 5 grupos en log
         });
-        
+
         return error(res, `Sin permisos para ${action} en ${resource}. Rol requerido superior a ${userRole}`, 403);
       }
-      
+
       logger.info('Acceso autorizado:', {
         userId: req.user.id,
         userRole,
         resource,
         action
       });
-      
+
       next();
     } catch (err) {
       logger.error('Error en middleware de permisos:', err);
@@ -65,22 +66,22 @@ const requireRole = (...allowedRoles) => {
       const userRole = roleService.getUserRole(req.user.groups || []);
       req.user.role = userRole;
       req.user.roleInfo = roleService.getRoleInfo(userRole);
-      
+
       // Verificar si el usuario tiene suficiente jerarquía
-      const hasAccess = allowedRoles.some(requiredRole => 
+      const hasAccess = allowedRoles.some(requiredRole =>
         roleService.hasRoleLevel(userRole, requiredRole)
       );
-      
+
       if (!hasAccess) {
         logger.warn('Acceso denegado por jerarquía de rol:', {
           userId: req.user.id,
           userRole,
           allowedRoles
         });
-        
+
         return error(res, 'Sin permisos suficientes para este recurso', 403);
       }
-      
+
       next();
     } catch (err) {
       logger.error('Error en middleware de rol:', err);
@@ -114,7 +115,7 @@ const enrichUserWithRole = (req, res, next) => {
  * @param {string|string[]} roleNames - Nombre del rol o array de nombres de roles permitidos
  */
 const requireDatabaseRole = (roleNames) => {
-  const { Personal, Rol } = require('../../../models');
+  // Personal y Rol ya importados al inicio del archivo
 
   return async (req, res, next) => {
     try {
@@ -179,7 +180,14 @@ const requireDatabaseRole = (roleNames) => {
   };
 };
 
-module.exports = {
+export {
+  requirePermission,
+  requireRole,
+  enrichUserWithRole,
+  requireDatabaseRole
+};
+
+export default {
   requirePermission,
   requireRole,
   enrichUserWithRole,

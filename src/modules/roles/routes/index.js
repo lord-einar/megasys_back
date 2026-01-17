@@ -1,10 +1,10 @@
 // src/modules/roles/routes/index.js
-const express = require('express');
-const { authenticate } = require('../../auth/middleware/authMiddleware');
-const { requirePermission } = require('../../auth/middleware/roleMiddleware');
-const validate = require('../../../shared/middleware/validation');
-const { body, param, query } = require('express-validator');
-const rolesController = require('../controllers/rolesController');
+import express from 'express';
+import { authenticate } from '../../auth/middleware/authMiddleware.js';
+import { requirePermission } from '../../auth/middleware/roleMiddleware.js';
+import validate from '../../../shared/middleware/validation.js';
+import { body, param, query } from 'express-validator';
+import rolesController from '../controllers/rolesController.js';
 
 const router = express.Router();
 
@@ -132,4 +132,4 @@ router.delete('/:id',
   rolesController.eliminar
 );
 
-module.exports = router;
+export default router;

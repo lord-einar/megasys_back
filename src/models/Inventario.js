@@ -1,8 +1,8 @@
 // src/models/Inventario.js
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../shared/utils/database');
-const { v4: uuidv4 } = require('uuid');
-const { VALID_STATES } = require('../shared/constants/inventoryStates');
+import { DataTypes, Op } from 'sequelize';
+import { sequelize } from '../shared/utils/database.js';
+import { v4 as uuidv4 } from 'uuid';
+import { VALID_STATES } from '../shared/constants/inventoryStates.js';
 
 const Inventario = sequelize.define('Inventario', {
   id: {
@@ -132,7 +132,7 @@ const Inventario = sequelize.define('Inventario', {
       fields: ['numero_serie'],
       where: {
         numero_serie: {
-          [sequelize.Sequelize.Op.ne]: null
+          [Op.ne]: null
         }
       }
     },
@@ -175,39 +175,39 @@ const Inventario = sequelize.define('Inventario', {
 });
 
 // Métodos de instancia
-Inventario.prototype.getIdentificacion = function() {
+Inventario.prototype.getIdentificacion = function () {
   const identificadores = [];
   if (this.numero_serie) identificadores.push(`S/N: ${this.numero_serie}`);
   if (this.service_tag) identificadores.push(`TAG: ${this.service_tag}`);
-  
-  return identificadores.length > 0 
-    ? identificadores.join(' | ') 
+
+  return identificadores.length > 0
+    ? identificadores.join(' | ')
     : `${this.marca} ${this.modelo}`;
 };
 
-Inventario.prototype.getDescripcionCompleta = function() {
+Inventario.prototype.getDescripcionCompleta = function () {
   return `${this.marca} ${this.modelo} - ${this.getIdentificacion()}`;
 };
 
-Inventario.prototype.estaDisponible = function() {
+Inventario.prototype.estaDisponible = function () {
   return this.activo && this.estado === 'disponible';
 };
 
 // Métodos estáticos
-Inventario.findDisponibles = function(sedeId = null) {
+Inventario.findDisponibles = function (sedeId = null) {
   const where = {
     estado: 'disponible',
     activo: true
   };
-  
+
   if (sedeId) {
     where.sede_id = sedeId;
   }
-  
+
   return this.findAll({ where });
 };
 
-Inventario.findPorTipo = function(tipoArticuloId) {
+Inventario.findPorTipo = function (tipoArticuloId) {
   return this.findAll({
     where: {
       tipo_articulo_id: tipoArticuloId,
@@ -216,4 +216,4 @@ Inventario.findPorTipo = function(tipoArticuloId) {
   });
 };
 
-module.exports = Inventario;
+export default Inventario;

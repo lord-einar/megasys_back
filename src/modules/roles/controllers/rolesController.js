@@ -1,10 +1,10 @@
 // src/modules/roles/controllers/rolesController.js
-const { Rol, sequelize } = require('../../../models');
-const { success, paginated, error } = require('../../../shared/utils/response');
-const asyncHandler = require('../../../shared/utils/asyncHandler');
-const logger = require('../../../shared/utils/logger');
-const { Op } = require('sequelize');
-const TransactionWrapper = require('../../../shared/utils/transactionWrapper');
+import { Rol, sequelize } from '../../../models/index.js';
+import { success, paginated, error } from '../../../shared/utils/response.js';
+import asyncHandler from '../../../shared/utils/asyncHandler.js';
+import logger from '../../../shared/utils/logger.js';
+import { Op } from 'sequelize';
+import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
 
 class RolesController {
   /**
@@ -211,4 +211,4 @@ class RolesController {
   });
 }
 
-module.exports = new RolesController();
+export default new RolesController();

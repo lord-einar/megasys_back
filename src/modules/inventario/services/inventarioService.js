@@ -1,8 +1,8 @@
 // src/modules/inventario/services/inventarioService.js
-const { Inventario, TipoArticulo, Sede, HistorialMovimiento, sequelize } = require('../../../models');
-const logger = require('../../../shared/utils/logger');
-const { Op } = require('sequelize');
-const TransactionWrapper = require('../../../shared/utils/transactionWrapper');
+import { Inventario, TipoArticulo, Sede, HistorialMovimiento, sequelize, RemitoDetalle, Remito } from '../../../models/index.js';
+import logger from '../../../shared/utils/logger.js';
+import { Op } from 'sequelize';
+import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
 
 class InventarioService {
   /**
@@ -196,7 +196,7 @@ class InventarioService {
     // Si el artículo está en préstamo, buscar el remito activo
     const itemJson = item.toJSON();
     if (item.estado === 'en_prestamo') {
-      const { RemitoDetalle, Remito, Sede: SedeModel } = require('../../../models');
+      // RemitoDetalle, Remito y Sede ya importados al inicio del archivo
 
       const prestamoActivo = await RemitoDetalle.findOne({
         where: {
@@ -215,12 +215,12 @@ class InventarioService {
             },
             include: [
               {
-                model: SedeModel,
+                model: Sede,
                 as: 'sedeDestino',
                 attributes: ['id', 'nombre_sede', 'localidad', 'provincia']
               },
               {
-                model: SedeModel,
+                model: Sede,
                 as: 'sedeOrigen',
                 attributes: ['id', 'nombre_sede', 'localidad']
               }
@@ -772,4 +772,4 @@ class InventarioService {
   }
 }
 
-module.exports = new InventarioService();
+export default new InventarioService();

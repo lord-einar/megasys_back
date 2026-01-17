@@ -1,6 +1,7 @@
 // src/modules/inventario/services/tipoArticuloService.js
-const { TipoArticulo, sequelize } = require('../../../models');
-const logger = require('../../../shared/utils/logger');
+import { Op } from 'sequelize';
+import { TipoArticulo, sequelize } from '../../../models/index.js';
+import logger from '../../../shared/utils/logger.js';
 
 class TipoArticuloService {
   /**
@@ -17,7 +18,7 @@ class TipoArticuloService {
 
       // Búsqueda por nombre o descripción
       if (search && search.trim()) {
-        const { Op } = require('sequelize');
+        // Op ya importado al inicio del archivo
         where[Op.or] = [
           { nombre: { [Op.iLike]: `%${search}%` } },
           { descripcion: { [Op.iLike]: `%${search}%` } }
@@ -149,7 +150,7 @@ class TipoArticuloService {
           where: {
             nombre: datos.nombre.trim(),
             activo: true,
-            id: { [require('sequelize').Op.ne]: id }
+            id: { [Op.ne]: id }
           },
           transaction: t
         });
@@ -244,4 +245,4 @@ class TipoArticuloService {
   }
 }
 
-module.exports = new TipoArticuloService();
+export default new TipoArticuloService();

@@ -1,6 +1,6 @@
 // src/shared/middleware/rateLimiter.js
-const rateLimit = require('express-rate-limit');
-const logger = require('../utils/logger');
+import rateLimit from 'express-rate-limit';
+import logger from '../utils/logger.js';
 
 /**
  * Función para extraer la IP real del cliente desde los headers de proxy de Azure
@@ -34,7 +34,7 @@ const getClientIp = (req) => {
 /**
  * Rate limiter general - para la mayoría de rutas autenticadas
  */
-const generalLimiter = rateLimit({
+export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: process.env.NODE_ENV === 'development' ? 1000 : 100, // desarrollo: 1000, producción: 100
   message: {
@@ -62,7 +62,7 @@ const generalLimiter = rateLimit({
 /**
  * Rate limiter específico para autenticación - más permisivo para desarrollo
  */
-const authLimiter = rateLimit({
+export const authLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minuto
   max: 50, // máximo 50 requests por IP por minuto
   message: {
@@ -94,7 +94,7 @@ const authLimiter = rateLimit({
  * - Solicitudes de visitas
  * - Feedback de visitas
  */
-const publicEndpointLimiter = rateLimit({
+export const publicEndpointLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: process.env.NODE_ENV === 'development' ? 100 : 20, // desarrollo: 100, producción: 20
   message: {
@@ -117,9 +117,3 @@ const publicEndpointLimiter = rateLimit({
     });
   }
 });
-
-module.exports = {
-  generalLimiter,
-  authLimiter,
-  publicEndpointLimiter
-};

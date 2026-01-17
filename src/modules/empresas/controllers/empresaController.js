@@ -1,9 +1,9 @@
 // src/modules/empresas/controllers/empresaController.js
-const empresaService = require('../services/empresaService');
-const { success, error } = require('../../../shared/utils/response');
-const asyncHandler = require('../../../shared/utils/asyncHandler');
-const logger = require('../../../shared/utils/logger');
-const TransactionWrapper = require('../../../shared/utils/transactionWrapper');
+import empresaService from '../services/empresaService.js';
+import { success, error } from '../../../shared/utils/response.js';
+import asyncHandler from '../../../shared/utils/asyncHandler.js';
+import logger from '../../../shared/utils/logger.js';
+import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
 
 class EmpresaController {
   /**
@@ -204,4 +204,4 @@ class EmpresaController {
   });
 }
 
-module.exports = new EmpresaController();
+export default new EmpresaController();

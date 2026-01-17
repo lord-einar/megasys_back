@@ -1,7 +1,7 @@
 // src/models/Auditoria.js - SISTEMA DE AUDITORÍA COMPLETO
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../shared/utils/database');
-const { v4: uuidv4 } = require('uuid');
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../shared/utils/database.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const Auditoria = sequelize.define('Auditoria', {
   id: {
@@ -117,4 +117,4 @@ const Auditoria = sequelize.define('Auditoria', {
   comment: 'Tabla de auditoría para registrar todas las acciones de los usuarios'
 });
 
-module.exports = Auditoria;
+export default Auditoria;

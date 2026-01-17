@@ -1,7 +1,7 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const authController = require('../controllers/authController');
-const { authenticate } = require('../middleware/authMiddleware');
+import authController from '../controllers/authController.js';
+import { authenticate } from '../middleware/authMiddleware.js';
 
 // Rutas de autenticación
 router.get('/login', authController.login);
@@ -21,4 +21,4 @@ if (process.env.NODE_ENV === 'development') {
   router.post('/dev-login', authController.devLogin);
 }
 
-module.exports = router;
+export default router;

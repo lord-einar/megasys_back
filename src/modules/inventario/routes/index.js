@@ -1,11 +1,11 @@
 // src/modules/inventario/routes/index.js - COMPLETO
-const express = require('express');
-const { authenticate } = require('../../auth/middleware/authMiddleware');
-const { requirePermission } = require('../../auth/middleware/roleMiddleware');
-const validate = require('../../../shared/middleware/validation');
-const { body, param, query } = require('express-validator');
-const inventarioController = require('../controllers/inventarioController');
-const { VALID_STATES } = require('../../../shared/constants/inventoryStates');
+import express from 'express';
+import { authenticate } from '../../auth/middleware/authMiddleware.js';
+import { requirePermission } from '../../auth/middleware/roleMiddleware.js';
+import validate from '../../../shared/middleware/validation.js';
+import { body, param, query } from 'express-validator';
+import inventarioController from '../controllers/inventarioController.js';
+import { VALID_STATES } from '../../../shared/constants/inventoryStates.js';
 
 const router = express.Router();
 
@@ -342,4 +342,4 @@ router.get('/:id/historial',
   inventarioController.obtenerHistorial
 );
 
-module.exports = router;
+export default router;

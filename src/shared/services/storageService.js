@@ -1,5 +1,5 @@
-const { S3Client, PutObjectCommand, HeadObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
-const logger = require('../utils/logger');
+import { S3Client, PutObjectCommand, HeadObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import logger from '../utils/logger.js';
 
 class StorageService {
   constructor() {
@@ -199,7 +199,7 @@ class StorageService {
     }
 
     try {
-      const { GetObjectCommand } = require('@aws-sdk/client-s3');
+      // GetObjectCommand ya importado al inicio del archivo
       const key = `${folder}/${filename}`;
 
       logger.info('Descargando PDF de R2:', { key, bucket: this.bucketName });
@@ -256,4 +256,4 @@ class StorageService {
   }
 }
 
-module.exports = new StorageService();
+export default new StorageService();

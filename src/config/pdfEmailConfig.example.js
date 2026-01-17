@@ -64,7 +64,7 @@ const TOKEN_CONFIG = {
   algorithm: 'HS256'
 };
 
-module.exports = {
+export default {
   EMAIL_CONFIG,
   PDF_CONFIG,
   TOKEN_CONFIG

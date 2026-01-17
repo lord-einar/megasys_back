@@ -1,7 +1,7 @@
 // src/models/EjecutivoCuentas.js
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../shared/utils/database');
-const { v4: uuidv4 } = require('uuid');
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../shared/utils/database.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const EjecutivoCuentas = sequelize.define('EjecutivoCuentas', {
   id: {
@@ -54,4 +54,4 @@ const EjecutivoCuentas = sequelize.define('EjecutivoCuentas', {
   tableName: 'ejecutivos_cuentas'
 });
 
-module.exports = EjecutivoCuentas
+export default EjecutivoCuentas;

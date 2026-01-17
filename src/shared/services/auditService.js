@@ -1,5 +1,5 @@
 // src/shared/services/auditService.js - SERVICIO DE AUDITORÍA CENTRALIZADO
-const { Auditoria } = require('../../models');
+import { Auditoria } from '../../models/index.js';
 
 /**
  * Servicio centralizado para logging de auditoría
@@ -253,4 +253,4 @@ class AuditService {
   }
 }
 
-module.exports = AuditService;
+export default AuditService;

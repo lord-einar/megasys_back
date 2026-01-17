@@ -1,7 +1,7 @@
 // src/models/RemitoDetalle.js
-const { DataTypes, Op, Sequelize } = require('sequelize');
-const { sequelize } = require('../shared/utils/database');
-const { v4: uuidv4 } = require('uuid');
+import { DataTypes, Op, Sequelize } from 'sequelize';
+import { sequelize } from '../shared/utils/database.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const RemitoDetalle = sequelize.define('RemitoDetalle', {
   id: {
@@ -143,4 +143,4 @@ RemitoDetalle.prototype.marcarDevuelto = async function() {
   return this;
 };
 
-module.exports = RemitoDetalle;
+export default RemitoDetalle;

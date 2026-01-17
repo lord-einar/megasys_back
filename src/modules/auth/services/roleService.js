@@ -1,6 +1,6 @@
 // src/modules/auth/services/roleService.js - Actualizado para usar GUIDs
-const { GUID_TO_GROUP_MAP, GROUP_TO_ROLE_MAP, ROLE_HIERARCHY, PERMISSIONS, ROLES } = require('../config/roles');
-const logger = require('../../../shared/utils/logger');
+import { GUID_TO_GROUP_MAP, GROUP_TO_ROLE_MAP, ROLE_HIERARCHY, PERMISSIONS, ROLES } from '../config/roles.js';
+import logger from '../../../shared/utils/logger.js';
 
 class RoleService {
   /**
@@ -167,4 +167,4 @@ class RoleService {
   }
 }
 
-module.exports = new RoleService();
+export default new RoleService();

@@ -1,9 +1,10 @@
 // src/modules/personal/controllers/personalSedeController.js - REFACTORIZADO PARA SOLID
-const personalSedeService = require('../services/personalSedeService');
-const { success, error, paginated } = require('../../../shared/utils/response');
-const asyncHandler = require('../../../shared/utils/asyncHandler');
-const logger = require('../../../shared/utils/logger');
-const TransactionWrapper = require('../../../shared/utils/transactionWrapper');
+import personalSedeService from '../services/personalSedeService.js';
+import { success, error, paginated } from '../../../shared/utils/response.js';
+import asyncHandler from '../../../shared/utils/asyncHandler.js';
+import logger from '../../../shared/utils/logger.js';
+import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
+import { PersonalSede } from '../../../models/index.js';
 
 class PersonalSedeController {
   /**
@@ -96,7 +97,7 @@ class PersonalSedeController {
       const { id } = req.params;
 
       // Get previous values for audit - using service's internal method
-      const { PersonalSede } = require('../../../models');
+      // PersonalSede ya importado al inicio del archivo
       const previousData = await PersonalSede.findByPk(id);
       if (!previousData) {
         return error(res, 'Asignación no encontrada', 404);
@@ -140,7 +141,7 @@ class PersonalSedeController {
       const { id } = req.params;
 
       // Get previous values for audit
-      const { PersonalSede } = require('../../../models');
+      // PersonalSede ya importado al inicio del archivo
       const previousData = await PersonalSede.findByPk(id);
       if (!previousData) {
         return error(res, 'Asignación no encontrada', 404);
@@ -187,4 +188,4 @@ class PersonalSedeController {
   });
 }
 
-module.exports = new PersonalSedeController();
+export default new PersonalSedeController();

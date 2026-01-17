@@ -1,6 +1,6 @@
 // src/modules/proveedores/routes/index.js
-const express = require('express');
-const { authenticate } = require('../../auth/middleware/authMiddleware');
+import express from 'express';
+import { authenticate } from '../../auth/middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -17,4 +17,4 @@ router.get('/', (req, res) => {
   });
 });
 
-module.exports = router;
+export default router;

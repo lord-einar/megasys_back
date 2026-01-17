@@ -1,7 +1,7 @@
 // src/modules/inventario/controllers/tipoArticuloController.js
-const tipoArticuloService = require('../services/tipoArticuloService');
-const logger = require('../../../shared/utils/logger');
-const TransactionWrapper = require('../../../shared/utils/transactionWrapper');
+import tipoArticuloService from '../services/tipoArticuloService.js';
+import logger from '../../../shared/utils/logger.js';
+import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
 
 class TipoArticuloController {
   /**
@@ -171,4 +171,4 @@ class TipoArticuloController {
   }
 }
 
-module.exports = new TipoArticuloController();
+export default new TipoArticuloController();

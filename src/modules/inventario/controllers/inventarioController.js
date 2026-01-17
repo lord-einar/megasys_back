@@ -1,8 +1,8 @@
 // src/modules/inventario/controllers/inventarioController.js
-const inventarioService = require('../services/inventarioService');
-const { success, error, paginated } = require('../../../shared/utils/response');
-const asyncHandler = require('../../../shared/utils/asyncHandler');
-const logger = require('../../../shared/utils/logger');
+import inventarioService from '../services/inventarioService.js';
+import { success, error, paginated } from '../../../shared/utils/response.js';
+import asyncHandler from '../../../shared/utils/asyncHandler.js';
+import logger from '../../../shared/utils/logger.js';
 
 class InventarioController {
   /**
@@ -182,4 +182,4 @@ class InventarioController {
   });
 }
 
-module.exports = new InventarioController();
+export default new InventarioController();

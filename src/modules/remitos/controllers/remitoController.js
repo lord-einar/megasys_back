@@ -1,10 +1,12 @@
 // src/modules/remitos/controllers/remitoController.js
-const remitoService = require('../services/remitoService');
-const logger = require('../../../shared/utils/logger');
-const { success, error, paginated } = require('../../../shared/utils/response');
-const { sequelize } = require('../../../models');
-const { GUID_TO_GROUP_MAP } = require('../../auth/config/roles');
-const roleService = require('../../auth/services/roleService');
+import remitoService from '../services/remitoService.js';
+import logger from '../../../shared/utils/logger.js';
+import { success, error, paginated } from '../../../shared/utils/response.js';
+import { sequelize, Personal, Rol, Remito, Inventario, TipoArticulo, RemitoDetalle } from '../../../models/index.js';
+import { GUID_TO_GROUP_MAP } from '../../auth/config/roles.js';
+import roleService from '../../auth/services/roleService.js';
+import emailService from '../../../shared/services/emailService.js';
+import personalService from '../../personal/services/personalService.js';
 
 class RemitoController {
   /**
@@ -105,7 +107,7 @@ class RemitoController {
     try {
       const { id } = req.params;
       const { estado } = req.body;
-      const { Personal, Rol } = require('../../../models');
+      // Personal y Rol ya importados al inicio del archivo
 
       if (!estado) {
         return error(res, 'El nuevo estado es requerido', 400);
@@ -132,7 +134,7 @@ class RemitoController {
         });
 
         try {
-          const personalService = require('../../../modules/personal/services/personalService');
+          // personalService ya importado al inicio del archivo
           await personalService.autoProvisionarPersonal(req.user, {
             role: req.user.role || 'user',
             permissions: []
@@ -230,7 +232,7 @@ class RemitoController {
 
       if (!isSuperAdmin) {
         // Si no es super_admin, verificar si es el técnico asignado
-        const { Remito, Personal } = require('../../../models');
+        // Remito y Personal ya importados al inicio del archivo
         const remitoOriginal = await Remito.findByPk(remitoOriginalId, {
           include: [{
             model: Personal,
@@ -301,7 +303,7 @@ class RemitoController {
         limit
       });
 
-      const { Inventario, TipoArticulo } = require('../../../models');
+      // Inventario y TipoArticulo ya importados al inicio del archivo
       const offset = (parseInt(page) - 1) * parseInt(limit);
 
       const whereClause = {
@@ -382,8 +384,7 @@ class RemitoController {
         usuario: req.user?.email
       });
 
-      const { RemitoDetalle, Remito } = require('../../../models');
-      const emailService = require('../../../shared/services/emailService');
+      // RemitoDetalle, Remito y emailService ya importados al inicio del archivo
 
       // Verificar que el detalle existe y pertenece al remito
       const detalle = await RemitoDetalle.findOne({
@@ -763,4 +764,4 @@ class RemitoController {
   }
 }
 
-module.exports = new RemitoController();
+export default new RemitoController();

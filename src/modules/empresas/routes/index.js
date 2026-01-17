@@ -1,10 +1,10 @@
 // src/modules/empresas/routes/index.js
-const express = require('express');
-const empresaController = require('../controllers/empresaController');
-const { authenticate } = require('../../auth/middleware/authMiddleware');
-const { requirePermission } = require('../../auth/middleware/roleMiddleware');
-const validate = require('../../../shared/middleware/validation');
-const { body, param } = require('express-validator');
+import express from 'express';
+import empresaController from '../controllers/empresaController.js';
+import { authenticate } from '../../auth/middleware/authMiddleware.js';
+import { requirePermission } from '../../auth/middleware/roleMiddleware.js';
+import validate from '../../../shared/middleware/validation.js';
+import { body, param } from 'express-validator';
 
 const router = express.Router();
 
@@ -117,4 +117,4 @@ router.delete(
   empresaController.eliminar
 );
 
-module.exports = router;
+export default router;

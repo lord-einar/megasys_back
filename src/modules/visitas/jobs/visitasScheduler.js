@@ -1,8 +1,8 @@
-const cron = require('node-cron');
-const { Op } = require('sequelize');
-const { Visita, Sede, Personal } = require('../../../models');
-const visitaEmailService = require('../services/emailService');
-const logger = require('../../../shared/utils/logger');
+import cron from 'node-cron';
+import { Op } from 'sequelize';
+import { Visita, Sede, Personal } from '../../../models/index.js';
+import visitaEmailService from '../services/emailService.js';
+import logger from '../../../shared/utils/logger.js';
 
 class VisitasScheduler {
     constructor() {
@@ -72,4 +72,4 @@ class VisitasScheduler {
     }
 }
 
-module.exports = new VisitasScheduler();
+export default new VisitasScheduler();

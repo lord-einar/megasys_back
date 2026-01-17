@@ -1,11 +1,11 @@
 // src/modules/personal/routes/index.js - COMPLETO
-const express = require('express');
-const { authenticate } = require('../../auth/middleware/authMiddleware');
-const { requirePermission } = require('../../auth/middleware/roleMiddleware');
-const validate = require('../../../shared/middleware/validation');
-const { body, param, query } = require('express-validator');
-const personalController = require('../controllers/personalController');
-const personalSedeController = require('../controllers/personalSedeController');
+import express from 'express';
+import { authenticate } from '../../auth/middleware/authMiddleware.js';
+import { requirePermission } from '../../auth/middleware/roleMiddleware.js';
+import validate from '../../../shared/middleware/validation.js';
+import { body, param, query } from 'express-validator';
+import personalController from '../controllers/personalController.js';
+import personalSedeController from '../controllers/personalSedeController.js';
 
 const router = express.Router();
 
@@ -462,4 +462,4 @@ router.get('/sedes/estadisticas',
   personalSedeController.obtenerEstadisticas
 );
 
-module.exports = router;
+export default router;

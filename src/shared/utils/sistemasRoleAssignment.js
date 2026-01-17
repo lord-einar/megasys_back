@@ -4,8 +4,8 @@
  * (Estos se mapean a los roles existentes)
  */
 
-const { Rol, Personal, sequelize } = require('../../models');
-const logger = require('./logger');
+import { Rol, Personal, sequelize } from '../../models/index.js';
+import logger from './logger.js';
 
 /**
  * Roles autorizados que automáticamente reciben rol "Sistemas"
@@ -145,7 +145,13 @@ async function assignSistemasRoleBatch(personalIds) {
   }
 }
 
-module.exports = {
+export {
+  assignSistemasRoleIfAuthorized,
+  assignSistemasRoleBatch,
+  AUTHORIZED_ROLES_FOR_SISTEMAS
+};
+
+export default {
   assignSistemasRoleIfAuthorized,
   assignSistemasRoleBatch,
   AUTHORIZED_ROLES_FOR_SISTEMAS

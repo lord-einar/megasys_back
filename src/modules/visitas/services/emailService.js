@@ -1,5 +1,5 @@
-const emailService = require('../../../shared/services/emailService');
-const logger = require('../../../shared/utils/logger');
+import emailService from '../../../shared/services/emailService.js';
+import logger from '../../../shared/utils/logger.js';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
@@ -359,4 +359,4 @@ class VisitaEmailService {
   }
 }
 
-module.exports = new VisitaEmailService();
+export default new VisitaEmailService();

@@ -1,8 +1,8 @@
 // src/modules/sedes/controllers/sedeAsignacionController.js
-const sedeAsignacionService = require('../services/sedeAsignacionService');
-const { success, error, paginated } = require('../../../shared/utils/response');
-const asyncHandler = require('../../../shared/utils/asyncHandler');
-const logger = require('../../../shared/utils/logger');
+import sedeAsignacionService from '../services/sedeAsignacionService.js';
+import { success, error, paginated } from '../../../shared/utils/response.js';
+import asyncHandler from '../../../shared/utils/asyncHandler.js';
+import logger from '../../../shared/utils/logger.js';
 
 class SedeAsignacionController {
   /**
@@ -149,4 +149,4 @@ class SedeAsignacionController {
   });
 }
 
-module.exports = new SedeAsignacionController();
+export default new SedeAsignacionController();

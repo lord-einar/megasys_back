@@ -2,8 +2,8 @@
  * Email Service - Envío de correos para remitos vía Office365 SMTP
  */
 
-const nodemailer = require('nodemailer');
-const logger = require('../utils/logger');
+import nodemailer from 'nodemailer';
+import logger from '../utils/logger.js';
 
 // Configuración SMTP para Office365
 // Railway y otros servicios cloud suelen bloquear el puerto 587
@@ -942,4 +942,4 @@ class EmailService {
   }
 }
 
-module.exports = new EmailService();
+export default new EmailService();

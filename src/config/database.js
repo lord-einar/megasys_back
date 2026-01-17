@@ -1,7 +1,7 @@
 // src/config/database.js (Para Sequelize CLI)
-require('dotenv').config();
+import 'dotenv/config';
 
-module.exports = {
+export default {
   development: {
     username: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
@@ -14,7 +14,7 @@ module.exports = {
       createdAt: 'created_at',
       updatedAt: 'updated_at',
       underscored: true
-    }
+    };
   },
   test: {
     username: process.env.DB_USER,
@@ -49,9 +49,9 @@ module.exports = {
 // ---
 
 // .sequelizerc
-const path = require('path');
+import path from 'path';
 
-module.exports = {
+export default {
   'config': path.resolve('src', 'config', 'database.js'),
   'models-path': path.resolve('src', 'models'),
   'seeders-path': path.resolve('seeders'),

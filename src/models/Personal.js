@@ -1,7 +1,7 @@
 // src/models/Personal.js
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../shared/utils/database');
-const { v4: uuidv4 } = require('uuid');
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../shared/utils/database.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const Personal = sequelize.define('Personal', {
   id: {
@@ -165,8 +165,6 @@ Personal.prototype.getInfoBasica = function () {
     nombreCompleto: this.getNombreCompleto(),
     email: this.email,
     telefono: this.telefono,
-    email: this.email,
-    telefono: this.telefono,
     activo: this.activo,
     color: this.color
   };
@@ -186,4 +184,4 @@ Personal.findBySede = function (sedeId) {
   });
 };
 
-module.exports = Personal;
+export default Personal;

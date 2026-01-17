@@ -1,16 +1,11 @@
 // src/server.js
-require('dotenv').config();
-const app = require('./app');
-const { connectDatabase } = require('./shared/utils/database');
-const logger = require('./shared/utils/logger');
+import 'dotenv/config';
+import fs from 'fs';
+import app from './app.js';
+import { connectDatabase, sequelize } from './shared/utils/database.js';
+import logger from './shared/utils/logger.js';
 
 const PORT = process.env.PORT || 4000;
-
-// console.log('🔍 Verificando configuración de BD:');
-// console.log('DB_HOST:', process.env.DB_HOST);
-// console.log('DB_NAME:', process.env.DB_NAME);
-// console.log('DB_DIALECT:', process.env.DB_DIALECT);
-
 
 // Función para inicializar el servidor
 const initializeServer = async () => {
@@ -31,14 +26,13 @@ const initializeServer = async () => {
     }
 
     // Crear directorio de logs si no existe
-    const fs = require('fs');
     const logsDir = 'logs';
     if (!fs.existsSync(logsDir)) {
       fs.mkdirSync(logsDir, { recursive: true });
     }
 
     // Iniciar servidor
-    const server = app.listen(PORT, () => {
+    const server = app.listen(PORT, async () => {
       logger.info(`🚀 Servidor ejecutándose en puerto ${PORT}`);
       logger.info(`📊 Entorno: ${process.env.NODE_ENV}`);
       logger.info(`🔗 URL: http://localhost:${PORT}`);
@@ -46,7 +40,7 @@ const initializeServer = async () => {
 
       // Iniciar Scheduler de Visitas
       try {
-        const visitasScheduler = require('./modules/visitas/jobs/visitasScheduler');
+        const { default: visitasScheduler } = await import('./modules/visitas/jobs/visitasScheduler.js');
         visitasScheduler.iniciar();
       } catch (schedulerError) {
         console.error('❌ Error iniciando scheduler de visitas:', schedulerError);
@@ -63,7 +57,7 @@ const initializeServer = async () => {
       logger.info('Señal de terminación recibida, cerrando servidor...');
       server.close(async () => {
         try {
-          await require('./shared/utils/database').sequelize.close();
+          await sequelize.close();
           logger.info('Conexión a la base de datos cerrada');
           logger.info('Servidor cerrado correctamente');
           process.exit(0);

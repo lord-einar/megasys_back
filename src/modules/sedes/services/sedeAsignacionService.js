@@ -1,6 +1,6 @@
 // src/modules/sedes/services/sedeAsignacionService.js
-const { SedeAsignacion, Sede, Personal, Rol, sequelize } = require('../../../models');
-const logger = require('../../../shared/utils/logger');
+import { SedeAsignacion, Sede, Personal, Rol, sequelize } from '../../../models/index.js';
+import logger from '../../../shared/utils/logger.js';
 
 class SedeAsignacionService {
   /**
@@ -228,4 +228,4 @@ class SedeAsignacionService {
   }
 }
 
-module.exports = new SedeAsignacionService();
+export default new SedeAsignacionService();

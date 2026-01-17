@@ -1,5 +1,5 @@
-const { Op } = require('sequelize');
-const {
+import { Op } from 'sequelize';
+import {
     Visita,
     VisitaRecurrencia,
     VisitaSolicitudPrevia,
@@ -9,11 +9,11 @@ const {
     Sede,
     Personal,
     sequelize
-} = require('../../../models');
-const visitaEmailService = require('./emailService');
-const logger = require('../../../shared/utils/logger');
-const { v4: uuidv4 } = require('uuid');
-const AuditService = require('../../../shared/services/auditService');
+} from '../../../models/index.js';
+import visitaEmailService from './emailService.js';
+import logger from '../../../shared/utils/logger.js';
+import { v4 as uuidv4 } from 'uuid';
+import AuditService from '../../../shared/services/auditService.js';
 
 class VisitaService {
 
@@ -1011,4 +1011,4 @@ class VisitaService {
     }
 }
 
-module.exports = new VisitaService();
+export default new VisitaService();

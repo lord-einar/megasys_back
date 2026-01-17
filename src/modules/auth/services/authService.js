@@ -1,8 +1,10 @@
 // src/modules/auth/services/authService.js - CORREGIDO
-const jwt = require('jsonwebtoken');
-const { msalInstance } = require('../config/msalConfig');
-const logger = require('../../../shared/utils/logger');
-const { GUID_TO_GROUP_MAP } = require('../config/roles');
+import jwt from 'jsonwebtoken';
+import axios from 'axios';
+import { msalInstance } from '../config/msalConfig.js';
+import logger from '../../../shared/utils/logger.js';
+import { GUID_TO_GROUP_MAP } from '../config/roles.js';
+import Personal from '../../../models/Personal.js';
 
 // GUIDs de grupos autorizados
 const AUTHORIZED_GROUP_GUIDS = [
@@ -106,7 +108,7 @@ class AuthService {
       // IMPORTANTE: Antes de generar el JWT, mapear al ID de la tabla Personal
       // en lugar de usar el Azure AD localAccountId
       try {
-        const { Personal } = require('../../../models');
+        // Personal ya importado al inicio del archivo
         const personalRecord = await Personal.findOne({
           where: { email: userInfo.email.toLowerCase() }
         });
@@ -192,7 +194,7 @@ class AuthService {
       };
 
       const response = await msalInstance.acquireTokenByRefreshToken(refreshTokenRequest);
-      
+
       if (!response || !response.account) {
         throw new Error('No se pudo refrescar el token');
       }
@@ -236,8 +238,8 @@ class AuthService {
    */
   async getUserPhoto(accessToken) {
     try {
-      const axios = require('axios');
-      
+      // axios ya importado al inicio del archivo
+
       const photoResponse = await axios.get('https://graph.microsoft.com/v1.0/me/photo/$value', {
         headers: {
           'Authorization': `Bearer ${accessToken}`
@@ -248,7 +250,7 @@ class AuthService {
       const photoBuffer = Buffer.from(photoResponse.data);
       const photoBase64 = photoBuffer.toString('base64');
       const photoMimeType = photoResponse.headers['content-type'] || 'image/jpeg';
-      
+
       return {
         data: `data:${photoMimeType};base64,${photoBase64}`,
         mimeType: photoMimeType,
@@ -262,4 +264,4 @@ class AuthService {
   }
 }
 
-module.exports = new AuthService();
+export default new AuthService();

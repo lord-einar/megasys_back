@@ -1,7 +1,7 @@
 // src/models/PersonalSede.js
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../shared/utils/database');
-const { v4: uuidv4 } = require('uuid');
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../shared/utils/database.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const PersonalSede = sequelize.define('PersonalSede', {
   id: {
@@ -90,4 +90,4 @@ const PersonalSede = sequelize.define('PersonalSede', {
   }
 });
 
-module.exports = PersonalSede;
+export default PersonalSede;
