@@ -35,3 +35,9 @@ backups/
 *.cert
 secrets/
 railway-env-backup.txt
+
+# Local database setup scripts
+setup_database.sql
+setup_db.sh
+production_dump.sql
+*.dump
