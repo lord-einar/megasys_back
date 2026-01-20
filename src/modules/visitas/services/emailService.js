@@ -350,6 +350,185 @@ class VisitaEmailService {
       throw error;
     }
   }
+
+  /**
+   * Enviar notificación de cancelación de visita
+   */
+  async enviarNotificacionCancelacion(visita, motivo, emailsDestino) {
+    try {
+      const fecha = new Date(visita.fecha).toLocaleDateString('es-AR', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #dc3545; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+            .content { padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 0 0 5px 5px; }
+            .info-row { margin: 10px 0; padding: 10px; background: white; border-radius: 4px; }
+            .label { font-weight: bold; color: #555; }
+            .motivo-box { background: #fff3cd; padding: 15px; border-radius: 6px; margin: 15px 0; border-left: 4px solid #ffc107; }
+            .footer { margin-top: 20px; font-size: 12px; color: #777; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1 style="margin:0; font-size: 24px;">❌ Visita Cancelada</h1>
+            </div>
+            <div class="content">
+              <p>Te informamos que la visita de soporte programada ha sido <strong>cancelada</strong>.</p>
+
+              <div class="info-row">
+                <span class="label">Sede:</span> ${visita.sedePrincipal?.nombre_sede || 'N/A'}
+              </div>
+              <div class="info-row">
+                <span class="label">Fecha programada:</span> ${fecha}
+              </div>
+              <div class="info-row">
+                <span class="label">Tipo de visita:</span> ${visita.tipo?.toUpperCase() || 'N/A'}
+              </div>
+              ${visita.tecnicoAsignado ? `
+              <div class="info-row">
+                <span class="label">Técnico asignado:</span> ${visita.tecnicoAsignado.nombre} ${visita.tecnicoAsignado.apellido}
+              </div>` : ''}
+
+              ${motivo ? `
+              <div class="motivo-box">
+                <strong>Motivo de cancelación:</strong><br>
+                ${motivo}
+              </div>` : ''}
+
+              <p style="margin-top: 20px;">
+                Si tienes alguna consulta, por favor contacta al equipo de infraestructura.
+              </p>
+
+              <p style="margin-top: 30px;">
+                Saludos,<br>
+                <strong>Equipo de Infraestructura</strong>
+              </p>
+            </div>
+            <div class="footer">
+              Este es un mensaje automático del Sistema de Gestión Megatlon.
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const asunto = `Visita Cancelada - ${visita.sedePrincipal?.nombre_sede || 'Sede'} - ${new Date(visita.fecha).toLocaleDateString('es-AR')}`;
+
+      const promesas = emailsDestino.map(email =>
+        emailService.enviarEmailHTML(email, asunto, html)
+      );
+
+      await Promise.all(promesas);
+
+      logger.info(`Notificación de cancelación enviada para visita ${visita.id} a ${emailsDestino.length} destinatarios`);
+      return true;
+    } catch (error) {
+      logger.error('Error enviando notificación de cancelación:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Enviar notificación de reprogramación de visita
+   */
+  async enviarNotificacionReprogramacion(visita, fechaAnterior, nuevaFecha, emailsDestino) {
+    try {
+      const fechaAnteriorStr = new Date(fechaAnterior).toLocaleDateString('es-AR', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      const nuevaFechaStr = new Date(nuevaFecha).toLocaleDateString('es-AR', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #f59e0b; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+            .content { padding: 20px; background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 0 0 5px 5px; }
+            .info-row { margin: 10px 0; padding: 10px; background: white; border-radius: 4px; }
+            .label { font-weight: bold; color: #555; }
+            .fecha-box { display: flex; align-items: center; justify-content: center; margin: 20px 0; }
+            .fecha-old { background: #fee2e2; padding: 15px 20px; border-radius: 6px; text-decoration: line-through; color: #991b1b; }
+            .fecha-arrow { font-size: 24px; margin: 0 15px; color: #666; }
+            .fecha-new { background: #d1fae5; padding: 15px 20px; border-radius: 6px; color: #065f46; font-weight: bold; }
+            .footer { margin-top: 20px; font-size: 12px; color: #777; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1 style="margin:0; font-size: 24px;">📅 Visita Reprogramada</h1>
+            </div>
+            <div class="content">
+              <p>Te informamos que la visita de soporte ha sido <strong>reprogramada</strong>.</p>
+
+              <div class="info-row">
+                <span class="label">Sede:</span> ${visita.sedePrincipal?.nombre_sede || 'N/A'}
+              </div>
+              ${visita.tecnicoAsignado ? `
+              <div class="info-row">
+                <span class="label">Técnico asignado:</span> ${visita.tecnicoAsignado.nombre} ${visita.tecnicoAsignado.apellido}
+              </div>` : ''}
+
+              <div class="fecha-box">
+                <div class="fecha-old">${fechaAnteriorStr}</div>
+                <div class="fecha-arrow">➜</div>
+                <div class="fecha-new">${nuevaFechaStr}</div>
+              </div>
+
+              <p style="margin-top: 20px;">
+                Por favor, ten en cuenta la nueva fecha para tu planificación.
+              </p>
+
+              <p style="margin-top: 30px;">
+                Saludos,<br>
+                <strong>Equipo de Infraestructura</strong>
+              </p>
+            </div>
+            <div class="footer">
+              Este es un mensaje automático del Sistema de Gestión Megatlon.
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const asunto = `Visita Reprogramada - ${visita.sedePrincipal?.nombre_sede || 'Sede'} - Nueva fecha: ${new Date(nuevaFecha).toLocaleDateString('es-AR')}`;
+
+      const promesas = emailsDestino.map(email =>
+        emailService.enviarEmailHTML(email, asunto, html)
+      );
+
+      await Promise.all(promesas);
+
+      logger.info(`Notificación de reprogramación enviada para visita ${visita.id} a ${emailsDestino.length} destinatarios`);
+      return true;
+    } catch (error) {
+      logger.error('Error enviando notificación de reprogramación:', error);
+      throw error;
+    }
+  }
 }
 
 export default new VisitaEmailService();

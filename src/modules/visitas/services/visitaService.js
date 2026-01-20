@@ -562,7 +562,19 @@ class VisitaService {
                 });
             }
 
-            // TODO: Enviar email de notificación de cancelación
+            // Enviar email de notificación de cancelación (fuera de transacción, no bloquea)
+            const personalSede = await Personal.findAll({
+                where: { sede_id: visita.sede_id, activo: true },
+                attributes: ['email']
+            });
+            const emailsDestino = personalSede.map(p => p.email).filter(e => e);
+
+            if (emailsDestino.length > 0) {
+                visitaEmailService.enviarNotificacionCancelacion(visita, motivo, emailsDestino).catch(err =>
+                    logger.error('Error enviando notificación de cancelación:', err)
+                );
+            }
+
             logger.info(`Visita ${id} cancelada por usuario ${usuarioId}`);
 
             return visita;
@@ -625,7 +637,19 @@ class VisitaService {
                 });
             }
 
-            // TODO: Enviar email de notificación de reprogramación
+            // Enviar email de notificación de reprogramación (fuera de transacción, no bloquea)
+            const personalSede = await Personal.findAll({
+                where: { sede_id: visita.sede_id, activo: true },
+                attributes: ['email']
+            });
+            const emailsDestino = personalSede.map(p => p.email).filter(e => e);
+
+            if (emailsDestino.length > 0) {
+                visitaEmailService.enviarNotificacionReprogramacion(visita, fechaAnterior, nuevaFecha, emailsDestino).catch(err =>
+                    logger.error('Error enviando notificación de reprogramación:', err)
+                );
+            }
+
             logger.info(`Visita ${id} reprogramada de ${fechaAnterior} a ${nuevaFecha} por usuario ${usuarioId}`);
 
             return visita;
@@ -636,7 +660,6 @@ class VisitaService {
         }
     }
 
-    /**
     /**
      * Obtener estadísticas de visitas
      */

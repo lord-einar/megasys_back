@@ -17,6 +17,17 @@ import emailService from '../../../shared/services/emailService.js';
 import tokenService from '../../../shared/services/tokenService.js';
 import CommonValidators from '../../../shared/validators/commonValidators.js';
 
+/**
+ * Servicio de gestión de remitos
+ *
+ * NOTA TÉCNICA: Este servicio NO usa TransactionWrapper porque:
+ * 1. Acepta transacciones externas para operaciones anidadas (ej: devoluciones)
+ * 2. Tiene lógica de commit condicional que TransactionWrapper no soporta
+ * 3. Migrar requeriría refactorización significativa y tests exhaustivos
+ *
+ * La auditoría se maneja manualmente después de cada operación exitosa.
+ * TODO: Evaluar migración a TransactionWrapper cuando se agreguen tests unitarios.
+ */
 class RemitoService {
   /**
    * Generar número de remito único con formato REM-YYYY-NNN
