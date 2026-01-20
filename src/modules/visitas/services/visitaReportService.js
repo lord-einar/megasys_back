@@ -49,12 +49,8 @@ class VisitaReportService {
         try {
             const where = this._construirFiltros(filtros);
 
-            console.log('🔍 DEBUG - Filtros aplicados:', filtros);
-            console.log('🔍 DEBUG - WHERE clause:', where);
-
             // Total de visitas
             const totalVisitas = await Visita.count({ where });
-            console.log('🔍 DEBUG - Total visitas encontradas:', totalVisitas);
 
             // Visitas realizadas
             const visitasRealizadas = await Visita.count({

@@ -249,13 +249,6 @@ class VisitaEmailService {
    */
   async enviarMinuta(visita, informe, emailsSede) {
     try {
-      console.log('📧 DEBUG - Datos del informe para email:', {
-        casos_resueltos: informe.casos_resueltos,
-        casos_resueltos_length: informe.casos_resueltos?.length,
-        casos_resueltos_type: typeof informe.casos_resueltos,
-        problemasResueltos: informe.problemasResueltos?.length
-      });
-
       const html = this._generarHTMLMinuta(visita, informe);
       const asunto = `Minuta de Visita - ${visita.sedePrincipal.nombre_sede} - ${new Date(visita.fecha).toLocaleDateString('es-AR')}`;
 

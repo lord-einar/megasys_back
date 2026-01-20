@@ -1,5 +1,6 @@
 // src/shared/services/auditService.js - SERVICIO DE AUDITORÍA CENTRALIZADO
 import { Auditoria } from '../../models/index.js';
+import logger from '../utils/logger.js';
 
 /**
  * Servicio centralizado para logging de auditoría
@@ -68,7 +69,7 @@ class AuditService {
       return registro;
     } catch (error) {
       // Log del error pero no lanzar excepción para no detener la operación principal
-      console.error('❌ Error registrando auditoría:', {
+      logger.error('Error registrando auditoría:', {
         mensaje: error.message,
         stack: error.stack,
         params
@@ -97,7 +98,7 @@ class AuditService {
       }
       return registros;
     } catch (error) {
-      console.error('❌ Error registrando múltiples auditorías:', error.message);
+      logger.error('Error registrando múltiples auditorías:', error.message);
       return [];
     }
   }
@@ -244,10 +245,10 @@ class AuditService {
         }
       });
 
-      console.log(`✅ Se eliminaron ${deletedCount} registros de auditoría antiguos`);
+      logger.info(`Se eliminaron ${deletedCount} registros de auditoría antiguos`);
       return deletedCount;
     } catch (error) {
-      console.error('❌ Error limpiando auditoría antigua:', error.message);
+      logger.error('Error limpiando auditoría antigua:', error.message);
       return 0;
     }
   }

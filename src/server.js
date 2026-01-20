@@ -21,8 +21,8 @@ const initializeServer = async () => {
         )
       ]);
     } catch (dbError) {
-      console.warn('⚠️ Advertencia: No se pudo conectar a la base de datos inicialmente:', dbError.message);
-      console.warn('⚠️ El servidor continuará iniciándose. La BD puede estar disponible en breve.');
+      logger.warn('No se pudo conectar a la base de datos inicialmente:', dbError.message);
+      logger.warn('El servidor continuará iniciándose. La BD puede estar disponible en breve.');
     }
 
     // Crear directorio de logs si no existe
@@ -43,13 +43,13 @@ const initializeServer = async () => {
         const { default: visitasScheduler } = await import('./modules/visitas/jobs/visitasScheduler.js');
         visitasScheduler.iniciar();
       } catch (schedulerError) {
-        console.error('❌ Error iniciando scheduler de visitas:', schedulerError);
+        logger.error('Error iniciando scheduler de visitas:', schedulerError);
       }
     });
 
     // Manejo de errores del servidor
     server.on('error', (error) => {
-      console.error('Error del servidor:', error);
+      logger.error('Error del servidor:', error);
     });
 
     // Manejo de cierre graceful
@@ -62,7 +62,7 @@ const initializeServer = async () => {
           logger.info('Servidor cerrado correctamente');
           process.exit(0);
         } catch (error) {
-          console.error('Error al cerrar conexiones:', error);
+          logger.error('Error al cerrar conexiones:', error);
           process.exit(1);
         }
       });
@@ -73,7 +73,7 @@ const initializeServer = async () => {
 
     return server;
   } catch (error) {
-    console.error('❌ Error al inicializar el servidor:', error);
+    logger.error('Error al inicializar el servidor:', error);
     process.exit(1);
   }
 };

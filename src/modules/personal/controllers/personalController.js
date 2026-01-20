@@ -76,7 +76,6 @@ class PersonalController {
    */
   crear = asyncHandler(async (req, res) => {
     try {
-      console.log('➡️ Recibiendo solicitud de creación de personal:', JSON.stringify(req.body, null, 2));
       const resultado = await TransactionWrapper.execute({
         operation: async (transaction) => {
           return await personalService.crear(req.body, req.user.email, { transaction });

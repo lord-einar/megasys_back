@@ -1,6 +1,7 @@
 // src/shared/utils/transactionWrapper.js - UTILIDAD DE TRANSACCIONES CON AUDITORÍA
 import { sequelize } from './database.js';
 import AuditService from '../services/auditService.js';
+import logger from './logger.js';
 
 /**
  * Wrapper para ejecutar operaciones dentro de transacciones automáticas
@@ -65,7 +66,7 @@ class TransactionWrapper {
       // Commit de la transacción
       await transaction.commit();
 
-      console.log(`✅ Operación exitosa: ${modulo}/${accion}/${recurso}`);
+      logger.debug(`Operación exitosa: ${modulo}/${accion}/${recurso}`);
     } catch (error) {
       // Rollback de la transacción en caso de error
       if (transaction) {
@@ -75,7 +76,7 @@ class TransactionWrapper {
       resultado = 'fallido';
       mensajeError = error.message;
 
-      console.error(`❌ Error en transacción ${modulo}/${accion}/${recurso}:`, {
+      logger.error(`Error en transacción ${modulo}/${accion}/${recurso}:`, {
         mensaje: error.message,
         stack: error.stack
       });
@@ -101,7 +102,7 @@ class TransactionWrapper {
           mensaje_error: mensajeError
         });
       } catch (auditError) {
-        console.error('⚠️  Error registrando auditoría:', auditError.message);
+        logger.warn('Error registrando auditoría:', auditError.message);
         // No lanzar error de auditoría para no interrumpir la operación
       }
     }
@@ -158,7 +159,7 @@ class TransactionWrapper {
       // Commit de la transacción
       await transaction.commit();
 
-      console.log(`✅ Operaciones batch exitosas en ${modulo}: ${operations.length} operaciones`);
+      logger.debug(`Operaciones batch exitosas en ${modulo}: ${operations.length} operaciones`);
     } catch (error) {
       // Rollback de la transacción en caso de error
       if (transaction) {
@@ -168,7 +169,7 @@ class TransactionWrapper {
       resultado = 'fallido';
       mensajeError = error.message;
 
-      console.error(`❌ Error en transacción batch ${modulo}:`, {
+      logger.error(`Error en transacción batch ${modulo}:`, {
         mensaje: error.message,
         operacionesProcesadas: resultados.length,
         stack: error.stack
@@ -192,7 +193,7 @@ class TransactionWrapper {
           mensaje_error: mensajeError
         });
       } catch (auditError) {
-        console.error('⚠️  Error registrando auditoría batch:', auditError.message);
+        logger.warn('Error registrando auditoría batch:', auditError.message);
       }
     }
 
