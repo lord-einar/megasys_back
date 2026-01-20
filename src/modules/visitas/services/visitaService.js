@@ -787,6 +787,16 @@ class VisitaService {
                 throw new Error('No se puede eliminar una visita que ya fue realizada');
             }
 
+            // Validar que no se eliminen visitas con fecha pasada (proteger estadísticas)
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            const fechaVisita = new Date(visita.fecha);
+            fechaVisita.setHours(0, 0, 0, 0);
+
+            if (fechaVisita < hoy) {
+                throw new Error('No se puede eliminar una visita con fecha pasada');
+            }
+
             // Guardar datos para auditoría
             const datosVisita = {
                 sede_id: visita.sede_id,
@@ -799,11 +809,11 @@ class VisitaService {
 
             // Si se pide eliminar serie y tiene recurrencia
             if (eliminarSerie && visita.recurrencia_id) {
-                // 1. Eliminar visitas futuras pendientes de la misma serie
+                // 1. Eliminar visitas futuras pendientes de la misma serie (solo desde hoy en adelante)
                 await Visita.destroy({
                     where: {
                         recurrencia_id: visita.recurrencia_id,
-                        fecha: { [Op.gte]: visita.fecha }, // Incluye la actual y futuras
+                        fecha: { [Op.gte]: hoy }, // Solo desde hoy en adelante, nunca pasadas
                         estado: 'programada'
                     },
                     transaction: t
