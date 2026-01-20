@@ -15,6 +15,7 @@ import AuditService from '../../../shared/services/auditService.js';
 import pdfService from '../../../shared/services/pdfService.js';
 import emailService from '../../../shared/services/emailService.js';
 import tokenService from '../../../shared/services/tokenService.js';
+import CommonValidators from '../../../shared/validators/commonValidators.js';
 
 class RemitoService {
   /**
@@ -52,42 +53,6 @@ class RemitoService {
       });
       throw error;
     }
-  }
-
-  /**
-   * Validar que solicitante existe y está activo
-   */
-  async validarPersonaActiva(personalId, label = 'Personal') {
-    const persona = await Personal.findOne({
-      where: {
-        id: personalId,
-        activo: true
-      }
-    });
-
-    if (!persona) {
-      throw new Error(`${label} no existe o no está activo`);
-    }
-
-    return persona;
-  }
-
-  /**
-   * Validar que sede existe y está activa
-   */
-  async validarSedeActiva(sedeId, label = 'Sede') {
-    const sede = await Sede.findOne({
-      where: {
-        id: sedeId,
-        activo: true
-      }
-    });
-
-    if (!sede) {
-      throw new Error(`${label} no existe o no está activa`);
-    }
-
-    return sede;
   }
 
   /**
@@ -299,16 +264,16 @@ class RemitoService {
     try {
       logger.info('crear - Iniciando validaciones de remito');
 
-      await this.validarPersonaActiva(solicitante_id, 'Solicitante');
+      await CommonValidators.validarPersonaActiva(solicitante_id, 'Solicitante');
       logger.info('crear - Solicitante validado');
 
-      await this.validarPersonaActiva(tecnico_id, 'Técnico');
+      await CommonValidators.validarPersonaActiva(tecnico_id, 'Técnico');
       logger.info('crear - Técnico validado');
 
-      await this.validarSedeActiva(sede_origen_id, 'Sede de origen');
+      await CommonValidators.validarSedeActiva(sede_origen_id, 'Sede de origen');
       logger.info('crear - Sede origen validada');
 
-      await this.validarSedeActiva(sede_destino_id, 'Sede de destino');
+      await CommonValidators.validarSedeActiva(sede_destino_id, 'Sede de destino');
       logger.info('crear - Sede destino validada');
 
       if (!Array.isArray(articulos) || articulos.length === 0) {

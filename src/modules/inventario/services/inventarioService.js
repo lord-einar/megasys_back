@@ -3,44 +3,9 @@ import { Inventario, TipoArticulo, Sede, HistorialMovimiento, sequelize, RemitoD
 import logger from '../../../shared/utils/logger.js';
 import { Op } from 'sequelize';
 import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
+import CommonValidators from '../../../shared/validators/commonValidators.js';
 
 class InventarioService {
-  /**
-   * Validar que el tipo de artículo existe y está activo
-   */
-  async validarTipoArticuloActivo(tipoArticuloId) {
-    const tipoArticulo = await TipoArticulo.findOne({
-      where: {
-        id: tipoArticuloId,
-        activo: true
-      }
-    });
-
-    if (!tipoArticulo) {
-      throw new Error('El tipo de artículo no existe o no está disponible. Por favor selecciona un tipo válido.');
-    }
-
-    return tipoArticulo;
-  }
-
-  /**
-   * Validar que la sede existe y está activa
-   */
-  async validarSedeActiva(sedeId) {
-    const sede = await Sede.findOne({
-      where: {
-        id: sedeId,
-        activo: true
-      }
-    });
-
-    if (!sede) {
-      throw new Error('La sede no existe o no está disponible. Por favor selecciona una sede válida.');
-    }
-
-    return sede;
-  }
-
   /**
    * Validar que el número de serie sea único (si se proporciona)
    */
@@ -263,8 +228,8 @@ class InventarioService {
     } = datosNuevo;
 
     // Validaciones previas (fuera de la transacción)
-    await this.validarTipoArticuloActivo(tipo_articulo_id);
-    await this.validarSedeActiva(sede_id);
+    await CommonValidators.validarTipoArticuloActivo(tipo_articulo_id);
+    await CommonValidators.validarSedeActiva(sede_id);
     await this.validarNumeroSerieUnico(numero_serie);
 
     // Guardar datos para auditoría
@@ -359,7 +324,7 @@ class InventarioService {
 
     // Validaciones previas (fuera de la transacción)
     if (datosActualizacion.tipo_articulo_id && datosActualizacion.tipo_articulo_id !== item.tipo_articulo_id) {
-      await this.validarTipoArticuloActivo(datosActualizacion.tipo_articulo_id);
+      await CommonValidators.validarTipoArticuloActivo(datosActualizacion.tipo_articulo_id);
     }
 
     if (datosActualizacion.numero_serie && datosActualizacion.numero_serie !== item.numero_serie) {
@@ -368,7 +333,7 @@ class InventarioService {
 
     let sedeAnterior = null;
     if (datosActualizacion.sede_id && datosActualizacion.sede_id !== item.sede_id) {
-      await this.validarSedeActiva(datosActualizacion.sede_id);
+      await CommonValidators.validarSedeActiva(datosActualizacion.sede_id);
       sedeAnterior = item.sede_id;
     }
 

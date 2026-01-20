@@ -4,6 +4,7 @@ import logger from '../../../shared/utils/logger.js';
 import { Op } from 'sequelize';
 import { randomUUID as uuidv4 } from 'node:crypto';
 import { assignSistemasRoleIfAuthorized } from '../../../shared/utils/sistemasRoleAssignment.js';
+import CommonValidators from '../../../shared/validators/commonValidators.js';
 
 class PersonalService {
   /**
@@ -19,44 +20,6 @@ class PersonalService {
     if (personalExistente) {
       throw new Error(`El email "${email}" ya está registrado en el sistema. Intenta con otro email.`);
     }
-  }
-
-  /**
-   * Validar que todas las sedes existan y estén activas
-   */
-  async validarSedesActivas(sedesIds) {
-    if (!Array.isArray(sedesIds) || sedesIds.length === 0) {
-      throw new Error('Debes seleccionar al menos una sede para asignar el personal');
-    }
-
-    const sedesValidas = await Sede.count({
-      where: {
-        id: sedesIds,
-        activo: true
-      }
-    });
-
-    if (sedesValidas !== sedesIds.length) {
-      throw new Error(`${sedesIds.length - sedesValidas} de las sedes seleccionadas no existen o están inactivas. Por favor verifica tu selección.`);
-    }
-  }
-
-  /**
-   * Validar que el rol exista y esté activo
-   */
-  async validarRolActivo(rolId) {
-    const rol = await Rol.findOne({
-      where: {
-        id: rolId,
-        activo: true
-      }
-    });
-
-    if (!rol) {
-      throw new Error('El rol seleccionado no existe o no está disponible. Por favor selecciona un rol válido.');
-    }
-
-    return rol;
   }
 
   /**
@@ -289,8 +252,8 @@ class PersonalService {
 
     // Validaciones (fuera de la transacción - son operaciones de lectura)
     await this.validarEmailUnico(email);
-    await this.validarSedesActivas(sedes);
-    await this.validarRolActivo(rol_id);
+    await CommonValidators.validarSedesActivas(sedes);
+    await CommonValidators.validarRolActivo(rol_id);
 
     // TODO: Envolver esto en transacción en el controlador mediante TransactionWrapper
     // CRITICAL: Si se pasa transaction, usarla. Si no, crear una nueva
@@ -402,13 +365,13 @@ class PersonalService {
 
     // Validar rol si se actualiza
     if (datosActualizacion.rol_id && datosActualizacion.rol_id !== persona.rol_id) {
-      await this.validarRolActivo(datosActualizacion.rol_id);
+      await CommonValidators.validarRolActivo(datosActualizacion.rol_id);
     }
 
     // Validar sedes si se actualizan
     const sedesParaActualizar = datosActualizacion.sedes;
     if (sedesParaActualizar && Array.isArray(sedesParaActualizar)) {
-      await this.validarSedesActivas(sedesParaActualizar);
+      await CommonValidators.validarSedesActivas(sedesParaActualizar);
     }
 
     // CRITICAL: Si se pasa transaction, usarla. Si no, crear una nueva
