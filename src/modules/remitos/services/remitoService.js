@@ -438,26 +438,8 @@ class RemitoService {
           esPrestamo: articulo.es_prestamo
         });
 
-        // 3c. Crear historial de movimiento
-        // El hook de afterCreate en RemitoDetalle también creará un historial,
-        // pero lo hacemos aquí de forma explícita en la transacción
-        const tipoMovimiento = articulo.es_prestamo ? 'prestamo' : 'transferencia';
-        await HistorialMovimiento.create({
-          inventario_id: articulo.inventario_id,
-          remito_id: remito.id,
-          sede_origen_id,
-          sede_destino_id,
-          tipo_movimiento: tipoMovimiento,
-          fecha_movimiento: new Date(),
-          usuario_id: null, // Se asignará después si tenemos el usuario
-          observaciones: `${tipoMovimiento === 'prestamo' ? 'Préstamo' : 'Transferencia'} vía remito ${numeroRemito}`
-        }, { transaction: t });
-
-        logger.info('HistorialMovimiento creado:', {
-          inventarioId: articulo.inventario_id,
-          tipoMovimiento,
-          numeroRemito
-        });
+        // NOTA: El historial de movimiento se crea automáticamente via hook afterCreate
+        // en RemitoDetalle (ver models/index.js)
       }
 
       // Commit solo si creamos la transacción localmente
@@ -1093,12 +1075,14 @@ class RemitoService {
 
       // Crear detalles de devolución
       for (const detalleOriginal of detallesADevolver) {
+        // NOTA: hooks: false para evitar que el hook afterCreate cree historial duplicado
+        // El historial de devolución se crea explícitamente más abajo con tipo 'devolucion'
         await RemitoDetalle.create({
           remito_id: remitoDevolucion.id,
           inventario_id: detalleOriginal.inventario_id,
           es_prestamo: false,
           devuelto: false
-        }, { transaction: t });
+        }, { transaction: t, hooks: false });
 
         // Actualizar ubicación y estado: devolver a Deposito y marcar como disponible
         await Inventario.update(
