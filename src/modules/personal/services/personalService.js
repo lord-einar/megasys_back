@@ -5,6 +5,7 @@ import { Op } from 'sequelize';
 import { randomUUID as uuidv4 } from 'node:crypto';
 import { assignSistemasRoleIfAuthorized } from '../../../shared/utils/sistemasRoleAssignment.js';
 import CommonValidators from '../../../shared/validators/commonValidators.js';
+import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
 
 class PersonalService {
   /**
@@ -239,7 +240,7 @@ class PersonalService {
    * @param {Object} options - Opciones incluyendo transaction
    */
   async crear(datosNueva, usuarioEmail, options = {}) {
-    const { transaction } = options;
+    const { transaction: externalTransaction, ipAddress = null, userAgent = null } = options;
     const {
       nombre,
       apellido,
@@ -255,90 +256,77 @@ class PersonalService {
     await CommonValidators.validarSedesActivas(sedes);
     await CommonValidators.validarRolActivo(rol_id);
 
-    // TODO: Envolver esto en transacción en el controlador mediante TransactionWrapper
-    // CRITICAL: Si se pasa transaction, usarla. Si no, crear una nueva
-    let t = transaction;
-    let shouldCommit = false;
-
-    if (!t) {
-      t = await sequelize.transaction();
-      shouldCommit = true;
-    }
-
-    try {
-      // Crear persona dentro de la transacción
-      let personaRolId = rol_id;
-      const persona = await Personal.create({
-        nombre: nombre.trim(),
-        apellido: apellido.trim(),
-        email: email.toLowerCase().trim(),
-        telefono: telefono?.trim() || null,
-        rol_id,
-        sede_id: sedes[0], // Primera sede como principal
-        activo: true,
-        color: color || '#007bff'
-      }, { transaction: t });
-
-      // Asignar automáticamente rol "Sistemas" si el rol actual está autorizado
-      const rolAutorizado = await Rol.findByPk(rol_id);
-      if (rolAutorizado) {
-        const roleAssignmentResult = await assignSistemasRoleIfAuthorized(
-          persona.id,
+    const result = await TransactionWrapper.execute({
+      operation: async (transaction) => {
+        // Crear persona dentro de la transacción
+        let personaRolId = rol_id;
+        const persona = await Personal.create({
+          nombre: nombre.trim(),
+          apellido: apellido.trim(),
+          email: email.toLowerCase().trim(),
+          telefono: telefono?.trim() || null,
           rol_id,
-          t
-        );
+          sede_id: sedes[0], // Primera sede como principal
+          activo: true,
+          color: color || '#007bff'
+        }, { transaction });
 
-        if (roleAssignmentResult) {
-          // Refrescar el usuario para obtener el nuevo rol_id asignado
-          await persona.reload({ transaction: t });
-          personaRolId = persona.rol_id;
+        // Asignar automáticamente rol "Sistemas" si el rol actual está autorizado
+        const rolAutorizado = await Rol.findByPk(rol_id);
+        if (rolAutorizado) {
+          const roleAssignmentResult = await assignSistemasRoleIfAuthorized(
+            persona.id,
+            rol_id,
+            transaction
+          );
 
-          logger.info('Rol Sistemas asignado automáticamente al crear personal:', {
-            personalId: persona.id,
-            nombre: persona.nombre,
-            rolAnterior: rol_id,
-            rolNuevo: persona.rol_id
-          });
+          if (roleAssignmentResult) {
+            // Refrescar el usuario para obtener el nuevo rol_id asignado
+            await persona.reload({ transaction });
+            personaRolId = persona.rol_id;
+
+            logger.info('Rol Sistemas asignado automáticamente al crear personal:', {
+              personalId: persona.id,
+              nombre: persona.nombre,
+              rolAnterior: rol_id,
+              rolNuevo: persona.rol_id
+            });
+          }
         }
-      }
 
-      // Crear asignaciones a sedes dentro de la MISMA transacción
-      // Usar el rol_id que fue asignado automáticamente (si aplica)
-      for (const sedeId of sedes) {
-        await PersonalSede.create({
-          personal_id: persona.id,
-          sede_id: sedeId,
-          rol_id: personaRolId,
-          fecha_inicio: new Date(),
-          activo: true
-        }, { transaction: t });
-      }
+        // Crear asignaciones a sedes dentro de la MISMA transacción
+        // Usar el rol_id que fue asignado automáticamente (si aplica)
+        for (const sedeId of sedes) {
+          await PersonalSede.create({
+            personal_id: persona.id,
+            sede_id: sedeId,
+            rol_id: personaRolId,
+            fecha_inicio: new Date(),
+            activo: true
+          }, { transaction });
+        }
 
-      // Solo commit si creamos la transacción localmente
-      if (shouldCommit) {
-        await t.commit();
-      }
+        return persona;
+      },
+      usuarioEmail: usuarioEmail || 'sistema@megatlon.com.ar',
+      modulo: 'personal',
+      accion: 'crear',
+      recurso: 'Personal',
+      descripcion: `Creó personal ${nombre} ${apellido} (${email})`,
+      valoresNuevos: { nombre, apellido, email, rol_id, sedes },
+      ipAddress,
+      userAgent,
+      transaction: externalTransaction
+    });
 
-      logger.info('Nuevo personal creado correctamente:', {
-        personalId: persona.id,
-        email: persona.email,
-        sedes: sedes.length,
-        creadoPor: usuarioEmail
-      });
+    logger.info('Nuevo personal creado correctamente:', {
+      personalId: result.data.id,
+      email: result.data.email,
+      sedes: sedes.length,
+      creadoPor: usuarioEmail
+    });
 
-      return persona;
-    } catch (error) {
-      // Rollback si creamos la transacción localmente
-      if (shouldCommit && t) {
-        await t.rollback();
-      }
-      logger.error('Error creando personal:', {
-        error: error.message,
-        email,
-        stack: error.stack
-      });
-      throw error;
-    }
+    return result.data;
   }
 
   /**
@@ -349,7 +337,7 @@ class PersonalService {
    * @param {Object} options - Opciones incluyendo transaction
    */
   async actualizar(personalId, datosActualizacion, usuarioEmail, options = {}) {
-    const { transaction } = options;
+    const { transaction: externalTransaction, ipAddress = null, userAgent = null } = options;
 
     // Validaciones (fuera de la transacción - son operaciones de lectura)
     const persona = await Personal.findByPk(personalId);
@@ -357,6 +345,16 @@ class PersonalService {
     if (!persona) {
       throw new Error('Personal no encontrado');
     }
+
+    // Guardar valores anteriores para auditoría
+    const valoresAnteriores = {
+      nombre: persona.nombre,
+      apellido: persona.apellido,
+      email: persona.email,
+      telefono: persona.telefono,
+      rol_id: persona.rol_id,
+      sede_id: persona.sede_id
+    };
 
     // Validar email si se actualiza
     if (datosActualizacion.email && datosActualizacion.email !== persona.email) {
@@ -374,91 +372,81 @@ class PersonalService {
       await CommonValidators.validarSedesActivas(sedesParaActualizar);
     }
 
-    // CRITICAL: Si se pasa transaction, usarla. Si no, crear una nueva
-    let t = transaction;
-    let shouldCommit = false;
-
-    if (!t) {
-      t = await sequelize.transaction();
-      shouldCommit = true;
-    }
-
-    try {
-      // Preparar datos (excluir 'sedes' de la actualización de Personal)
-      const datosLimpios = {};
-      Object.keys(datosActualizacion).forEach(key => {
-        if (key === 'sedes') {
-          // No actualizar sedes aquí, se maneja aparte
-          return;
-        }
-        if (key === 'email') {
-          datosLimpios[key] = datosActualizacion[key].toLowerCase().trim();
-        } else if (typeof datosActualizacion[key] === 'string') {
-          datosLimpios[key] = datosActualizacion[key].trim();
-        } else {
-          datosLimpios[key] = datosActualizacion[key];
-        }
-      });
-
-      // Asegurar que telefono sea null si está vacío
-      if (datosLimpios.telefono === '') {
-        datosLimpios.telefono = null;
-      }
-
-      // Actualizar datos básicos de personal DENTRO DE LA TRANSACCIÓN
-      await persona.update(datosLimpios, { transaction: t });
-
-      // Actualizar sedes si se proporcionan - DENTRO DE LA MISMA TRANSACCIÓN
-      if (sedesParaActualizar && Array.isArray(sedesParaActualizar) && sedesParaActualizar.length > 0) {
-        // Desactivar asignaciones previas
-        await PersonalSede.update(
-          { activo: false, fecha_fin: new Date() },
-          {
-            where: { personal_id: personalId, activo: true },
-            transaction: t
+    await TransactionWrapper.execute({
+      operation: async (transaction) => {
+        // Preparar datos (excluir 'sedes' de la actualización de Personal)
+        const datosLimpios = {};
+        Object.keys(datosActualizacion).forEach(key => {
+          if (key === 'sedes') {
+            // No actualizar sedes aquí, se maneja aparte
+            return;
           }
-        );
+          if (key === 'email') {
+            datosLimpios[key] = datosActualizacion[key].toLowerCase().trim();
+          } else if (typeof datosActualizacion[key] === 'string') {
+            datosLimpios[key] = datosActualizacion[key].trim();
+          } else {
+            datosLimpios[key] = datosActualizacion[key];
+          }
+        });
 
-        // Crear nuevas asignaciones
-        for (const sedeId of sedesParaActualizar) {
-          await PersonalSede.create({
-            personal_id: personalId,
-            sede_id: sedeId,
-            rol_id: datosLimpios.rol_id || persona.rol_id,
-            fecha_inicio: new Date(),
-            activo: true
-          }, { transaction: t });
+        // Asegurar que telefono sea null si está vacío
+        if (datosLimpios.telefono === '') {
+          datosLimpios.telefono = null;
         }
 
-        // Actualizar sede_id principal (primera sede de la lista)
-        await persona.update({ sede_id: sedesParaActualizar[0] }, { transaction: t });
-      }
+        // Actualizar datos básicos de personal DENTRO DE LA TRANSACCIÓN
+        await persona.update(datosLimpios, { transaction });
 
-      // Solo commit si creamos la transacción localmente
-      if (shouldCommit) {
-        await t.commit();
-      }
+        // Actualizar sedes si se proporcionan - DENTRO DE LA MISMA TRANSACCIÓN
+        if (sedesParaActualizar && Array.isArray(sedesParaActualizar) && sedesParaActualizar.length > 0) {
+          // Desactivar asignaciones previas
+          await PersonalSede.update(
+            { activo: false, fecha_fin: new Date() },
+            {
+              where: { personal_id: personalId, activo: true },
+              transaction
+            }
+          );
 
-      logger.info('Personal actualizado correctamente:', {
-        personalId: persona.id,
-        cambios: Object.keys(datosLimpios),
-        sedesActualizadas: sedesParaActualizar?.length || 0,
-        actualizadoPor: usuarioEmail
-      });
+          // Crear nuevas asignaciones
+          for (const sedeId of sedesParaActualizar) {
+            await PersonalSede.create({
+              personal_id: personalId,
+              sede_id: sedeId,
+              rol_id: datosLimpios.rol_id || persona.rol_id,
+              fecha_inicio: new Date(),
+              activo: true
+            }, { transaction });
+          }
 
-      return await this.obtenerConDetalles(personalId);
-    } catch (error) {
-      // Rollback si creamos la transacción localmente
-      if (shouldCommit && t) {
-        await t.rollback();
-      }
-      logger.error('Error actualizando personal:', {
-        error: error.message,
-        personalId,
-        stack: error.stack
-      });
-      throw error;
-    }
+          // Actualizar sede_id principal (primera sede de la lista)
+          await persona.update({ sede_id: sedesParaActualizar[0] }, { transaction });
+        }
+
+        return persona;
+      },
+      usuarioEmail: usuarioEmail || 'sistema@megatlon.com.ar',
+      modulo: 'personal',
+      accion: 'actualizar',
+      recurso: 'Personal',
+      recursoId: personalId,
+      descripcion: `Actualizó personal ${persona.nombre} ${persona.apellido}`,
+      valoresAnteriores,
+      valoresNuevos: datosActualizacion,
+      ipAddress,
+      userAgent,
+      transaction: externalTransaction
+    });
+
+    logger.info('Personal actualizado correctamente:', {
+      personalId: persona.id,
+      cambios: Object.keys(datosActualizacion),
+      sedesActualizadas: sedesParaActualizar?.length || 0,
+      actualizadoPor: usuarioEmail
+    });
+
+    return await this.obtenerConDetalles(personalId);
   }
 
   /**
@@ -486,7 +474,7 @@ class PersonalService {
    * @param {Object} options - Opciones incluyendo transaction
    */
   async eliminar(personalId, usuarioEmail, options = {}) {
-    const { transaction } = options;
+    const { transaction: externalTransaction, ipAddress = null, userAgent = null } = options;
 
     // Validaciones (fuera de la transacción - son operaciones de lectura)
     const persona = await Personal.findByPk(personalId);
@@ -495,55 +483,53 @@ class PersonalService {
       throw new Error('Personal no encontrado');
     }
 
+    // Guardar valores anteriores para auditoría
+    const valoresAnteriores = {
+      nombre: persona.nombre,
+      apellido: persona.apellido,
+      email: persona.email,
+      activo: persona.activo
+    };
+
     // Verificar remitos pendientes
     await this.verificarRemitosPendientes(personalId);
 
-    // CRITICAL: Si se pasa transaction, usarla. Si no, crear una nueva
-    let t = transaction;
-    let shouldCommit = false;
+    await TransactionWrapper.execute({
+      operation: async (transaction) => {
+        // Soft delete - DENTRO DE LA TRANSACCIÓN
+        await persona.update({ activo: false }, { transaction });
 
-    if (!t) {
-      t = await sequelize.transaction();
-      shouldCommit = true;
-    }
+        // Desactivar asignaciones - DENTRO DE LA MISMA TRANSACCIÓN
+        await PersonalSede.update(
+          { activo: false, fecha_fin: new Date() },
+          {
+            where: { personal_id: personalId },
+            transaction
+          }
+        );
 
-    try {
-      // Soft delete - DENTRO DE LA TRANSACCIÓN
-      await persona.update({ activo: false }, { transaction: t });
+        return true;
+      },
+      usuarioEmail: usuarioEmail || 'sistema@megatlon.com.ar',
+      modulo: 'personal',
+      accion: 'eliminar',
+      recurso: 'Personal',
+      recursoId: personalId,
+      descripcion: `Eliminó personal ${persona.nombre} ${persona.apellido} (${persona.email})`,
+      valoresAnteriores,
+      valoresNuevos: { activo: false },
+      ipAddress,
+      userAgent,
+      transaction: externalTransaction
+    });
 
-      // Desactivar asignaciones - DENTRO DE LA MISMA TRANSACCIÓN
-      await PersonalSede.update(
-        { activo: false, fecha_fin: new Date() },
-        {
-          where: { personal_id: personalId },
-          transaction: t
-        }
-      );
+    logger.info('Personal eliminado correctamente (soft delete):', {
+      personalId: persona.id,
+      email: persona.email,
+      eliminadoPor: usuarioEmail
+    });
 
-      // Solo commit si creamos la transacción localmente
-      if (shouldCommit) {
-        await t.commit();
-      }
-
-      logger.info('Personal eliminado correctamente (soft delete):', {
-        personalId: persona.id,
-        email: persona.email,
-        eliminadoPor: usuarioEmail
-      });
-
-      return true;
-    } catch (error) {
-      // Rollback si creamos la transacción localmente
-      if (shouldCommit && t) {
-        await t.rollback();
-      }
-      logger.error('Error eliminando personal:', {
-        error: error.message,
-        personalId,
-        stack: error.stack
-      });
-      throw error;
-    }
+    return true;
   }
 
   /**
@@ -699,14 +685,25 @@ class PersonalService {
         privilegioNuevo: privilegioApp
       });
 
-      const transaction = await sequelize.transaction();
       try {
-        await personalInactivo.update({
-          activo: true,
-          privilegio_app: privilegioApp
-        }, { transaction });
+        await TransactionWrapper.execute({
+          operation: async (transaction) => {
+            await personalInactivo.update({
+              activo: true,
+              privilegio_app: privilegioApp
+            }, { transaction });
 
-        await transaction.commit();
+            return personalInactivo;
+          },
+          usuarioEmail: email,
+          modulo: 'personal',
+          accion: 'reactivar',
+          recurso: 'Personal',
+          recursoId: personalInactivo.id,
+          descripcion: `Personal reactivado por auto-provisioning: ${email}`,
+          valoresAnteriores: { activo: false, privilegio_app: personalInactivo.privilegio_app },
+          valoresNuevos: { activo: true, privilegio_app: privilegioApp }
+        });
 
         logger.info('Personal reactivado exitosamente:', {
           email,
@@ -716,7 +713,6 @@ class PersonalService {
 
         return personalInactivo;
       } catch (error) {
-        await transaction.rollback();
         logger.error('Error al reactivar personal:', {
           email,
           error: error.message
@@ -726,40 +722,46 @@ class PersonalService {
     }
 
     // Crear nuevo usuario con privilegios basados en grupo Azure AD
-    const transaction = await sequelize.transaction();
-
     try {
       // El id de Entra ID contiene un punto (homeAccountId) que no es válido como UUID en PostgreSQL
       // Generar un UUID válido en su lugar - el email será el identificador único
       const validUUID = uuidv4();
 
-      const nuevoPersonal = await Personal.create({
-        id: validUUID, // Generar UUID válido en lugar de usar homeAccountId
-        nombre: nombre.trim(),
-        apellido: apellido.trim(),
-        email: email.toLowerCase().trim(),
-        privilegio_app: privilegioApp,
-        activo: true,
-        // Sin sede principal por defecto
-        sede_id: null,
-        // Sin rol de sede por defecto
-        rol_id: null
-      }, { transaction });
+      const result = await TransactionWrapper.execute({
+        operation: async (transaction) => {
+          const nuevoPersonal = await Personal.create({
+            id: validUUID, // Generar UUID válido en lugar de usar homeAccountId
+            nombre: nombre.trim(),
+            apellido: apellido.trim(),
+            email: email.toLowerCase().trim(),
+            privilegio_app: privilegioApp,
+            activo: true,
+            // Sin sede principal por defecto
+            sede_id: null,
+            // Sin rol de sede por defecto
+            rol_id: null
+          }, { transaction });
 
-      await transaction.commit();
+          return nuevoPersonal;
+        },
+        usuarioEmail: email,
+        modulo: 'personal',
+        accion: 'auto_provisionar',
+        recurso: 'Personal',
+        descripcion: `Personal auto-provisionado desde Azure AD: ${email}`,
+        valoresNuevos: { nombre, apellido, email, privilegio_app: privilegioApp }
+      });
 
       logger.info('Personal creado automáticamente por auto-provisioning:', {
-        personalId: nuevoPersonal.id,
-        email: nuevoPersonal.email,
-        nombre: nuevoPersonal.nombre,
-        apellido: nuevoPersonal.apellido,
+        personalId: result.data.id,
+        email: result.data.email,
+        nombre: result.data.nombre,
+        apellido: result.data.apellido,
         privilegioAsignado: privilegioApp
       });
 
-      return nuevoPersonal;
+      return result.data;
     } catch (error) {
-      await transaction.rollback();
-
       logger.error('Error en auto-provisioning de personal:', {
         email,
         error: error.message,

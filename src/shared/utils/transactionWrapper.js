@@ -22,6 +22,7 @@ class TransactionWrapper {
    * @param {string} [params.descripcion] - Descripción adicional
    * @param {string} [params.ipAddress] - IP del cliente
    * @param {string} [params.userAgent] - User agent del navegador
+   * @param {Object} [params.transaction] - Transacción externa (opcional). Si se proporciona, no se crea ni se commitea.
    * @returns {Promise<Object>} Resultado de la operación
    */
   static async execute(params) {
@@ -36,7 +37,8 @@ class TransactionWrapper {
       valoresAnteriores = null,
       descripcion = null,
       ipAddress = null,
-      userAgent = null
+      userAgent = null,
+      transaction: externalTransaction = null
     } = params;
 
     // Validar parámetros requeridos
@@ -47,29 +49,36 @@ class TransactionWrapper {
       throw new Error('Faltan parámetros requeridos: usuarioEmail, modulo, accion, recurso');
     }
 
-    let transaction = null;
+    // Determinar si usar transacción externa o crear una nueva
+    let transaction = externalTransaction;
+    let shouldCommit = false;
+
+    if (!transaction) {
+      transaction = await sequelize.transaction();
+      shouldCommit = true;
+    }
+
     let resultado = 'exitoso';
     let mensajeError = null;
     let valoresNuevos = null;
     let operationResult = null;
 
     try {
-      // Crear transacción
-      transaction = await sequelize.transaction();
-
       // Ejecutar operación dentro de la transacción
       operationResult = await operation(transaction);
 
       // Guardar valores nuevos del resultado
       valoresNuevos = operationResult?.data || operationResult;
 
-      // Commit de la transacción
-      await transaction.commit();
+      // Commit de la transacción solo si la creamos nosotros
+      if (shouldCommit) {
+        await transaction.commit();
+      }
 
       logger.debug(`Operación exitosa: ${modulo}/${accion}/${recurso}`);
     } catch (error) {
-      // Rollback de la transacción en caso de error
-      if (transaction) {
+      // Rollback de la transacción solo si la creamos nosotros
+      if (shouldCommit && transaction) {
         await transaction.rollback();
       }
 
