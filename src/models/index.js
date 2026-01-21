@@ -28,6 +28,7 @@ import VisitaSolicitudPrevia from './VisitaSolicitudPrevia.js';
 import VisitaInforme from './VisitaInforme.js';
 import VisitaProblemaResuelto from './VisitaProblemaResuelto.js';
 import VisitaChecklistItem from './VisitaChecklistItem.js';
+import CategoriaProblema from './CategoriaProblema.js';
 
 // =====================================================
 // DEFINICIÓN DE RELACIONES
@@ -484,6 +485,16 @@ VisitaProblemaResuelto.belongsTo(VisitaInforme, {
   as: 'informe'
 });
 
+// CategoriaProblema -> VisitaProblemaResuelto
+CategoriaProblema.hasMany(VisitaProblemaResuelto, {
+  foreignKey: 'categoria_id',
+  as: 'problemasResueltos'
+});
+VisitaProblemaResuelto.belongsTo(CategoriaProblema, {
+  foreignKey: 'categoria_id',
+  as: 'categoriaProblema' // Cambiado de 'categoria' para evitar conflicto con el campo ENUM 'categoria'
+});
+
 // =====================================================
 // HOOKS Y FUNCIONES AUTOMÁTICAS
 // =====================================================
@@ -589,7 +600,8 @@ const models = {
   VisitaSolicitudPrevia,
   VisitaInforme,
   VisitaProblemaResuelto,
-  VisitaChecklistItem
+  VisitaChecklistItem,
+  CategoriaProblema
 };
 
 // Agregar métodos de asociación globales
@@ -633,5 +645,6 @@ export {
   VisitaSolicitudPrevia,
   VisitaInforme,
   VisitaProblemaResuelto,
-  VisitaChecklistItem
+  VisitaChecklistItem,
+  CategoriaProblema
 };

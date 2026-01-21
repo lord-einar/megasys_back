@@ -19,10 +19,10 @@ const VisitaProblemaResuelto = sequelize.define('VisitaProblemaResuelto', {
         allowNull: false,
         comment: 'Descripción del problema resuelto'
     },
-    categoria: {
-        type: DataTypes.ENUM('telefonia', 'red', 'camaras_seguridad', 'grabaciones', 'otro'),
+    categoria_id: {
+        type: DataTypes.UUID,
         allowNull: false,
-        defaultValue: 'otro'
+        comment: 'ID de la categoría del problema'
     },
     causado_por_usuario: {
         type: DataTypes.BOOLEAN,
@@ -36,7 +36,7 @@ const VisitaProblemaResuelto = sequelize.define('VisitaProblemaResuelto', {
             fields: ['informe_id']
         },
         {
-            fields: ['categoria']
+            fields: ['categoria_id']
         }
     ]
 });

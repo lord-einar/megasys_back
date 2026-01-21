@@ -1,4 +1,4 @@
-import { Visita, VisitaInforme, VisitaProblemaResuelto, Sede, Personal, sequelize } from '../../../models/index.js';
+import { Visita, VisitaInforme, VisitaProblemaResuelto, CategoriaProblema, Sede, Personal, sequelize } from '../../../models/index.js';
 import { Op } from 'sequelize';
 import logger from '../../../shared/utils/logger.js';
 
@@ -200,39 +200,40 @@ class VisitaReportService {
 
             const resultado = await VisitaProblemaResuelto.findAll({
                 attributes: [
-                    'categoria',
+                    'categoria_id',
                     [sequelize.fn('COUNT', sequelize.col('VisitaProblemaResuelto.id')), 'count']
                 ],
-                include: [{
-                    model: VisitaInforme,
-                    as: 'informe',
-                    attributes: [],
-                    required: true,
-                    include: [{
-                        model: Visita,
-                        as: 'visita',
+                include: [
+                    {
+                        model: CategoriaProblema,
+                        as: 'categoriaProblema',
+                        attributes: ['id', 'nombre', 'codigo', 'color']
+                    },
+                    {
+                        model: VisitaInforme,
+                        as: 'informe',
                         attributes: [],
-                        where,
-                        required: true
-                    }]
-                }],
-                group: ['categoria'],
+                        required: true,
+                        include: [{
+                            model: Visita,
+                            as: 'visita',
+                            attributes: [],
+                            where,
+                            required: true
+                        }]
+                    }
+                ],
+                group: ['categoria_id', 'categoriaProblema.id', 'categoriaProblema.nombre', 'categoriaProblema.codigo', 'categoriaProblema.color'],
                 order: [[sequelize.fn('COUNT', sequelize.col('VisitaProblemaResuelto.id')), 'DESC']],
                 raw: true
             });
 
-            const categoriaLabels = {
-                'telefonia': 'Telefonía',
-                'red': 'Red / Internet',
-                'camaras_seguridad': 'Cámaras de Seguridad',
-                'grabaciones': 'Grabaciones (NVR/DVR)',
-                'otro': 'Otro'
-            };
-
             return resultado.map(r => ({
-                name: categoriaLabels[r.categoria] || r.categoria,
+                name: r['categoriaProblema.nombre'] || 'Sin categoría',
                 value: parseInt(r.count),
-                categoria: r.categoria
+                categoria_id: r.categoria_id,
+                codigo: r['categoriaProblema.codigo'],
+                color: r['categoriaProblema.color']
             }));
         } catch (error) {
             logger.error('Error obteniendo problemas por categoría:', error);

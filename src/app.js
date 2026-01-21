@@ -155,7 +155,16 @@ const initializeRoutes = async () => {
   // Rutas de proveedores
   await loadRoutes('./modules/proveedores/routes/index.js', '/api/proveedores');
 
-  // Rutas de visitas
+  // IMPORTANTE: Cargar rutas específicas ANTES de la ruta general de visitas
+  // para evitar que /:id capture estas rutas como parámetros
+
+  // Rutas de checklist items de visitas (ANTES de /api/visitas)
+  await loadRoutes('./modules/visitas/routes/checklistItemRoutes.js', '/api/visitas/checklist-items');
+
+  // Rutas de categorías de problemas de visitas (ANTES de /api/visitas)
+  await loadRoutes('./modules/visitas/routes/categoriaProblemaRoutes.js', '/api/visitas/categorias-problemas');
+
+  // Rutas de visitas (DESPUÉS de las rutas específicas)
   await loadRoutes('./modules/visitas/routes/index.js', '/api/visitas');
 
   logger.info('✅ Todas las rutas han sido procesadas');

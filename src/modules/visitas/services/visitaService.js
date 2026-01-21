@@ -6,6 +6,7 @@ import {
     VisitaInforme,
     VisitaProblemaResuelto,
     VisitaChecklistItem,
+    CategoriaProblema,
     Sede,
     Personal,
     sequelize
@@ -89,7 +90,15 @@ class VisitaService {
                     {
                         model: VisitaInforme,
                         as: 'informe',
-                        include: [{ model: VisitaProblemaResuelto, as: 'problemasResueltos' }]
+                        include: [{
+                            model: VisitaProblemaResuelto,
+                            as: 'problemasResueltos',
+                            include: [{
+                                model: CategoriaProblema,
+                                as: 'categoriaProblema',
+                                attributes: ['id', 'nombre', 'codigo', 'color', 'icono']
+                            }]
+                        }]
                     }
                 ]
             });
