@@ -26,15 +26,15 @@ const PERMISSIONS = {
   sedes: {
     read: ['super_admin', 'helpdesk', 'support'],
     create: ['super_admin'],
-    update: ['super_admin'],
+    update: ['super_admin', 'helpdesk', 'support'],
     delete: ['super_admin']
   },
 
   // Permisos para Personal
   personal: {
     read: ['super_admin', 'helpdesk', 'support'],
-    create: ['super_admin', 'helpdesk'],
-    update: ['super_admin', 'helpdesk'],
+    create: ['super_admin', 'helpdesk', 'support'],
+    update: ['super_admin', 'helpdesk', 'support'],
     delete: ['super_admin', 'helpdesk']
   },
 
@@ -67,7 +67,7 @@ const PERMISSIONS = {
     system_settings: ['super_admin'],
     user_management: ['super_admin'],
     audit_logs: ['super_admin', 'helpdesk'],
-    reports: ['super_admin', 'helpdesk', 'support']
+    reports: ['super_admin']
   }
 };
 
@@ -82,14 +82,14 @@ const ROLES = {
   },
   helpdesk: {
     name: 'Mesa de Ayuda',
-    description: 'Lectura total, gestión de personal',
+    description: 'Gestión de personal y sedes, lectura del resto',
     azureGroup: 'Mesa de ayuda',
     azureGuid: '88c0f708-14a1-4081-bcc6-4b3ab33a7ca6',
     level: 2
   },
   support: {
     name: 'Soporte',
-    description: 'Gestión de inventario y remitos, lectura total',
+    description: 'Gestión de inventario, personal, sedes y remitos propios',
     azureGroup: 'Soporte',
     azureGuid: '4c25f14c-c4ba-4bf9-b07b-5d03572a2661',
     level: 3
