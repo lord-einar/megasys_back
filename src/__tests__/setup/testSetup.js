@@ -1,13 +1,8 @@
 // src/__tests__/setup/testSetup.js
-// Configuración global para tests
+import { jest, afterEach } from '@jest/globals';
 
-// Mock de logger para evitar logs durante tests
-jest.mock('../../shared/utils/logger', () => ({
-  info: jest.fn(),
-  error: jest.fn(),
-  warn: jest.fn(),
-  debug: jest.fn()
-}));
+// Exponer jest globalmente para los tests
+global.jest = jest;
 
 // Configurar timezone para tests consistentes
 process.env.TZ = 'UTC';

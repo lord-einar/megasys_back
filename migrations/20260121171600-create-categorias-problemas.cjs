@@ -48,20 +48,22 @@ module.exports = {
             },
             created_at: {
                 allowNull: false,
-                type: Sequelize.DATE
+                type: Sequelize.DATE,
+                defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
             },
             updated_at: {
                 allowNull: false,
-                type: Sequelize.DATE
+                type: Sequelize.DATE,
+                defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
             }
         });
 
         // 2. Crear índices
         await queryInterface.addIndex('categorias_problemas', ['activo']);
         await queryInterface.addIndex('categorias_problemas', ['orden']);
-        await queryInterface.addIndex('categorias_problemas', ['codigo'], { unique: true });
 
-        // 3. Insertar categorías por defecto basadas en el ENUM existente
+        // 3. Insertar categorías por defecto (PostgreSQL utiliza gen_random_uuid())
+        const now = new Date();
         await queryInterface.bulkInsert('categorias_problemas', [
             {
                 id: Sequelize.literal('gen_random_uuid()'),
@@ -72,8 +74,8 @@ module.exports = {
                 color: '#3b82f6',
                 orden: 1,
                 activo: true,
-                created_at: new Date(),
-                updated_at: new Date()
+                created_at: now,
+                updated_at: now
             },
             {
                 id: Sequelize.literal('gen_random_uuid()'),
@@ -84,8 +86,8 @@ module.exports = {
                 color: '#10b981',
                 orden: 2,
                 activo: true,
-                created_at: new Date(),
-                updated_at: new Date()
+                created_at: now,
+                updated_at: now
             },
             {
                 id: Sequelize.literal('gen_random_uuid()'),
@@ -96,8 +98,8 @@ module.exports = {
                 color: '#ef4444',
                 orden: 3,
                 activo: true,
-                created_at: new Date(),
-                updated_at: new Date()
+                created_at: now,
+                updated_at: now
             },
             {
                 id: Sequelize.literal('gen_random_uuid()'),
@@ -108,8 +110,8 @@ module.exports = {
                 color: '#f59e0b',
                 orden: 4,
                 activo: true,
-                created_at: new Date(),
-                updated_at: new Date()
+                created_at: now,
+                updated_at: now
             },
             {
                 id: Sequelize.literal('gen_random_uuid()'),
@@ -120,15 +122,15 @@ module.exports = {
                 color: '#6b7280',
                 orden: 5,
                 activo: true,
-                created_at: new Date(),
-                updated_at: new Date()
+                created_at: now,
+                updated_at: now
             }
         ]);
 
-        // 4. Agregar nueva columna categoria_id a visita_problemas_resueltos
+        // 4. Agregar columna categoria_id a visita_problemas_resueltos
         await queryInterface.addColumn('visita_problemas_resueltos', 'categoria_id', {
             type: Sequelize.UUID,
-            allowNull: true, // Temporalmente nullable para migración
+            allowNull: true,
             references: {
                 model: 'categorias_problemas',
                 key: 'id'
@@ -137,9 +139,7 @@ module.exports = {
             onDelete: 'RESTRICT'
         });
 
-        // 5. Migrar datos del ENUM al nuevo campo categoria_id
-        // Esto se hace mediante una consulta SQL directa
-        // Usamos cast ::text para comparar el ENUM con VARCHAR
+        // 5. Migrar datos existentes del ENUM 'categoria' al nuevo campo 'categoria_id'
         await queryInterface.sequelize.query(`
       UPDATE visita_problemas_resueltos vpr
       SET categoria_id = cp.id
@@ -147,62 +147,32 @@ module.exports = {
       WHERE cp.codigo = vpr.categoria::text
     `);
 
-        // 6. Crear índice en categoria_id
-        await queryInterface.addIndex('visita_problemas_resueltos', ['categoria_id']);
-
-        // 7. Eliminar la columna ENUM antigua (categoria)
-        // NOTA: En PostgreSQL, también necesitamos eliminar el tipo ENUM si no se usa en otro lugar
+        // 6. Eliminar la columna ENUM antigua
         await queryInterface.removeColumn('visita_problemas_resueltos', 'categoria');
 
-        // 8. Intentar eliminar el tipo ENUM (puede fallar si se usa en otro lugar, pero está bien)
-        try {
-            await queryInterface.sequelize.query('DROP TYPE IF EXISTS "enum_visita_problemas_resueltos_categoria"');
-        } catch (error) {
-            console.log('No se pudo eliminar el tipo ENUM, puede que aún esté en uso:', error.message);
-        }
-
-        // 9. Hacer categoria_id NOT NULL ahora que todos los datos están migrados
+        // 7. Hacer la nueva columna NOT NULL
         await queryInterface.changeColumn('visita_problemas_resueltos', 'categoria_id', {
             type: Sequelize.UUID,
-            allowNull: false,
-            references: {
-                model: 'categorias_problemas',
-                key: 'id'
-            },
-            onUpdate: 'CASCADE',
-            onDelete: 'RESTRICT'
+            allowNull: false
         });
     },
 
     async down(queryInterface, Sequelize) {
-        // 1. Agregar de vuelta la columna ENUM categoria
+        // Revertir cambios
         await queryInterface.addColumn('visita_problemas_resueltos', 'categoria', {
             type: Sequelize.ENUM('telefonia', 'red', 'camaras_seguridad', 'grabaciones', 'otro'),
             allowNull: true,
             defaultValue: 'otro'
         });
 
-        // 2. Migrar datos de vuelta del categoria_id al ENUM
-        // Usamos cast al tipo ENUM para asignar el valor correcto
         await queryInterface.sequelize.query(`
       UPDATE visita_problemas_resueltos vpr
-      SET categoria = cp.codigo::enum_visita_problemas_resueltos_categoria
+      SET categoria = cp.codigo::text::enum_visita_problemas_resueltos_categoria
       FROM categorias_problemas cp
       WHERE cp.id = vpr.categoria_id
     `);
 
-        // 3. Hacer categoria NOT NULL
-        await queryInterface.changeColumn('visita_problemas_resueltos', 'categoria', {
-            type: Sequelize.ENUM('telefonia', 'red', 'camaras_seguridad', 'grabaciones', 'otro'),
-            allowNull: false,
-            defaultValue: 'otro'
-        });
-
-        // 4. Eliminar índice y columna categoria_id
-        await queryInterface.removeIndex('visita_problemas_resueltos', ['categoria_id']);
         await queryInterface.removeColumn('visita_problemas_resueltos', 'categoria_id');
-
-        // 5. Eliminar tabla categorias_problemas
         await queryInterface.dropTable('categorias_problemas');
     }
 };

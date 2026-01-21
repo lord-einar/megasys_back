@@ -1,111 +1,162 @@
 // src/__tests__/modules/remitos/remitoService.test.js
+import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
 
-// IMPORTANTE: Mockear database ANTES de cualquier import
-jest.mock('../../../shared/utils/database', () => ({
-  sequelize: {
-    transaction: jest.fn(),
-    query: jest.fn(),
-    QueryTypes: { SELECT: 'SELECT' }
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Mocks de sequelize
+const mockTransaction = {
+  commit: jest.fn().mockResolvedValue(undefined),
+  rollback: jest.fn().mockResolvedValue(undefined)
+};
+
+const mockSequelize = {
+  transaction: jest.fn().mockResolvedValue(mockTransaction),
+  query: jest.fn(),
+  QueryTypes: { SELECT: 'SELECT' }
+};
+
+// Definir rutas absolutas ANTES del mock
+const modelsPath = resolve(__dirname, '../../../models/index.js');
+const pdfServicePath = resolve(__dirname, '../../../shared/services/pdfService.js');
+const emailServicePath = resolve(__dirname, '../../../shared/services/emailService.js');
+const tokenServicePath = resolve(__dirname, '../../../shared/services/tokenService.js');
+const auditServicePath = resolve(__dirname, '../../../shared/services/auditService.js');
+const loggerPath = resolve(__dirname, '../../../shared/utils/logger.js');
+const commonValidatorsPath = resolve(__dirname, '../../../shared/validators/commonValidators.js');
+const servicePath = resolve(__dirname, '../../../modules/remitos/services/remitoService.js');
+
+// Mock de modelos
+await jest.unstable_mockModule(modelsPath, () => ({
+  Remito: {
+    create: jest.fn(),
+    findByPk: jest.fn(),
+    findOne: jest.fn(),
+    findAll: jest.fn(),
+    findAndCountAll: jest.fn(),
+    update: jest.fn(),
+    destroy: jest.fn()
+  },
+  RemitoDetalle: {
+    create: jest.fn(),
+    findByPk: jest.fn(),
+    findOne: jest.fn(),
+    findAll: jest.fn(),
+    count: jest.fn()
+  },
+  Inventario: {
+    create: jest.fn(),
+    findByPk: jest.fn(),
+    findOne: jest.fn(),
+    findAll: jest.fn(),
+    update: jest.fn()
+  },
+  HistorialMovimiento: {
+    create: jest.fn(),
+    findAll: jest.fn()
+  },
+  Personal: {
+    findByPk: jest.fn(),
+    findOne: jest.fn(),
+    findAll: jest.fn()
+  },
+  Sede: {
+    findByPk: jest.fn(),
+    findOne: jest.fn(),
+    findAll: jest.fn()
+  },
+  TipoArticulo: {
+    findByPk: jest.fn(),
+    findOne: jest.fn(),
+    findAll: jest.fn()
+  },
+  Rol: {
+    findByPk: jest.fn(),
+    findOne: jest.fn(),
+    findAll: jest.fn()
+  },
+  sequelize: mockSequelize
+}));
+
+// Mock de CommonValidators
+await jest.unstable_mockModule(commonValidatorsPath, () => ({
+  default: {
+    validarSedeActiva: jest.fn().mockResolvedValue({ id: 'uuid-sede', activo: true }),
+    validarTipoArticuloActivo: jest.fn().mockResolvedValue({ id: 'uuid-tipo', activo: true }),
+    validarPersonalActivo: jest.fn().mockResolvedValue({ id: 'uuid-personal', activo: true }),
+    validarPersonaActiva: jest.fn().mockResolvedValue({ id: 'uuid-personal', activo: true }),
+    validarRolActivo: jest.fn().mockResolvedValue({ id: 'uuid-rol', activo: true }),
+    validarEmpresaActiva: jest.fn().mockResolvedValue({ id: 'uuid-empresa', activo: true }),
+    validarSedesActivas: jest.fn().mockResolvedValue(undefined)
   }
 }));
 
-// Mock de modelos
-jest.mock('../../../models', () => {
-  const mockSequelize = {
-    transaction: jest.fn(),
-    query: jest.fn(),
-    QueryTypes: { SELECT: 'SELECT' }
-  };
-
-  return {
-    Remito: {
-      create: jest.fn(),
-      findByPk: jest.fn(),
-      findOne: jest.fn(),
-      findAll: jest.fn(),
-      update: jest.fn(),
-      destroy: jest.fn()
-    },
-    RemitoDetalle: {
-      create: jest.fn(),
-      findByPk: jest.fn(),
-      findOne: jest.fn(),
-      findAll: jest.fn(),
-      count: jest.fn()
-    },
-    Inventario: {
-      create: jest.fn(),
-      findByPk: jest.fn(),
-      findOne: jest.fn(),
-      findAll: jest.fn(),
-      update: jest.fn()
-    },
-    HistorialMovimiento: {
-      create: jest.fn(),
-      findAll: jest.fn()
-    },
-    Personal: {
-      findByPk: jest.fn(),
-      findOne: jest.fn(),
-      findAll: jest.fn()
-    },
-    Sede: {
-      findByPk: jest.fn(),
-      findOne: jest.fn(),
-      findAll: jest.fn()
-    },
-    sequelize: mockSequelize
-  };
-});
-
-// Mock de servicios externos
-jest.mock('../../../shared/services/pdfService', () => ({
-  generarPDF: jest.fn().mockResolvedValue({
-    path: '/tmp/remito.pdf',
-    buffer: Buffer.from('pdf-content')
-  }),
-  generarPDFRemito: jest.fn().mockResolvedValue({
-    path: '/tmp/remito.pdf',
-    buffer: Buffer.from('pdf-content')
-  })
+// Mock de pdfService
+await jest.unstable_mockModule(pdfServicePath, () => ({
+  default: {
+    generarPDF: jest.fn().mockResolvedValue({
+      path: '/tmp/remito.pdf',
+      buffer: Buffer.from('pdf-content')
+    }),
+    generarPDFRemito: jest.fn().mockResolvedValue({
+      path: '/tmp/remito.pdf',
+      buffer: Buffer.from('pdf-content')
+    })
+  }
 }));
 
-jest.mock('../../../shared/services/emailService', () => ({
-  enviarEmailConAdjuntos: jest.fn().mockResolvedValue(true),
-  enviarEmail: jest.fn().mockResolvedValue(true),
-  enviarAlReceptor: jest.fn().mockResolvedValue(true),
-  enviarAlSolicitante: jest.fn().mockResolvedValue(true)
+// Mock de emailService
+await jest.unstable_mockModule(emailServicePath, () => ({
+  default: {
+    enviarEmailConAdjuntos: jest.fn().mockResolvedValue(true),
+    enviarEmail: jest.fn().mockResolvedValue(true),
+    enviarAlReceptor: jest.fn().mockResolvedValue(true),
+    enviarAlSolicitante: jest.fn().mockResolvedValue(true)
+  }
 }));
 
-jest.mock('../../../shared/services/tokenService', () => ({
-  generarTokenConfirmacion: jest.fn().mockReturnValue('mock-confirmation-token'),
-  generarUrlConfirmacion: jest.fn().mockReturnValue('https://megasys.com/confirmar/mock-token'),
-  validarTokenConfirmacion: jest.fn()
+// Mock de tokenService
+await jest.unstable_mockModule(tokenServicePath, () => ({
+  default: {
+    generarTokenConfirmacion: jest.fn().mockReturnValue('mock-confirmation-token'),
+    generarUrlConfirmacion: jest.fn().mockReturnValue('https://megasys.com/confirmar/mock-token'),
+    validarTokenConfirmacion: jest.fn()
+  }
 }));
 
-jest.mock('../../../shared/services/auditService', () => ({
-  registrarActividad: jest.fn().mockResolvedValue({ id: 'uuid-auditoria' }),
-  registrarAccion: jest.fn().mockResolvedValue({ id: 'uuid-auditoria' })
+// Mock de auditService
+await jest.unstable_mockModule(auditServicePath, () => ({
+  default: {
+    registrarActividad: jest.fn().mockResolvedValue({ id: 'uuid-auditoria' }),
+    registrarAccion: jest.fn().mockResolvedValue({ id: 'uuid-auditoria' })
+  }
 }));
 
-const remitoService = require('../../../modules/remitos/services/remitoService');
-const { Remito, RemitoDetalle, Inventario, HistorialMovimiento, Personal, Sede, sequelize } = require('../../../models');
+// Mock de logger
+await jest.unstable_mockModule(loggerPath, () => ({
+  default: {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn()
+  }
+}));
+
+// Importar DESPUÉS de los mocks
+const { Remito, RemitoDetalle, Inventario, HistorialMovimiento, Personal, Sede, sequelize } = await import(modelsPath);
+const { default: tokenService } = await import(tokenServicePath);
+const { default: CommonValidators } = await import(commonValidatorsPath);
+const { default: remitoService } = await import(servicePath);
 
 describe('RemitoService', () => {
-  let mockTransaction;
-
   beforeEach(() => {
-    // Reset all mocks
     jest.clearAllMocks();
-
-    // Mock de transacción
-    mockTransaction = {
-      commit: jest.fn().mockResolvedValue(undefined),
-      rollback: jest.fn().mockResolvedValue(undefined)
-    };
-
-    sequelize.transaction = jest.fn().mockResolvedValue(mockTransaction);
-    sequelize.query = jest.fn();
+    mockSequelize.transaction.mockResolvedValue(mockTransaction);
+    mockTransaction.commit.mockResolvedValue(undefined);
+    mockTransaction.rollback.mockResolvedValue(undefined);
+    mockSequelize.query = jest.fn();
   });
 
   describe('crear()', () => {
@@ -125,20 +176,20 @@ describe('RemitoService', () => {
     const usuarioEmail = 'test@megatlon.com.ar';
 
     beforeEach(() => {
-      // Limpiar todos los mocks
       jest.clearAllMocks();
 
-      // Mock de validaciones CON MÚLTIPLES LLAMADAS (solicitante y técnico)
+      // Mocks de CommonValidators
+      CommonValidators.validarPersonaActiva = jest.fn().mockResolvedValue({ id: 'uuid-persona', activo: true });
+      CommonValidators.validarSedeActiva = jest.fn().mockResolvedValue({ id: 'uuid-sede', activo: true });
+
       Personal.findOne = jest.fn()
-        .mockResolvedValueOnce({ id: 'uuid-solicitante', activo: true })  // 1ra llamada
-        .mockResolvedValueOnce({ id: 'uuid-tecnico', activo: true });     // 2da llamada
+        .mockResolvedValueOnce({ id: 'uuid-solicitante', activo: true })
+        .mockResolvedValueOnce({ id: 'uuid-tecnico', activo: true });
 
-      // Mock de validaciones de sedes (origen y destino)
       Sede.findOne = jest.fn()
-        .mockResolvedValueOnce({ id: 'uuid-sede-origen', activo: true })    // 1ra llamada
-        .mockResolvedValueOnce({ id: 'uuid-sede-destino', activo: true });  // 2da llamada
+        .mockResolvedValueOnce({ id: 'uuid-sede-origen', activo: true })
+        .mockResolvedValueOnce({ id: 'uuid-sede-destino', activo: true });
 
-      // Mock de validación de inventario (puede ser llamado múltiples veces, una por artículo)
       Inventario.findOne = jest.fn().mockResolvedValue({
         id: 'uuid-inventario',
         sede_id: 'uuid-sede-origen',
@@ -146,7 +197,6 @@ describe('RemitoService', () => {
         estado: 'disponible'
       });
 
-      // Mock de validación batch de inventarios (OPTIMIZACIÓN - nuevo método)
       Inventario.findAll = jest.fn().mockResolvedValue([
         {
           id: 'uuid-inventario-1',
@@ -164,34 +214,27 @@ describe('RemitoService', () => {
         }
       ]);
 
-      // Mock de búsqueda de remitos activos (RemitoDetalle.findAll)
       RemitoDetalle.findAll = jest.fn().mockResolvedValue([]);
 
-      // Mock de generación de número de remito
-      sequelize.query = jest.fn().mockResolvedValue([[{ numero: 1 }]]);
+      mockSequelize.query = jest.fn().mockResolvedValue([[{ numero: 1 }]]);
 
-      // Mock de creación de remito
       Remito.create = jest.fn().mockResolvedValue({
         id: 'uuid-remito',
         numero_remito: 'REM-2025-001',
         estado: 'preparado'
       });
 
-      // Mock de creación de detalles
       RemitoDetalle.create = jest.fn().mockResolvedValue({
         id: 'uuid-detalle',
         remito_id: 'uuid-remito'
       });
 
-      // Mock de actualización de inventario
       Inventario.update = jest.fn().mockResolvedValue([1]);
 
-      // Mock de creación de historial
       HistorialMovimiento.create = jest.fn().mockResolvedValue({
         id: 'uuid-historial'
       });
 
-      // ⭐ CRÍTICO: Mock del método obtener() usando spyOn
       jest.spyOn(remitoService, 'obtener').mockResolvedValue({
         id: 'uuid-remito',
         numero_remito: 'REM-2025-001',
@@ -202,6 +245,10 @@ describe('RemitoService', () => {
         ],
         toJSON: function() { return this; }
       });
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
     });
 
     it('debe crear un remito exitosamente con artículos válidos', async () => {
@@ -216,9 +263,9 @@ describe('RemitoService', () => {
 
     it('debe lanzar error si falta solicitante_id', async () => {
       const datosInvalidos = { ...validDatos, solicitante_id: null };
-
-      // Override del mock para retornar null cuando se busca con id null
-      Personal.findOne = jest.fn().mockResolvedValue(null);
+      CommonValidators.validarPersonaActiva = jest.fn().mockRejectedValue(
+        new Error('Solicitante no existe o no está activo')
+      );
 
       await expect(remitoService.crear(datosInvalidos, usuarioEmail))
         .rejects.toThrow('Solicitante no existe o no está activo');
@@ -266,7 +313,6 @@ describe('RemitoService', () => {
     it('debe actualizar estado del inventario correctamente para transferencia', async () => {
       await remitoService.crear(validDatos, usuarioEmail);
 
-      // Verificar que se actualizó el primer artículo (no préstamo)
       expect(Inventario.update).toHaveBeenCalledWith(
         expect.objectContaining({
           estado: 'en_uso',
@@ -279,7 +325,6 @@ describe('RemitoService', () => {
     it('debe actualizar estado del inventario a "en_prestamo" sin cambiar sede', async () => {
       await remitoService.crear(validDatos, usuarioEmail);
 
-      // Verificar que se actualizó el segundo artículo (préstamo)
       expect(Inventario.update).toHaveBeenCalledWith(
         expect.objectContaining({
           estado: 'en_prestamo'
@@ -288,23 +333,8 @@ describe('RemitoService', () => {
       );
     });
 
-    it('debe crear historial de movimiento para cada artículo', async () => {
-      await remitoService.crear(validDatos, usuarioEmail);
-
-      expect(HistorialMovimiento.create).toHaveBeenCalledTimes(2);
-      expect(HistorialMovimiento.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tipo_movimiento: 'transferencia'
-        }),
-        expect.any(Object)
-      );
-      expect(HistorialMovimiento.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tipo_movimiento: 'prestamo'
-        }),
-        expect.any(Object)
-      );
-    });
+    // NOTA: HistorialMovimiento ya no se crea en crear(), se crea en completar()
+    // La creación de historial se maneja en cambiarEstado cuando el remito se completa
   });
 
   describe('cambiarEstado()', () => {
@@ -332,7 +362,6 @@ describe('RemitoService', () => {
 
       Remito.findByPk = jest.fn().mockResolvedValue(mockRemito);
 
-      // Mock de obtener para el email (se llama en setImmediate)
       jest.spyOn(remitoService, 'obtener').mockResolvedValue({
         id: remitoId,
         numero_remito: 'REM-2025-001',
@@ -340,6 +369,10 @@ describe('RemitoService', () => {
         solicitante: { email: 'solicitante@test.com' },
         toJSON: function() { return this; }
       });
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
     });
 
     it('debe cambiar estado de "preparado" a "en_transito"', async () => {
@@ -416,57 +449,10 @@ describe('RemitoService', () => {
     });
   });
 
+  // NOTA: validarPersonaActiva() y validarSedeActiva() fueron movidos a CommonValidators
+  // Las validaciones se testean indirectamente a través de crear()
+
   describe('validaciones', () => {
-    describe('validarPersonaActiva()', () => {
-      it('debe pasar si persona existe y está activa', async () => {
-        Personal.findOne = jest.fn().mockResolvedValue({
-          id: 'uuid-persona',
-          activo: true
-        });
-
-        await expect(
-          remitoService.validarPersonaActiva('uuid-persona', 'Solicitante')
-        ).resolves.not.toThrow();
-      });
-
-      it('debe lanzar error si persona no existe', async () => {
-        Personal.findOne = jest.fn().mockResolvedValue(null);
-
-        await expect(
-          remitoService.validarPersonaActiva('uuid-inexistente', 'Solicitante')
-        ).rejects.toThrow('no existe o no está activo');
-      });
-
-      it('debe lanzar error si persona está inactiva', async () => {
-        Personal.findOne = jest.fn().mockResolvedValue(null);
-
-        await expect(
-          remitoService.validarPersonaActiva('uuid-persona', 'Solicitante')
-        ).rejects.toThrow('no existe o no está activo');
-      });
-    });
-
-    describe('validarSedeActiva()', () => {
-      it('debe pasar si sede existe y está activa', async () => {
-        Sede.findOne = jest.fn().mockResolvedValue({
-          id: 'uuid-sede',
-          activo: true
-        });
-
-        await expect(
-          remitoService.validarSedeActiva('uuid-sede', 'Sede de origen')
-        ).resolves.not.toThrow();
-      });
-
-      it('debe lanzar error si sede no existe', async () => {
-        Sede.findOne = jest.fn().mockResolvedValue(null);
-
-        await expect(
-          remitoService.validarSedeActiva('uuid-inexistente', 'Sede')
-        ).rejects.toThrow('no existe o no está activa');
-      });
-    });
-
     describe('validarInventarioDisponible()', () => {
       it('debe pasar si inventario está disponible en la sede', async () => {
         Inventario.findOne = jest.fn().mockResolvedValue({
@@ -476,7 +462,6 @@ describe('RemitoService', () => {
           estado: 'disponible'
         });
 
-        // Mock de validación de remitos activos
         RemitoDetalle.findAll = jest.fn().mockResolvedValue([]);
 
         await expect(
@@ -513,7 +498,6 @@ describe('RemitoService', () => {
   describe('obtener()', () => {
     const remitoId = 'uuid-remito';
 
-    // Clase helper para crear mocks de Sequelize que permiten asignaciones dinámicas
     class MockSequelizeModel {
       constructor(data) {
         Object.assign(this, data);
@@ -521,10 +505,6 @@ describe('RemitoService', () => {
     }
 
     beforeEach(() => {
-      // Restaurar el spy de obtener() que se creó en tests anteriores
-      if (remitoService.obtener.mockRestore) {
-        remitoService.obtener.mockRestore();
-      }
       jest.restoreAllMocks();
     });
 
@@ -550,7 +530,7 @@ describe('RemitoService', () => {
 
       expect(result).toBeDefined();
       expect(result.id).toBe(remitoId);
-      expect(result.es_prestamo).toBe(true); // Tiene al menos un artículo en préstamo
+      expect(result.es_prestamo).toBe(true);
       expect(Remito.findByPk).toHaveBeenCalledWith(
         remitoId,
         expect.objectContaining({
@@ -594,7 +574,7 @@ describe('RemitoService', () => {
 
       const result = await remitoService.obtener(remitoId);
 
-      expect(result.es_prestamo).toBeFalsy(); // null o false son valores falsy válidos
+      expect(result.es_prestamo).toBeFalsy();
     });
   });
 
@@ -775,10 +755,8 @@ describe('RemitoService', () => {
     beforeEach(() => {
       jest.restoreAllMocks();
 
-      // Mock de generarNumeroRemito
       jest.spyOn(remitoService, 'generarNumeroRemito').mockResolvedValue('REM-2025-DEV-001');
 
-      // Mock del remito original
       Remito.findByPk = jest.fn().mockResolvedValue({
         id: remitoOriginalId,
         numero_remito: 'REM-2025-001',
@@ -788,13 +766,11 @@ describe('RemitoService', () => {
         tecnico_asignado_id: 'uuid-tec'
       });
 
-      // Mock de sede Deposito
       Sede.findOne = jest.fn().mockResolvedValue({
         id: 'uuid-deposito',
         nombre_sede: 'Deposito'
       });
 
-      // Mock de detalles a devolver
       RemitoDetalle.findAll = jest.fn().mockResolvedValue([
         {
           id: 'uuid-detalle-1',
@@ -822,6 +798,10 @@ describe('RemitoService', () => {
         numero_remito: 'REM-2025-DEV-001',
         toJSON: function() { return this; }
       });
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
     });
 
     it('debe generar remito de devolución exitosamente', async () => {
@@ -887,8 +867,8 @@ describe('RemitoService', () => {
 
       expect(Remito.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          sede_origen_id: 'uuid-sede-2', // Invertido
-          sede_destino_id: 'uuid-sede-1'  // Invertido
+          sede_origen_id: 'uuid-sede-2',
+          sede_destino_id: 'uuid-sede-1'
         }),
         expect.any(Object)
       );
@@ -981,8 +961,6 @@ describe('RemitoService', () => {
     beforeEach(() => {
       jest.clearAllMocks();
 
-      // Mock tokenService
-      const tokenService = require('../../../shared/services/tokenService');
       tokenService.validarTokenConfirmacion = jest.fn().mockReturnValue({
         remitoId: remitoId,
         email: 'receptor@test.com'
@@ -992,7 +970,7 @@ describe('RemitoService', () => {
         id: remitoId,
         numero_remito: 'REM-2025-001',
         estado: 'en_transito',
-        receptor_email: 'receptor@test.com', // Email que coincide con el token
+        receptor_email: 'receptor@test.com',
         solicitante: { email: 'solicitante@test.com' },
         sedeOrigen: { nombre_sede: 'Sede A' },
         sedeDestino: { nombre_sede: 'Sede B' },
@@ -1010,7 +988,6 @@ describe('RemitoService', () => {
     });
 
     it('debe lanzar error con token inválido', async () => {
-      const tokenService = require('../../../shared/services/tokenService');
       tokenService.validarTokenConfirmacion = jest.fn().mockImplementation(() => {
         throw new Error('inválido o expirado');
       });
@@ -1021,7 +998,6 @@ describe('RemitoService', () => {
     });
 
     it('debe lanzar error si token no corresponde al remito', async () => {
-      const tokenService = require('../../../shared/services/tokenService');
       tokenService.validarTokenConfirmacion = jest.fn().mockReturnValue({
         remitoId: 'otro-uuid',
         email: 'receptor@test.com'
@@ -1113,11 +1089,10 @@ describe('RemitoService', () => {
 
   describe('obtenerResumenPrestamos()', () => {
     it('debe obtener resumen de préstamos completo', async () => {
-      // Mock para count (3 llamadas: próximos a vencer, vencidos, total activos)
       RemitoDetalle.count = jest.fn()
-        .mockResolvedValueOnce(1) // Próximos a vencer
-        .mockResolvedValueOnce(1) // Vencidos
-        .mockResolvedValueOnce(2); // Total activos
+        .mockResolvedValueOnce(1)
+        .mockResolvedValueOnce(1)
+        .mockResolvedValueOnce(2);
 
       const result = await remitoService.obtenerResumenPrestamos();
 

@@ -342,14 +342,34 @@ class VisitaService {
 
                 // 2. Crear problemas resueltos
                 if (datosInforme.problemas_resueltos && datosInforme.problemas_resueltos.length > 0) {
-                    const problemas = datosInforme.problemas_resueltos.map(p => ({
-                        informe_id: informe.id,
-                        ...p
-                    }));
+                    // Obtener todas las categorías para mapear si es necesario
+                    const categorias = await CategoriaProblema.findAll({ transaction });
+
+                    const problemas = datosInforme.problemas_resueltos.map(p => {
+                        let categoria_id = p.categoria_id;
+
+                        // Si no viene categoria_id pero sí categoria (el código antiguo), buscar el ID
+                        if (!categoria_id && p.categoria) {
+                            const cat = categorias.find(c => c.codigo === p.categoria || c.nombre === p.categoria);
+                            if (cat) categoria_id = cat.id;
+                        }
+
+                        return {
+                            informe_id: informe.id,
+                            descripcion: p.descripcion,
+                            causado_por_usuario: p.causado_por_usuario,
+                            categoria_id: categoria_id
+                        };
+                    });
+
                     await VisitaProblemaResuelto.bulkCreate(problemas, { transaction });
 
-                    // Adjuntar para el email
-                    informe.setDataValue('problemasResueltos', datosInforme.problemas_resueltos);
+                    // Adjuntar para el email (incluyendo los nombres de categorías resueltos)
+                    const problemasConNombres = problemas.map(p => {
+                        const cat = categorias.find(c => c.id === p.categoria_id);
+                        return { ...p, categoriaNombre: cat ? cat.nombre : 'Otro' };
+                    });
+                    informe.setDataValue('problemasResueltos', problemasConNombres);
                 }
 
                 // 3. Marcar solicitudes previas como resueltas
@@ -687,8 +707,15 @@ class VisitaService {
                 // Esto requiere un join complejo: Visita -> VisitaInforme -> VisitaProblemaResuelto
                 // Lo hacemos consultando VisitaProblemaResuelto e incluyendo los padres con el filtro de fecha
                 VisitaProblemaResuelto.findAll({
-                    attributes: ['categoria', [sequelize.fn('COUNT', sequelize.col('VisitaProblemaResuelto.id')), 'count']],
+                    attributes: [
+                        'categoria_id',
+                        [sequelize.fn('COUNT', sequelize.col('VisitaProblemaResuelto.id')), 'count']
+                    ],
                     include: [{
+                        model: CategoriaProblema,
+                        as: 'categoriaProblema',
+                        attributes: ['nombre', 'codigo']
+                    }, {
                         model: VisitaInforme,
                         as: 'informe',
                         attributes: [],
@@ -701,7 +728,7 @@ class VisitaService {
                             required: true
                         }]
                     }],
-                    group: ['categoria'],
+                    group: ['categoria_id', 'categoriaProblema.id', 'categoriaProblema.nombre', 'categoriaProblema.codigo'],
                     raw: true
                 })
             ]);
@@ -738,7 +765,8 @@ class VisitaService {
             });
 
             problemasPorCategoria.forEach(item => {
-                stats.problemas_por_categoria[item.categoria] = parseInt(item.count);
+                const nombre = item['categoriaProblema.nombre'] || 'Otros';
+                stats.problemas_por_categoria[nombre] = parseInt(item.count);
             });
 
             return stats;
