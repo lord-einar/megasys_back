@@ -43,7 +43,7 @@ class VisitaEmailService {
           </div>
           <div class="content">
             <p>Hola,</p>
-            <p>Te recordamos que mañana <strong>${fecha}</strong> tendremos una visita de soporte en <strong>${visita.sedePrincipal.nombre}</strong>.</p>
+            <p>Te recordamos que mañana <strong>${fecha}</strong> tendremos una visita de soporte en <strong>${visita.sedePrincipal.nombre_sede}</strong>.</p>
             
             <div class="info-row">
               <span class="label">Técnico asignado:</span> ${visita.tecnicoAsignado.nombre} ${visita.tecnicoAsignado.apellido}
