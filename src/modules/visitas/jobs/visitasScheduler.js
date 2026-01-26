@@ -11,7 +11,8 @@ class VisitasScheduler {
 
     /**
      * Obtener destinatarios para notificaciones de visitas
-     * Incluye: Personal de la sede + Infraestructura (general)
+     * Incluye: Personal de la sede + Infraestructura (email fijo)
+     * NOTA: El técnico asignado debe agregarse por separado en cada caso
      */
     async obtenerDestinatariosVisita(sedeId) {
         try {
@@ -21,31 +22,18 @@ class VisitasScheduler {
                 attributes: ['email']
             });
 
-            // 2. Infraestructura (solo rol infraestructura, no filtrado por sede)
-            const infraestructura = await Personal.findAll({
-                where: { activo: true },
-                attributes: ['email'],
-                include: [{
-                    model: Rol,
-                    as: 'rol',
-                    where: {
-                        nombre: { [Op.iLike]: '%infraestructura%' },
-                        activo: true
-                    },
-                    attributes: []
-                }]
-            });
+            // 2. Email fijo de infraestructura (es un buzón que distribuye a todo el equipo)
+            const emailInfraestructura = process.env.EMAIL_INFRAESTRUCTURA || 'infraestructura@megatlon.com.ar';
 
-            // Combinar emails: Personal de sede + Infraestructura + Email fijo
+            // Combinar emails y eliminar duplicados
             const todosLosEmails = [
                 ...personalSede.map(p => p.email),
-                ...infraestructura.map(p => p.email),
-                process.env.EMAIL_INFRAESTRUCTURA || 'infraestructura@megatlon.com.ar'
+                emailInfraestructura
             ];
 
             const emailsUnicos = [...new Set(todosLosEmails.filter(e => e))];
 
-            logger.info(`📧 Destinatarios encontrados: ${emailsUnicos.length} (Personal sede: ${personalSede.length}, Infraestructura: ${infraestructura.length + 1})`);
+            logger.info(`📧 Destinatarios base: ${emailsUnicos.length} (Personal sede: ${personalSede.length}, Infraestructura: 1)`);
 
             return emailsUnicos;
         } catch (error) {
@@ -90,15 +78,23 @@ class VisitasScheduler {
 
             for (const visita of visitas) {
                 try {
-                    // Obtener destinatarios: personal de sede + gerentes + infraestructura
+                    // Obtener destinatarios: personal de sede + infraestructura
                     const emails = await this.obtenerDestinatariosVisita(visita.sede_id);
 
-                    if (emails.length > 0) {
-                        await visitaEmailService.enviarRecordatorio(visita, emails);
+                    // Agregar técnico asignado
+                    if (visita.tecnicoAsignado && visita.tecnicoAsignado.email) {
+                        emails.push(visita.tecnicoAsignado.email);
+                    }
+
+                    // Eliminar duplicados
+                    const emailsUnicos = [...new Set(emails)];
+
+                    if (emailsUnicos.length > 0) {
+                        await visitaEmailService.enviarRecordatorio(visita, emailsUnicos);
 
                         // Actualizar estado
                         await visita.update({ estado: 'recordatorio_enviado' });
-                        logger.info(`✅ Recordatorio enviado para visita ${visita.id} a ${emails.length} destinatarios`);
+                        logger.info(`✅ Recordatorio enviado para visita ${visita.id} a ${emailsUnicos.length} destinatarios`);
                     } else {
                         logger.warn(`⚠️ No hay destinatarios con email para la visita ${visita.id}`);
                     }

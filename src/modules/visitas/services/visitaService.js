@@ -21,7 +21,8 @@ import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
 class VisitaService {
     /**
      * Obtener destinatarios para notificaciones de visitas
-     * Incluye: Personal de la sede + Infraestructura (general)
+     * Incluye: Personal de la sede + Infraestructura (email fijo)
+     * NOTA: El técnico asignado debe agregarse por separado en cada caso
      */
     async obtenerDestinatariosVisita(sedeId) {
         try {
@@ -31,31 +32,18 @@ class VisitaService {
                 attributes: ['email']
             });
 
-            // 2. Infraestructura (solo rol infraestructura, no filtrado por sede)
-            const infraestructura = await Personal.findAll({
-                where: { activo: true },
-                attributes: ['email'],
-                include: [{
-                    model: Rol,
-                    as: 'rol',
-                    where: {
-                        nombre: { [Op.iLike]: '%infraestructura%' },
-                        activo: true
-                    },
-                    attributes: []
-                }]
-            });
+            // 2. Email fijo de infraestructura (es un buzón que distribuye a todo el equipo)
+            const emailInfraestructura = process.env.EMAIL_INFRAESTRUCTURA || 'infraestructura@megatlon.com.ar';
 
-            // Combinar emails: Personal de sede + Infraestructura + Email fijo
+            // Combinar emails y eliminar duplicados
             const todosLosEmails = [
                 ...personalSede.map(p => p.email),
-                ...infraestructura.map(p => p.email),
-                process.env.EMAIL_INFRAESTRUCTURA || 'infraestructura@megatlon.com.ar'
+                emailInfraestructura
             ];
 
             const emailsUnicos = [...new Set(todosLosEmails.filter(e => e))];
 
-            logger.info(`📧 Destinatarios encontrados: ${emailsUnicos.length} (Personal sede: ${personalSede.length}, Infraestructura: ${infraestructura.length + 1})`);
+            logger.info(`📧 Destinatarios base: ${emailsUnicos.length} (Personal sede: ${personalSede.length}, Infraestructura: 1)`);
 
             return emailsUnicos;
         } catch (error) {
@@ -608,8 +596,16 @@ class VisitaService {
         // Enviar email de notificación de cancelación (fuera de transacción - best effort)
         const emailsDestino = await this.obtenerDestinatariosVisita(visita.sede_id);
 
-        if (emailsDestino.length > 0) {
-            visitaEmailService.enviarNotificacionCancelacion(visita, motivo, emailsDestino).catch(err =>
+        // Agregar técnico asignado
+        if (visita.tecnicoAsignado && visita.tecnicoAsignado.email) {
+            emailsDestino.push(visita.tecnicoAsignado.email);
+        }
+
+        // Eliminar duplicados
+        const emailsUnicos = [...new Set(emailsDestino)];
+
+        if (emailsUnicos.length > 0) {
+            visitaEmailService.enviarNotificacionCancelacion(visita, motivo, emailsUnicos).catch(err =>
                 logger.error('Error enviando notificación de cancelación:', err)
             );
         }
@@ -673,8 +669,16 @@ class VisitaService {
         // Enviar email de notificación de reprogramación (fuera de transacción - best effort)
         const emailsDestino = await this.obtenerDestinatariosVisita(visita.sede_id);
 
-        if (emailsDestino.length > 0) {
-            visitaEmailService.enviarNotificacionReprogramacion(visita, fechaAnterior, nuevaFecha, emailsDestino).catch(err =>
+        // Agregar técnico asignado
+        if (visita.tecnicoAsignado && visita.tecnicoAsignado.email) {
+            emailsDestino.push(visita.tecnicoAsignado.email);
+        }
+
+        // Eliminar duplicados
+        const emailsUnicos = [...new Set(emailsDestino)];
+
+        if (emailsUnicos.length > 0) {
+            visitaEmailService.enviarNotificacionReprogramacion(visita, fechaAnterior, nuevaFecha, emailsUnicos).catch(err =>
                 logger.error('Error enviando notificación de reprogramación:', err)
             );
         }
