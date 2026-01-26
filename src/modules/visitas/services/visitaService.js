@@ -9,14 +9,76 @@ import {
     CategoriaProblema,
     Sede,
     Personal,
+    Rol,
     sequelize
 } from '../../../models/index.js';
+// Servicios
 import visitaEmailService from './emailService.js';
 import logger from '../../../shared/utils/logger.js';
 import { randomUUID as uuidv4 } from 'node:crypto';
 import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
 
 class VisitaService {
+    /**
+     * Obtener destinatarios para notificaciones de visitas
+     * Incluye: Personal de la sede + Gerentes + Infraestructura
+     */
+    async obtenerDestinatariosVisita(sedeId) {
+        try {
+            // 1. Personal activo de la sede
+            const personalSede = await Personal.findAll({
+                where: { sede_id: sedeId, activo: true },
+                attributes: ['email']
+            });
+
+            // 2. Gerentes (todos los roles que contengan "Gerente" en el nombre)
+            const gerentes = await Personal.findAll({
+                where: { activo: true },
+                attributes: ['email'],
+                include: [{
+                    model: Rol,
+                    as: 'rol',
+                    where: {
+                        nombre: { [Op.iLike]: '%gerente%' },
+                        activo: true
+                    },
+                    attributes: []
+                }]
+            });
+
+            // 3. Infraestructura (email fijo + rol)
+            const infraestructura = await Personal.findAll({
+                where: { activo: true },
+                attributes: ['email'],
+                include: [{
+                    model: Rol,
+                    as: 'rol',
+                    where: {
+                        nombre: { [Op.iLike]: '%infraestructura%' },
+                        activo: true
+                    },
+                    attributes: []
+                }]
+            });
+
+            // Combinar todos los emails y eliminar duplicados
+            const todosLosEmails = [
+                ...personalSede.map(p => p.email),
+                ...gerentes.map(p => p.email),
+                ...infraestructura.map(p => p.email),
+                process.env.EMAIL_INFRAESTRUCTURA || 'infraestructura@megatlon.com.ar'
+            ];
+
+            const emailsUnicos = [...new Set(todosLosEmails.filter(e => e))];
+
+            logger.info(`📧 Destinatarios encontrados: ${emailsUnicos.length} (Personal: ${personalSede.length}, Gerentes: ${gerentes.length}, Infraestructura: ${infraestructura.length + 1})`);
+
+            return emailsUnicos;
+        } catch (error) {
+            logger.error('Error obteniendo destinatarios de visita:', error);
+            throw error;
+        }
+    }
 
     /**
      * Listar visitas con filtros y paginación
@@ -560,11 +622,7 @@ class VisitaService {
         const visita = result.data;
 
         // Enviar email de notificación de cancelación (fuera de transacción - best effort)
-        const personalSede = await Personal.findAll({
-            where: { sede_id: visita.sede_id, activo: true },
-            attributes: ['email']
-        });
-        const emailsDestino = personalSede.map(p => p.email).filter(e => e);
+        const emailsDestino = await this.obtenerDestinatariosVisita(visita.sede_id);
 
         if (emailsDestino.length > 0) {
             visitaEmailService.enviarNotificacionCancelacion(visita, motivo, emailsDestino).catch(err =>
@@ -629,11 +687,7 @@ class VisitaService {
         const visita = result.data;
 
         // Enviar email de notificación de reprogramación (fuera de transacción - best effort)
-        const personalSede = await Personal.findAll({
-            where: { sede_id: visita.sede_id, activo: true },
-            attributes: ['email']
-        });
-        const emailsDestino = personalSede.map(p => p.email).filter(e => e);
+        const emailsDestino = await this.obtenerDestinatariosVisita(visita.sede_id);
 
         if (emailsDestino.length > 0) {
             visitaEmailService.enviarNotificacionReprogramacion(visita, fechaAnterior, nuevaFecha, emailsDestino).catch(err =>
@@ -979,20 +1033,13 @@ class VisitaService {
 
             if (!visita) throw new Error('Visita no encontrada');
 
-            // Obtener emails de personal de la sede
-            const personalSede = await Personal.findAll({
-                where: { sede_id: visita.sede_id, activo: true },
-                attributes: ['email']
-            });
+            // Obtener destinatarios: personal de sede + gerentes + infraestructura
+            const uniqueEmails = await this.obtenerDestinatariosVisita(visita.sede_id);
 
-            // Lista de destinatarios: Personal de la sede + Técnico asignado
-            const emails = personalSede.map(p => p.email).filter(e => e);
+            // Agregar técnico asignado si tiene email
             if (visita.tecnicoAsignado && visita.tecnicoAsignado.email) {
-                emails.push(visita.tecnicoAsignado.email);
+                uniqueEmails.push(visita.tecnicoAsignado.email);
             }
-
-            // Eliminar duplicados
-            const uniqueEmails = [...new Set(emails)];
 
             if (uniqueEmails.length === 0) {
                 throw new Error('No hay destinatarios con email válido para enviar el aviso');
