@@ -64,6 +64,16 @@ Personal.belongsTo(Rol, {
   as: 'rol'
 });
 
+// Relaciones jerárquicas de Rol (parent-child)
+Rol.hasMany(Rol, {
+  foreignKey: 'parent_id',
+  as: 'subRoles'
+});
+Rol.belongsTo(Rol, {
+  foreignKey: 'parent_id',
+  as: 'rolPadre'
+});
+
 // Relaciones Personal -> PersonalSede (uno a muchos)
 Personal.hasMany(PersonalSede, {
   foreignKey: 'personal_id',

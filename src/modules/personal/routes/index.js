@@ -6,6 +6,7 @@ import validate from '../../../shared/middleware/validation.js';
 import { body, param, query } from 'express-validator';
 import personalController from '../controllers/personalController.js';
 import personalSedeController from '../controllers/personalSedeController.js';
+import rolController from '../controllers/rolController.js';
 
 const router = express.Router();
 
@@ -460,6 +461,170 @@ router.get('/sedes/:id',
 router.get('/sedes/estadisticas',
   requirePermission('personal', 'read'),
   personalSedeController.obtenerEstadisticas
+);
+
+// =====================================================
+// RUTAS DE CONFIGURACIÓN - ROLES
+// =====================================================
+
+/**
+ * @route   GET /api/personal/configuracion/roles
+ * @desc    Listar todos los roles
+ * @access  Private (Read permission - Todos)
+ */
+router.get('/configuracion/roles',
+  requirePermission('personal', 'read'),
+  [
+    query('activo')
+      .optional()
+      .isBoolean()
+      .withMessage('Activo debe ser true o false'),
+    query('search')
+      .optional()
+      .trim()
+      .isLength({ max: 100 })
+      .withMessage('Búsqueda no puede exceder 100 caracteres')
+  ],
+  validate,
+  rolController.listar
+);
+
+/**
+ * @route   GET /api/personal/configuracion/roles/:id
+ * @desc    Obtener un rol por ID
+ * @access  Private (Read permission - Todos)
+ */
+router.get('/configuracion/roles/:id',
+  requirePermission('personal', 'read'),
+  [
+    param('id')
+      .isUUID()
+      .withMessage('ID debe ser un UUID válido')
+  ],
+  validate,
+  rolController.obtener
+);
+
+/**
+ * @route   GET /api/personal/configuracion/roles/:id/personal
+ * @desc    Obtener personal asignado a un rol
+ * @access  Private (Read permission - Todos)
+ */
+router.get('/configuracion/roles/:id/personal',
+  requirePermission('personal', 'read'),
+  [
+    param('id')
+      .isUUID()
+      .withMessage('ID debe ser un UUID válido')
+  ],
+  validate,
+  rolController.obtenerPersonalPorRol
+);
+
+/**
+ * @route   POST /api/personal/configuracion/roles
+ * @desc    Crear un nuevo rol
+ * @access  Private (Create permission - Infraestructura)
+ */
+router.post('/configuracion/roles',
+  requirePermission('personal', 'create'),
+  [
+    body('nombre')
+      .trim()
+      .notEmpty()
+      .withMessage('Nombre del rol es requerido')
+      .isLength({ min: 2, max: 50 })
+      .withMessage('Nombre debe tener entre 2 y 50 caracteres'),
+    body('descripcion')
+      .optional()
+      .trim(),
+    body('nivel_jerarquia')
+      .optional()
+      .isInt({ min: 1, max: 10 })
+      .withMessage('Nivel jerárquico debe ser entre 1 y 10'),
+    body('parent_id')
+      .optional()
+      .isUUID()
+      .withMessage('Parent ID debe ser un UUID válido')
+  ],
+  validate,
+  rolController.crear
+);
+
+/**
+ * @route   PUT /api/personal/configuracion/roles/:id
+ * @desc    Actualizar un rol existente
+ * @access  Private (Update permission - Infraestructura)
+ */
+router.put('/configuracion/roles/:id',
+  requirePermission('personal', 'update'),
+  [
+    param('id')
+      .isUUID()
+      .withMessage('ID debe ser un UUID válido'),
+    body('nombre')
+      .optional()
+      .trim()
+      .isLength({ min: 2, max: 50 })
+      .withMessage('Nombre debe tener entre 2 y 50 caracteres'),
+    body('descripcion')
+      .optional()
+      .trim(),
+    body('nivel_jerarquia')
+      .optional()
+      .isInt({ min: 1, max: 10 })
+      .withMessage('Nivel jerárquico debe ser entre 1 y 10'),
+    body('parent_id')
+      .optional()
+      .custom((value) => {
+        if (value === null) return true; // Allow null to remove parent
+        if (typeof value === 'string' && value.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+          return true;
+        }
+        throw new Error('Parent ID debe ser un UUID válido o null');
+      }),
+    body('activo')
+      .optional()
+      .isBoolean()
+      .withMessage('Activo debe ser true o false')
+  ],
+  validate,
+  rolController.actualizar
+);
+
+/**
+ * @route   DELETE /api/personal/configuracion/roles/:id
+ * @desc    Eliminar un rol (soft delete)
+ * @access  Private (Delete permission - Infraestructura)
+ */
+router.delete('/configuracion/roles/:id',
+  requirePermission('personal', 'delete'),
+  [
+    param('id')
+      .isUUID()
+      .withMessage('ID debe ser un UUID válido')
+  ],
+  validate,
+  rolController.eliminar
+);
+
+/**
+ * @route   POST /api/personal/configuracion/asignar-rol
+ * @desc    Asignar rol a un usuario
+ * @access  Private (Update permission - Infraestructura)
+ */
+router.post('/configuracion/asignar-rol',
+  requirePermission('personal', 'update'),
+  [
+    body('personalId')
+      .isUUID()
+      .withMessage('Personal ID debe ser un UUID válido'),
+    body('rolId')
+      .isUUID()
+      .withMessage('Rol ID debe ser un UUID válido')
+  ],
+  validate,
+  rolController.asignarRolAPersonal
 );
 
 export default router;

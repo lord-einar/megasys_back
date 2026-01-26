@@ -31,8 +31,8 @@ const Rol = sequelize.define('Rol', {
   },
   nivel_jerarquia: {
     type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 1,
+    allowNull: true,
+    defaultValue: 5,
     validate: {
       min: {
         args: 1,
@@ -42,6 +42,14 @@ const Rol = sequelize.define('Rol', {
         args: 10,
         msg: 'El nivel jerárquico no puede ser mayor a 10'
       }
+    }
+  },
+  parent_id: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    references: {
+      model: 'roles',
+      key: 'id'
     }
   },
   activo: {
