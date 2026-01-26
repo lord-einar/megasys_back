@@ -543,9 +543,15 @@ router.post('/configuracion/roles',
       .isInt({ min: 1, max: 10 })
       .withMessage('Nivel jerárquico debe ser entre 1 y 10'),
     body('parent_id')
-      .optional()
-      .isUUID()
-      .withMessage('Parent ID debe ser un UUID válido')
+      .optional({ nullable: true, checkFalsy: true })
+      .custom((value) => {
+        if (value === null || value === undefined || value === '') return true;
+        // Solo validar como UUID si tiene un valor
+        if (typeof value === 'string' && value.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+          return true;
+        }
+        throw new Error('Parent ID debe ser un UUID válido o null');
+      })
   ],
   validate,
   rolController.crear
