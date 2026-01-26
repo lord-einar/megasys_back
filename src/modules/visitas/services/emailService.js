@@ -52,7 +52,7 @@ class VisitaEmailService {
               <span class="label">Tipo de visita:</span> ${visita.tipo.toUpperCase()}
             </div>
             <div class="info-row">
-              <span class="label">Motivo:</span> ${visita.motivo || (visita.tipo === 'programada' ? 'Visita periódica preventiva' : 'No especificado')}
+              <span class="label">Motivo:</span> ${visita.motivo || (visita.es_recurrente ? 'Visita periódica preventiva' : 'No especificado')}
             </div>
 
             <p style="margin-top: 30px;">
