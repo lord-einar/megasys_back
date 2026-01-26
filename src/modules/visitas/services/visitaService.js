@@ -21,32 +21,17 @@ import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
 class VisitaService {
     /**
      * Obtener destinatarios para notificaciones de visitas
-     * Incluye: Personal de la sede + Gerentes + Infraestructura
+     * Incluye: Personal de la sede + Infraestructura (general)
      */
     async obtenerDestinatariosVisita(sedeId) {
         try {
-            // 1. Personal activo de la sede
+            // 1. TODO el personal activo de la sede (incluye gerentes/coordinadores de esa sede)
             const personalSede = await Personal.findAll({
                 where: { sede_id: sedeId, activo: true },
                 attributes: ['email']
             });
 
-            // 2. Gerentes (todos los roles que contengan "Gerente" en el nombre)
-            const gerentes = await Personal.findAll({
-                where: { activo: true },
-                attributes: ['email'],
-                include: [{
-                    model: Rol,
-                    as: 'rol',
-                    where: {
-                        nombre: { [Op.iLike]: '%gerente%' },
-                        activo: true
-                    },
-                    attributes: []
-                }]
-            });
-
-            // 3. Infraestructura (email fijo + rol)
+            // 2. Infraestructura (solo rol infraestructura, no filtrado por sede)
             const infraestructura = await Personal.findAll({
                 where: { activo: true },
                 attributes: ['email'],
@@ -61,17 +46,16 @@ class VisitaService {
                 }]
             });
 
-            // Combinar todos los emails y eliminar duplicados
+            // Combinar emails: Personal de sede + Infraestructura + Email fijo
             const todosLosEmails = [
                 ...personalSede.map(p => p.email),
-                ...gerentes.map(p => p.email),
                 ...infraestructura.map(p => p.email),
                 process.env.EMAIL_INFRAESTRUCTURA || 'infraestructura@megatlon.com.ar'
             ];
 
             const emailsUnicos = [...new Set(todosLosEmails.filter(e => e))];
 
-            logger.info(`📧 Destinatarios encontrados: ${emailsUnicos.length} (Personal: ${personalSede.length}, Gerentes: ${gerentes.length}, Infraestructura: ${infraestructura.length + 1})`);
+            logger.info(`📧 Destinatarios encontrados: ${emailsUnicos.length} (Personal sede: ${personalSede.length}, Infraestructura: ${infraestructura.length + 1})`);
 
             return emailsUnicos;
         } catch (error) {
