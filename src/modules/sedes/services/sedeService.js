@@ -699,25 +699,43 @@ class SedeService {
    */
   async obtenerEstadisticasGenerales() {
     // Ejecutar queries en paralelo con agregaciones
+    // EXCLUIR SEDES DE PRUEBA de todas las estadísticas
     const [sedesStats, personalStats, inventarioStats] = await Promise.all([
-      // Una query con agregaciones para sedes
+      // Una query con agregaciones para sedes (excluir pruebas)
       Sede.findAll({
         attributes: [
           [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
           [sequelize.fn('COUNT', sequelize.literal("CASE WHEN activo = true THEN 1 END")), 'activas'],
           [sequelize.fn('COUNT', sequelize.literal("CASE WHEN activo = false THEN 1 END")), 'inactivas']
         ],
+        where: { es_prueba: false },
         raw: true
       }),
-      // Una query simple para personal
-      Personal.count({ where: { activo: true } }),
-      // Una query con agregaciones para inventario
+      // Una query simple para personal (excluir sedes de prueba)
+      Personal.count({
+        where: { activo: true },
+        include: [{
+          model: Sede,
+          as: 'sede',
+          where: { es_prueba: false },
+          attributes: [],
+          required: true
+        }]
+      }),
+      // Una query con agregaciones para inventario (excluir sedes de prueba)
       Inventario.findAll({
         attributes: [
           [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
           [sequelize.fn('COUNT', sequelize.literal("CASE WHEN estado = 'disponible' THEN 1 END")), 'disponible']
         ],
         where: { activo: true },
+        include: [{
+          model: Sede,
+          as: 'sedePrincipal',
+          where: { es_prueba: false },
+          attributes: [],
+          required: true
+        }],
         raw: true
       })
     ]);
@@ -737,7 +755,7 @@ class SedeService {
       }
     };
 
-    // Top 5 sedes con más personal
+    // Top 5 sedes con más personal (excluir sedes de prueba)
     const sedesConMasPersonal = await Sede.findAll({
       attributes: [
         'id', 'empresa_id', 'nombre_sede',
@@ -752,7 +770,7 @@ class SedeService {
           required: false
         }
       ],
-      where: { activo: true },
+      where: { activo: true, es_prueba: false },
       group: ['Sede.id', 'Sede.empresa_id', 'Sede.nombre_sede'],
       order: [[sequelize.literal('total_personal'), 'DESC']],
       limit: 5,
@@ -760,7 +778,7 @@ class SedeService {
       subQuery: false
     });
 
-    // Top 5 sedes con más inventario
+    // Top 5 sedes con más inventario (excluir sedes de prueba)
     const sedesConMasInventario = await Sede.findAll({
       attributes: [
         'id', 'empresa_id', 'nombre_sede',
@@ -775,7 +793,7 @@ class SedeService {
           required: false
         }
       ],
-      where: { activo: true },
+      where: { activo: true, es_prueba: false },
       group: ['Sede.id', 'Sede.empresa_id', 'Sede.nombre_sede'],
       order: [[sequelize.literal('total_inventario'), 'DESC']],
       limit: 5,

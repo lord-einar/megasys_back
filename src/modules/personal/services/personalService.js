@@ -576,6 +576,7 @@ class PersonalService {
    * Obtener estadísticas por sede
    */
   async obtenerEstadisticasPorSede() {
+    // EXCLUIR SEDES DE PRUEBA
     const estadisticas = await sequelize.query(`
       SELECT
         s.id,
@@ -585,7 +586,7 @@ class PersonalService {
         COUNT(p.id) as total_personal
       FROM sedes s
       LEFT JOIN personal p ON s.id = p.sede_id AND p.activo = true
-      WHERE s.activo = true
+      WHERE s.activo = true AND s.es_prueba = false
       GROUP BY s.id, s.nombre_sede, s.localidad, s.provincia
       ORDER BY total_personal DESC
     `, { type: sequelize.QueryTypes.SELECT });
@@ -597,17 +598,28 @@ class PersonalService {
    * Obtener estadísticas generales
    */
   async obtenerEstadisticasGenerales() {
-    // Contar personal total
-    const totalPersonal = await Personal.count({ where: { activo: true } });
+    // EXCLUIR PERSONAL DE SEDES DE PRUEBA
+    // Contar personal total (excluir sedes de prueba)
+    const totalPersonal = await Personal.count({
+      where: { activo: true },
+      include: [{
+        model: Sede,
+        as: 'sede',
+        where: { es_prueba: false },
+        attributes: [],
+        required: true
+      }]
+    });
 
-    // Contar total de sedes activas en el sistema
-    const totalSedes = await Sede.count({ where: { activo: true } });
+    // Contar total de sedes activas en el sistema (excluir pruebas)
+    const totalSedes = await Sede.count({ where: { activo: true, es_prueba: false } });
 
-    // Contar roles únicos
+    // Contar roles únicos (excluir personal de sedes de prueba)
     const rolesUnicos = await sequelize.query(`
-      SELECT COUNT(DISTINCT rol_id) as total_roles
-      FROM personal
-      WHERE activo = true AND rol_id IS NOT NULL
+      SELECT COUNT(DISTINCT p.rol_id) as total_roles
+      FROM personal p
+      INNER JOIN sedes s ON p.sede_id = s.id
+      WHERE p.activo = true AND p.rol_id IS NOT NULL AND s.es_prueba = false
     `, { type: sequelize.QueryTypes.SELECT });
 
     const estadisticas = {

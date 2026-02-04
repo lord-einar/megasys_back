@@ -95,6 +95,12 @@ const Sede = sequelize.define('Sede', {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
     allowNull: false
+  },
+  es_prueba: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    allowNull: false,
+    comment: 'Indica si la sede es de prueba (excluida de estadísticas y reportes)'
   }
 }, {
   tableName: 'sedes',
@@ -108,12 +114,26 @@ const Sede = sequelize.define('Sede', {
     },
     {
       fields: ['empresa_id']
+    },
+    {
+      fields: ['es_prueba']
     }
   ],
   scopes: {
     activas: {
       where: {
         activo: true
+      }
+    },
+    produccion: {
+      where: {
+        es_prueba: false
+      }
+    },
+    activasProduccion: {
+      where: {
+        activo: true,
+        es_prueba: false
       }
     }
   }
