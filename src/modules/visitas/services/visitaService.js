@@ -689,16 +689,26 @@ class VisitaService {
     }
 
     /**
-     * Obtener estadísticas de visitas
+     * Obtener estadísticas de visitas (excluir visitas futuras por defecto)
      */
     async obtenerEstadisticas(fechaDesde, fechaHasta) {
         try {
             const where = {};
+            const hoy = new Date();
+            hoy.setHours(23, 59, 59, 999); // Fin del día de hoy
 
             if (fechaDesde || fechaHasta) {
                 where.fecha = {};
                 if (fechaDesde) where.fecha[Op.gte] = fechaDesde;
-                if (fechaHasta) where.fecha[Op.lte] = fechaHasta;
+                if (fechaHasta) {
+                    where.fecha[Op.lte] = fechaHasta;
+                } else {
+                    // Si solo se especifica desde, no incluir futuras
+                    where.fecha[Op.lte] = hoy;
+                }
+            } else {
+                // Por defecto, solo visitas hasta hoy (excluir programadas a futuro)
+                where.fecha = { [Op.lte]: hoy };
             }
 
             // 1. Total y conteos básicos (Estado, Tipo)

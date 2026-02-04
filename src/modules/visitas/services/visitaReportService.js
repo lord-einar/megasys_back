@@ -8,15 +8,24 @@ class VisitaReportService {
      */
     _construirFiltros(filtros = {}) {
         const where = {};
+        const hoy = new Date();
+        hoy.setHours(23, 59, 59, 999); // Fin del día de hoy
 
+        // Filtros de fecha
         if (filtros.fecha_desde && filtros.fecha_hasta) {
             where.fecha = {
                 [Op.between]: [filtros.fecha_desde, filtros.fecha_hasta]
             };
         } else if (filtros.fecha_desde) {
-            where.fecha = { [Op.gte]: filtros.fecha_desde };
+            where.fecha = {
+                [Op.gte]: filtros.fecha_desde,
+                [Op.lte]: hoy // No incluir visitas futuras
+            };
         } else if (filtros.fecha_hasta) {
             where.fecha = { [Op.lte]: filtros.fecha_hasta };
+        } else {
+            // Por defecto, excluir visitas programadas a futuro
+            where.fecha = { [Op.lte]: hoy };
         }
 
         if (filtros.tecnico_ids && filtros.tecnico_ids.length > 0) {
