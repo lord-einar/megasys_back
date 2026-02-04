@@ -19,8 +19,8 @@ const SMTP_CONFIG = {
   },
   tls: {
     minVersion: 'TLSv1.2',
-    rejectUnauthorized: false,
-    ciphers: 'SSLv3' // Compatible con Office365
+    rejectUnauthorized: false
+    // SSLv3 es obsoleto y no soportado, removido para compatibilidad con Office365
   },
   connectionTimeout: 60000,
   greetingTimeout: 30000,

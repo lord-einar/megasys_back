@@ -192,6 +192,17 @@ class VisitaController {
 
             const visita = await visitaService.obtenerPorTokenFeedback(token);
 
+            // Validar que existan las relaciones necesarias
+            if (!visita.sedePrincipal) {
+                return error(res, "La visita no tiene sede asociada", 400);
+            }
+            if (!visita.tecnicoAsignado) {
+                return error(res, "La visita no tiene técnico asignado", 400);
+            }
+            if (!visita.informe) {
+                return error(res, "La visita no tiene informe disponible", 400);
+            }
+
             // Devolver solo información necesaria para el formulario
             return success(res, {
                 sede: visita.sedePrincipal.nombre_sede,
