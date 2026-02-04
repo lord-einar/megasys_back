@@ -653,7 +653,7 @@ class InventarioService {
   }
 
   /**
-   * Obtener estadísticas generales del inventario
+   * Obtener estadísticas generales del inventario (excluir sedes de prueba)
    * Optimizado para reducir queries (5 → 1)
    */
   async obtenerEstadisticasGenerales(sedeId = null) {
@@ -662,16 +662,26 @@ class InventarioService {
       whereClause.sede_id = sedeId;
     }
 
-    // UNA SOLA query con agregaciones condicionales
+    // Include común para excluir sedes de prueba
+    const includeSede = [{
+      model: Sede,
+      as: 'sedePrincipal',
+      where: { es_prueba: false },
+      attributes: [],
+      required: true
+    }];
+
+    // UNA SOLA query con agregaciones condicionales (excluir sedes de prueba)
     const estadisticas = await Inventario.findAll({
       attributes: [
-        [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
-        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN estado = 'disponible' THEN 1 END")), 'disponible'],
-        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN estado = 'en_uso' THEN 1 END")), 'enUso'],
-        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN estado = 'mantenimiento' THEN 1 END")), 'mantenimiento'],
-        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN estado = 'dado_de_baja' THEN 1 END")), 'dadoDeBaja']
+        [sequelize.fn('COUNT', sequelize.col('Inventario.id')), 'total'],
+        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN \"Inventario\".\"estado\" = 'disponible' THEN 1 END")), 'disponible'],
+        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN \"Inventario\".\"estado\" = 'en_uso' THEN 1 END")), 'enUso'],
+        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN \"Inventario\".\"estado\" = 'mantenimiento' THEN 1 END")), 'mantenimiento'],
+        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN \"Inventario\".\"estado\" = 'dado_de_baja' THEN 1 END")), 'dadoDeBaja']
       ],
       where: whereClause,
+      include: includeSede,
       raw: true
     });
 
@@ -702,18 +712,20 @@ class InventarioService {
       subQuery: false
     });
 
-    // Estadísticas por sede
+    // Estadísticas por sede (excluir sedes de prueba)
     const porSede = await Inventario.findAll({
       attributes: [
         'sede_id',
         [sequelize.fn('COUNT', sequelize.col('Inventario.id')), 'total'],
-        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN estado = 'disponible' THEN 1 END")), 'disponible']
+        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN \"Inventario\".\"estado\" = 'disponible' THEN 1 END")), 'disponible']
       ],
       include: [
         {
           model: Sede,
           as: 'sedePrincipal',
-          attributes: ['nombre_sede']
+          attributes: ['nombre_sede'],
+          where: { es_prueba: false },
+          required: true
         }
       ],
       where: whereClause,
