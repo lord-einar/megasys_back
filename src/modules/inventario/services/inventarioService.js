@@ -692,7 +692,7 @@ class InventarioService {
     const mantenimiento = parseInt(resumen.mantenimiento) || 0;
     const dadoDeBaja = parseInt(resumen.dadoDeBaja) || 0;
 
-    // Estadísticas por tipo de artículo
+    // Estadísticas por tipo de artículo (excluir sedes de prueba)
     const porTipo = await Inventario.findAll({
       attributes: [
         'tipo_articulo_id',
@@ -703,6 +703,13 @@ class InventarioService {
           model: TipoArticulo,
           as: 'tipoArticulo',
           attributes: ['nombre']
+        },
+        {
+          model: Sede,
+          as: 'sedePrincipal',
+          attributes: [],
+          where: { es_prueba: false },
+          required: true
         }
       ],
       where: whereClause,
