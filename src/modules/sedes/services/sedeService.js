@@ -21,7 +21,8 @@ class SedeService {
     const offset = (parseInt(page) - 1) * parseInt(limit);
     const whereClause = {};
 
-    if (empresa_id) {
+    // Validar empresa_id: ignorar si es null, undefined, "null" o cadena vacía
+    if (empresa_id && empresa_id !== 'null' && empresa_id !== 'undefined') {
       whereClause.empresa_id = empresa_id;
     }
 
