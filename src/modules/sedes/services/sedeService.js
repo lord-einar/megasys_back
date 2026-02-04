@@ -704,9 +704,9 @@ class SedeService {
       // Una query con agregaciones para sedes (excluir pruebas)
       Sede.findAll({
         attributes: [
-          [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
-          [sequelize.fn('COUNT', sequelize.literal("CASE WHEN activo = true THEN 1 END")), 'activas'],
-          [sequelize.fn('COUNT', sequelize.literal("CASE WHEN activo = false THEN 1 END")), 'inactivas']
+          [sequelize.fn('COUNT', sequelize.col('Sede.id')), 'total'],
+          [sequelize.fn('COUNT', sequelize.literal("CASE WHEN \"Sede\".\"activo\" = true THEN 1 END")), 'activas'],
+          [sequelize.fn('COUNT', sequelize.literal("CASE WHEN \"Sede\".\"activo\" = false THEN 1 END")), 'inactivas']
         ],
         where: { es_prueba: false },
         raw: true
@@ -725,8 +725,8 @@ class SedeService {
       // Una query con agregaciones para inventario (excluir sedes de prueba)
       Inventario.findAll({
         attributes: [
-          [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
-          [sequelize.fn('COUNT', sequelize.literal("CASE WHEN estado = 'disponible' THEN 1 END")), 'disponible']
+          [sequelize.fn('COUNT', sequelize.col('Inventario.id')), 'total'],
+          [sequelize.fn('COUNT', sequelize.literal("CASE WHEN \"Inventario\".\"estado\" = 'disponible' THEN 1 END")), 'disponible']
         ],
         where: { activo: true },
         include: [{
