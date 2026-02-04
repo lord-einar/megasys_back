@@ -256,16 +256,13 @@ class VisitaEmailService {
         ...emailsSede
       ];
 
-      // Eliminar duplicados
-      const uniqueDestinatarios = [...new Set(destinatarios)];
+      // Eliminar duplicados y filtrar emails vacíos
+      const uniqueDestinatarios = [...new Set(destinatarios)].filter(e => e && e.trim());
 
-      const promesas = uniqueDestinatarios.map(email =>
-        emailService.enviarEmailHTML(email, asunto, html)
-      );
+      // Enviar UN SOLO email con múltiples destinatarios (evita error 429 de Microsoft)
+      await emailService.enviarEmailHTML(uniqueDestinatarios, asunto, html);
 
-      await Promise.all(promesas);
-
-      logger.info(`Minuta enviada para visita ${visita.id} a ${uniqueDestinatarios.length} destinatarios`);
+      logger.info(`✅ Minuta enviada para visita ${visita.id} a ${uniqueDestinatarios.length} destinatarios`);
       return true;
     } catch (error) {
       logger.error('Error enviando minuta:', error);

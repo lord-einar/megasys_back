@@ -114,6 +114,11 @@ class EmailService {
       }
     }
 
+    // Convertir destinatarios a array si es necesario
+    const destinatarios = Array.isArray(mailOptions.to)
+      ? mailOptions.to
+      : [mailOptions.to];
+
     const message = {
       message: {
         subject: mailOptions.subject,
@@ -121,13 +126,11 @@ class EmailService {
           contentType: 'HTML',
           content: mailOptions.html
         },
-        toRecipients: [
-          {
-            emailAddress: {
-              address: mailOptions.to
-            }
+        toRecipients: destinatarios.map(email => ({
+          emailAddress: {
+            address: email.trim()
           }
-        ],
+        })),
         attachments: attachments.length > 0 ? attachments : undefined
       },
       saveToSentItems: false
