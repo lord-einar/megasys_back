@@ -49,15 +49,28 @@ class VisitaReportService {
         try {
             const where = this._construirFiltros(filtros);
 
-            // Total de visitas
-            const totalVisitas = await Visita.count({ where });
+            // Include común para excluir sedes de prueba
+            const includeSede = [{
+                model: Sede,
+                as: 'sedePrincipal',
+                where: { es_prueba: false },
+                attributes: [],
+                required: true
+            }];
 
-            // Visitas realizadas
-            const visitasRealizadas = await Visita.count({
-                where: { ...where, estado: 'realizada' }
+            // Total de visitas (excluir sedes de prueba)
+            const totalVisitas = await Visita.count({
+                where,
+                include: includeSede
             });
 
-            // Total de problemas resueltos
+            // Visitas realizadas (excluir sedes de prueba)
+            const visitasRealizadas = await Visita.count({
+                where: { ...where, estado: 'realizada' },
+                include: includeSede
+            });
+
+            // Total de problemas resueltos (excluir sedes de prueba)
             const problemasResueltos = await VisitaProblemaResuelto.count({
                 include: [{
                     model: VisitaInforme,
@@ -67,7 +80,14 @@ class VisitaReportService {
                         model: Visita,
                         as: 'visita',
                         where,
-                        required: true
+                        required: true,
+                        include: [{
+                            model: Sede,
+                            as: 'sedePrincipal',
+                            where: { es_prueba: false },
+                            attributes: [],
+                            required: true
+                        }]
                     }]
                 }]
             });
@@ -95,7 +115,7 @@ class VisitaReportService {
                 ? (problemasResueltos / visitasRealizadas).toFixed(2)
                 : 0;
 
-            // Visitas con comentarios de sede
+            // Visitas con comentarios de sede (excluir sedes de prueba)
             const visitasConComentarios = await VisitaInforme.count({
                 where: {
                     comentarios_responsable_sede: { [Op.ne]: null }
@@ -104,7 +124,14 @@ class VisitaReportService {
                     model: Visita,
                     as: 'visita',
                     where,
-                    required: true
+                    required: true,
+                    include: [{
+                        model: Sede,
+                        as: 'sedePrincipal',
+                        where: { es_prueba: false },
+                        attributes: [],
+                        required: true
+                    }]
                 }]
             });
 
@@ -126,7 +153,7 @@ class VisitaReportService {
     }
 
     /**
-     * Obtener distribución de visitas por sede
+     * Obtener distribución de visitas por sede (excluir sedes de prueba)
      */
     async obtenerDistribucionPorSede(filtros = {}) {
         try {
@@ -140,7 +167,9 @@ class VisitaReportService {
                 include: [{
                     model: Sede,
                     as: 'sedePrincipal',
-                    attributes: ['id', 'nombre_sede']
+                    attributes: ['id', 'nombre_sede'],
+                    where: { es_prueba: false },
+                    required: true
                 }],
                 group: ['sedePrincipal.id', 'sedePrincipal.nombre_sede'],
                 order: [[sequelize.fn('COUNT', sequelize.col('Visita.id')), 'DESC']],
@@ -159,7 +188,7 @@ class VisitaReportService {
     }
 
     /**
-     * Obtener distribución de visitas por técnico
+     * Obtener distribución de visitas por técnico (excluir sedes de prueba)
      */
     async obtenerDistribucionPorTecnico(filtros = {}) {
         try {
@@ -170,11 +199,20 @@ class VisitaReportService {
                     [sequelize.fn('COUNT', sequelize.col('Visita.id')), 'count']
                 ],
                 where,
-                include: [{
-                    model: Personal,
-                    as: 'tecnicoAsignado',
-                    attributes: ['id', 'nombre', 'apellido']
-                }],
+                include: [
+                    {
+                        model: Personal,
+                        as: 'tecnicoAsignado',
+                        attributes: ['id', 'nombre', 'apellido']
+                    },
+                    {
+                        model: Sede,
+                        as: 'sedePrincipal',
+                        attributes: [],
+                        where: { es_prueba: false },
+                        required: true
+                    }
+                ],
                 group: ['tecnicoAsignado.id', 'tecnicoAsignado.nombre', 'tecnicoAsignado.apellido'],
                 order: [[sequelize.fn('COUNT', sequelize.col('Visita.id')), 'DESC']],
                 raw: true
@@ -192,7 +230,7 @@ class VisitaReportService {
     }
 
     /**
-     * Obtener distribución de problemas por categoría
+     * Obtener distribución de problemas por categoría (excluir sedes de prueba)
      */
     async obtenerProblemasPorCategoria(filtros = {}) {
         try {
@@ -219,7 +257,14 @@ class VisitaReportService {
                             as: 'visita',
                             attributes: [],
                             where,
-                            required: true
+                            required: true,
+                            include: [{
+                                model: Sede,
+                                as: 'sedePrincipal',
+                                attributes: [],
+                                where: { es_prueba: false },
+                                required: true
+                            }]
                         }]
                     }
                 ],
@@ -242,7 +287,7 @@ class VisitaReportService {
     }
 
     /**
-     * Obtener distribución de problemas causados por usuario
+     * Obtener distribución de problemas causados por usuario (excluir sedes de prueba)
      */
     async obtenerProblemasUsuario(filtros = {}) {
         try {
@@ -263,7 +308,14 @@ class VisitaReportService {
                         as: 'visita',
                         attributes: [],
                         where,
-                        required: true
+                        required: true,
+                        include: [{
+                            model: Sede,
+                            as: 'sedePrincipal',
+                            attributes: [],
+                            where: { es_prueba: false },
+                            required: true
+                        }]
                     }]
                 }],
                 group: ['causado_por_usuario'],
@@ -282,7 +334,7 @@ class VisitaReportService {
     }
 
     /**
-     * Obtener distribución por estado
+     * Obtener distribución por estado (excluir sedes de prueba)
      */
     async obtenerDistribucionEstados(filtros = {}) {
         try {
@@ -291,11 +343,18 @@ class VisitaReportService {
             const resultado = await Visita.findAll({
                 attributes: [
                     'estado',
-                    [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+                    [sequelize.fn('COUNT', sequelize.col('Visita.id')), 'count']
                 ],
                 where,
+                include: [{
+                    model: Sede,
+                    as: 'sedePrincipal',
+                    attributes: [],
+                    where: { es_prueba: false },
+                    required: true
+                }],
                 group: ['estado'],
-                order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
+                order: [[sequelize.fn('COUNT', sequelize.col('Visita.id')), 'DESC']],
                 raw: true
             });
 
@@ -317,7 +376,7 @@ class VisitaReportService {
     }
 
     /**
-     * Obtener distribución por tipo
+     * Obtener distribución por tipo (excluir sedes de prueba)
      */
     async obtenerDistribucionTipos(filtros = {}) {
         try {
@@ -326,11 +385,18 @@ class VisitaReportService {
             const resultado = await Visita.findAll({
                 attributes: [
                     'tipo',
-                    [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+                    [sequelize.fn('COUNT', sequelize.col('Visita.id')), 'count']
                 ],
                 where,
+                include: [{
+                    model: Sede,
+                    as: 'sedePrincipal',
+                    attributes: [],
+                    where: { es_prueba: false },
+                    required: true
+                }],
                 group: ['tipo'],
-                order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
+                order: [[sequelize.fn('COUNT', sequelize.col('Visita.id')), 'DESC']],
                 raw: true
             });
 
@@ -346,7 +412,7 @@ class VisitaReportService {
     }
 
     /**
-     * Obtener lista detallada de casos cerrados
+     * Obtener lista detallada de casos cerrados (excluir sedes de prueba)
      */
     async obtenerListaCasosCerrados(filtros = {}) {
         try {
@@ -373,7 +439,9 @@ class VisitaReportService {
                     {
                         model: Sede,
                         as: 'sedePrincipal',
-                        attributes: ['id', 'nombre_sede']
+                        attributes: ['id', 'nombre_sede'],
+                        where: { es_prueba: false },
+                        required: true
                     }
                 ],
                 order: [['fecha', 'DESC']]
@@ -406,7 +474,7 @@ class VisitaReportService {
     }
 
     /**
-     * Obtener lista de visitas con detalles
+     * Obtener lista de visitas con detalles (excluir sedes de prueba)
      */
     async obtenerListaVisitas(filtros = {}) {
         try {
@@ -418,7 +486,9 @@ class VisitaReportService {
                     {
                         model: Sede,
                         as: 'sedePrincipal',
-                        attributes: ['id', 'nombre_sede']
+                        attributes: ['id', 'nombre_sede'],
+                        where: { es_prueba: false },
+                        required: true
                     },
                     {
                         model: Personal,

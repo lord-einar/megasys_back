@@ -729,7 +729,7 @@ class VisitaService {
                     raw: true
                 }),
 
-                // Por Sede
+                // Por Sede (excluir sedes de prueba)
                 Visita.findAll({
                     attributes: [
                         [sequelize.col('sedePrincipal.nombre_sede'), 'nombre_sede'],
@@ -738,7 +738,9 @@ class VisitaService {
                     include: [{
                         model: Sede,
                         as: 'sedePrincipal',
-                        attributes: []
+                        attributes: [],
+                        where: { es_prueba: false },
+                        required: true
                     }],
                     where,
                     group: ['sedePrincipal.nombre_sede', 'sedePrincipal.id'], // Agrupamos también por ID por seguridad en algunos motores DB
