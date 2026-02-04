@@ -189,17 +189,22 @@ class VisitaController {
     async obtenerInfoFeedback(req, res) {
         try {
             const { token } = req.params;
+            logger.info(`📨 Feedback request recibido - Token: ${token?.substring(0, 10)}... (longitud: ${token?.length})`);
 
             const visita = await visitaService.obtenerPorTokenFeedback(token);
+            logger.info(`✅ Visita encontrada para feedback - ID: ${visita.id}`);
 
             // Validar que existan las relaciones necesarias
             if (!visita.sedePrincipal) {
+                logger.warn(`⚠️ Visita ${visita.id} sin sede asociada`);
                 return error(res, "La visita no tiene sede asociada", 400);
             }
             if (!visita.tecnicoAsignado) {
+                logger.warn(`⚠️ Visita ${visita.id} sin técnico asignado`);
                 return error(res, "La visita no tiene técnico asignado", 400);
             }
             if (!visita.informe) {
+                logger.warn(`⚠️ Visita ${visita.id} sin informe disponible`);
                 return error(res, "La visita no tiene informe disponible", 400);
             }
 
@@ -212,7 +217,7 @@ class VisitaController {
                 diasRestantes: 2 - Math.floor((new Date() - new Date(visita.informe.fecha_realizacion)) / (1000 * 60 * 60 * 24))
             });
         } catch (err) {
-            logger.error('Error obteniendo info feedback:', err);
+            logger.error('❌ Error obteniendo info feedback:', err);
             return error(res, err.message || "Error obteniendo información", 400);
         }
     }
