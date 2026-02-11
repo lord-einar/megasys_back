@@ -17,6 +17,7 @@ import visitaEmailService from './emailService.js';
 import logger from '../../../shared/utils/logger.js';
 import { randomUUID as uuidv4 } from 'node:crypto';
 import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
+import { detectarCambiosInforme, generarResumenCambios } from '../utils/informeChangesDetector.js';
 
 class VisitaService {
     /**
@@ -124,15 +125,22 @@ class VisitaService {
                     {
                         model: VisitaInforme,
                         as: 'informe',
-                        include: [{
-                            model: VisitaProblemaResuelto,
-                            as: 'problemasResueltos',
-                            include: [{
-                                model: CategoriaProblema,
-                                as: 'categoriaProblema',
-                                attributes: ['id', 'nombre', 'codigo', 'color', 'icono']
-                            }]
-                        }]
+                        include: [
+                            {
+                                model: VisitaProblemaResuelto,
+                                as: 'problemasResueltos',
+                                include: [{
+                                    model: CategoriaProblema,
+                                    as: 'categoriaProblema',
+                                    attributes: ['id', 'nombre', 'codigo', 'color', 'icono']
+                                }]
+                            },
+                            {
+                                model: Personal,
+                                as: 'editor',
+                                attributes: ['id', 'nombre', 'apellido', 'email']
+                            }
+                        ]
                     }
                 ]
             });
@@ -345,7 +353,7 @@ class VisitaService {
     }
 
     /**
-     * Marcar visita como realizada y guardar informe
+     * Marcar visita como realizada y guardar/actualizar informe
      */
     async marcarRealizada(id, datosInforme, usuarioId, options = {}) {
         const { usuarioEmail = null, ipAddress = null, userAgent = null } = options;
@@ -356,29 +364,103 @@ class VisitaService {
                     include: [
                         { model: Sede, as: 'sedePrincipal' },
                         { model: Personal, as: 'tecnicoAsignado' },
-                        { model: VisitaSolicitudPrevia, as: 'solicitudesPrevias' }
+                        { model: VisitaSolicitudPrevia, as: 'solicitudesPrevias' },
+                        {
+                            model: VisitaInforme,
+                            as: 'informe',
+                            include: [{
+                                model: Personal,
+                                as: 'editor',
+                                attributes: ['id', 'nombre', 'apellido', 'email']
+                            }]
+                        }
                     ],
                     transaction
                 });
 
                 if (!visita) throw new Error('Visita no encontrada');
-                if (visita.estado === 'realizada') throw new Error('La visita ya fue realizada');
 
-                // 1. Crear informe
-                const informe = await VisitaInforme.create({
-                    visita_id: id,
-                    tecnico_id: usuarioId,
-                    checklist_items: datosInforme.checklist_items,
-                    checklist_extra: datosInforme.checklist_extra,
-                    casos_resueltos: datosInforme.casos_resueltos,
-                    observaciones: datosInforme.observaciones
-                }, { transaction });
+                const esEdicion = visita.estado === 'realizada' && visita.informe;
+                let informe;
 
-                // 2. Crear problemas resueltos
+                if (esEdicion) {
+                    // 1. Detectar cambios antes de actualizar
+                    informe = visita.informe;
+
+                    // Obtener los problemas resueltos actuales para comparar
+                    const problemasActuales = await VisitaProblemaResuelto.findAll({
+                        where: { informe_id: informe.id },
+                        attributes: ['descripcion', 'categoria_id', 'causado_por_usuario'],
+                        transaction
+                    });
+
+                    // Crear objeto con datos actuales para comparación
+                    const informeActual = {
+                        checklist_items: informe.checklist_items,
+                        checklist_extra: informe.checklist_extra,
+                        casos_resueltos: informe.casos_resueltos,
+                        observaciones: informe.observaciones,
+                        problemasResueltos: problemasActuales.map(p => p.toJSON())
+                    };
+
+                    // Detectar qué cambió
+                    const cambiosDetectados = detectarCambiosInforme(informeActual, datosInforme);
+                    const resumenCambios = generarResumenCambios(cambiosDetectados);
+
+                    // Obtener info del usuario que edita
+                    const usuario = await Personal.findByPk(usuarioId, {
+                        attributes: ['nombre', 'apellido'],
+                        transaction
+                    });
+
+                    // Crear entrada del historial
+                    const entradaHistorial = {
+                        fecha: new Date().toISOString(),
+                        usuario_id: usuarioId,
+                        usuario_nombre: usuario ? `${usuario.nombre} ${usuario.apellido}` : 'Usuario desconocido',
+                        resumen: resumenCambios,
+                        cambios: cambiosDetectados
+                    };
+
+                    // Agregar al historial existente
+                    const historialActual = informe.historial_cambios || [];
+                    const nuevoHistorial = [...historialActual, entradaHistorial];
+
+                    // Actualizar informe
+                    await informe.update({
+                        checklist_items: datosInforme.checklist_items,
+                        checklist_extra: datosInforme.checklist_extra,
+                        casos_resueltos: datosInforme.casos_resueltos,
+                        observaciones: datosInforme.observaciones,
+                        editado_por_id: usuarioId,
+                        fecha_ultima_edicion: new Date(),
+                        veces_editado: sequelize.literal('veces_editado + 1'),
+                        historial_cambios: nuevoHistorial
+                    }, { transaction });
+                } else {
+                    // 1. Crear nuevo informe
+                    informe = await VisitaInforme.create({
+                        visita_id: id,
+                        tecnico_id: usuarioId,
+                        checklist_items: datosInforme.checklist_items,
+                        checklist_extra: datosInforme.checklist_extra,
+                        casos_resueltos: datosInforme.casos_resueltos,
+                        observaciones: datosInforme.observaciones
+                    }, { transaction });
+                }
+
+                // 2. Gestionar problemas resueltos
+                const categorias = await CategoriaProblema.findAll({ transaction });
+
+                if (esEdicion) {
+                    // Eliminar problemas anteriores
+                    await VisitaProblemaResuelto.destroy({
+                        where: { informe_id: informe.id },
+                        transaction
+                    });
+                }
+
                 if (datosInforme.problemas_resueltos && datosInforme.problemas_resueltos.length > 0) {
-                    // Obtener todas las categorías para mapear si es necesario
-                    const categorias = await CategoriaProblema.findAll({ transaction });
-
                     const problemas = datosInforme.problemas_resueltos.map(p => {
                         let categoria_id = p.categoria_id;
 
@@ -406,7 +488,19 @@ class VisitaService {
                     informe.setDataValue('problemasResueltos', problemasConNombres);
                 }
 
-                // 3. Marcar solicitudes previas como resueltas
+                // 3. Gestionar solicitudes previas
+                if (esEdicion) {
+                    // Resetear todas las solicitudes previas
+                    await VisitaSolicitudPrevia.update(
+                        { resuelta: false },
+                        {
+                            where: { visita_id: id },
+                            transaction
+                        }
+                    );
+                }
+
+                // Marcar solicitudes previas como resueltas según los nuevos datos
                 if (datosInforme.solicitudes_resueltas && datosInforme.solicitudes_resueltas.length > 0) {
                     await VisitaSolicitudPrevia.update(
                         { resuelta: true },
@@ -420,28 +514,43 @@ class VisitaService {
                     visita.solicitudesPrevias.forEach(s => {
                         if (datosInforme.solicitudes_resueltas.includes(s.id)) {
                             s.resuelta = true;
+                        } else {
+                            s.resuelta = false;
                         }
                     });
                 }
 
-                // 4. Actualizar estado de visita
-                await visita.update({ estado: 'realizada' }, { transaction });
+                // 4. Actualizar estado de visita (solo si no estaba realizada)
+                if (!esEdicion) {
+                    await visita.update({ estado: 'realizada' }, { transaction });
+                }
 
-                return { informe, visita };
+                return { informe, visita, esEdicion };
             },
             usuarioEmail: usuarioEmail || 'sistema@megatlon.com.ar',
             usuarioId,
             modulo: 'visitas',
-            accion: 'marcar_realizada',
+            accion: 'guardar_informe',
             recurso: 'Visita',
             recursoId: id,
-            descripcion: `Marcó visita ${id} como realizada y creó informe`,
-            valoresAnteriores: { estado: 'programada' },
+            descripcion: `Guardó informe de visita ${id}`,
+            valoresAnteriores: {},
             ipAddress,
             userAgent
         });
 
-        const { informe, visita } = result.data;
+        const { informe, visita, esEdicion } = result.data;
+
+        // Si es edición, recargar el informe con la relación del editor
+        if (esEdicion) {
+            await informe.reload({
+                include: [{
+                    model: Personal,
+                    as: 'editor',
+                    attributes: ['id', 'nombre', 'apellido', 'email']
+                }]
+            });
+        }
 
         // Preparar objeto informe para el email con todos los datos
         const informeParaEmail = {
@@ -450,7 +559,15 @@ class VisitaService {
             casos_resueltos: informe.casos_resueltos,
             observaciones: informe.observaciones,
             comentarios_responsable_sede: informe.comentarios_responsable_sede,
-            problemasResueltos: datosInforme.problemas_resueltos || []
+            problemasResueltos: datosInforme.problemas_resueltos || [],
+            esEdicion,
+            editado_por: esEdicion && informe.editor ? `${informe.editor.nombre} ${informe.editor.apellido}` : null,
+            fecha_edicion: esEdicion ? informe.fecha_ultima_edicion : null,
+            veces_editado: informe.veces_editado,
+            // Obtener el último cambio del historial para el email
+            ultimo_cambio: esEdicion && informe.historial_cambios && informe.historial_cambios.length > 0
+                ? informe.historial_cambios[informe.historial_cambios.length - 1]
+                : null
         };
 
         // 5. Enviar email de minuta (fuera de transacción - best effort)

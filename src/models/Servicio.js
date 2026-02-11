@@ -9,6 +9,19 @@ const Servicio = sequelize.define('Servicio', {
     primaryKey: true,
     defaultValue: () => uuidv4()
   },
+  id_servicio: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    unique: {
+      msg: 'Este ID de servicio ya existe'
+    },
+    validate: {
+      len: {
+        args: [2, 50],
+        msg: 'El ID de servicio debe tener entre 2 y 50 caracteres'
+      }
+    }
+  },
   nombre: {
     type: DataTypes.STRING(100),
     allowNull: false,

@@ -139,9 +139,26 @@ class VisitaEmailService {
       <body>
         <div class="container">
           <div class="header">
-            <h1 style="margin:0;">✅ Minuta de Visita de Soporte</h1>
+            <h1 style="margin:0;">${informe.esEdicion ? '✏️ Minuta de Visita (EDITADA)' : '✅ Minuta de Visita de Soporte'}</h1>
             <p style="margin:5px 0 0 0;">${fecha} - ${visita.sedePrincipal.nombre_sede}</p>
           </div>
+
+          ${informe.esEdicion ? `
+          <div style="background-color: #fff3cd; border: 2px solid #ffc107; border-radius: 5px; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0; color: #856404; font-weight: bold; font-size: 16px;">
+              ⚠️ Este informe ha sido editado ${informe.veces_editado > 1 ? `${informe.veces_editado} veces` : '1 vez'}
+            </p>
+            <p style="margin: 8px 0 0 0; color: #856404; font-size: 14px;">
+              <strong>Última edición:</strong> ${informe.fecha_edicion ? new Date(informe.fecha_edicion).toLocaleString('es-AR') : 'No disponible'}
+            </p>
+            ${informe.ultimo_cambio && informe.ultimo_cambio.resumen ? `
+            <div style="background-color: #fef3c7; border-left: 3px solid #f59e0b; padding: 10px; margin: 10px 0; border-radius: 4px;">
+              <p style="margin: 0; color: #92400e; font-size: 13px;">
+                <strong>Cambios realizados:</strong><br>
+                ${informe.ultimo_cambio.resumen}
+              </p>
+            </div>` : ''}
+          </div>` : ''}
 
           <div class="section">
             <div class="section-title">📋 Información General</div>
@@ -249,7 +266,9 @@ class VisitaEmailService {
   async enviarMinuta(visita, informe, emailsSede) {
     try {
       const html = this._generarHTMLMinuta(visita, informe);
-      const asunto = `Minuta de Visita - ${visita.sedePrincipal.nombre_sede} - ${new Date(visita.fecha).toLocaleDateString('es-AR')}`;
+      const asunto = informe.esEdicion
+        ? `[EDITADA] Minuta de Visita - ${visita.sedePrincipal.nombre_sede} - ${new Date(visita.fecha).toLocaleDateString('es-AR')}`
+        : `Minuta de Visita - ${visita.sedePrincipal.nombre_sede} - ${new Date(visita.fecha).toLocaleDateString('es-AR')}`;
 
       const destinatarios = [
         process.env.EMAIL_INFRAESTRUCTURA || 'infraestructura@megatlon.com.ar',

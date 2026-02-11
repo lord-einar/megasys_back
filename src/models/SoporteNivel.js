@@ -50,6 +50,15 @@ const SoporteNivel = sequelize.define('SoporteNivel', {
       }
     }
   },
+  web: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    validate: {
+      isUrl: {
+        msg: 'Debe ser una URL válida'
+      }
+    }
+  },
   activo: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,

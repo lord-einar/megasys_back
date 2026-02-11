@@ -303,8 +303,9 @@ router.post('/:id/servicios',
   validarId,
   [
     body('servicio_id')
-      .isInt({ min: 1 })
-      .withMessage('ID de servicio requerido y debe ser válido'),
+      .notEmpty()
+      .isUUID()
+      .withMessage('ID de servicio requerido y debe ser un UUID válido'),
 
     body('fecha_contratacion')
       .optional()

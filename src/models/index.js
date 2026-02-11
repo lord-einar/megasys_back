@@ -29,6 +29,8 @@ import VisitaInforme from './VisitaInforme.js';
 import VisitaProblemaResuelto from './VisitaProblemaResuelto.js';
 import VisitaChecklistItem from './VisitaChecklistItem.js';
 import CategoriaProblema from './CategoriaProblema.js';
+import EquipoServicio from './EquipoServicio.js';
+import Reclamo from './Reclamo.js';
 
 // =====================================================
 // DEFINICIÓN DE RELACIONES
@@ -186,6 +188,86 @@ Servicio.hasMany(SoporteNivel, {
 SoporteNivel.belongsTo(Servicio, {
   foreignKey: 'servicio_id',
   as: 'servicio'
+});
+
+// Relaciones TipoServicio -> EjecutivoCuentas
+TipoServicio.hasMany(EjecutivoCuentas, {
+  foreignKey: 'tipo_servicio_id',
+  as: 'ejecutivos'
+});
+EjecutivoCuentas.belongsTo(TipoServicio, {
+  foreignKey: 'tipo_servicio_id',
+  as: 'tipoServicio'
+});
+
+// Relaciones Servicio -> EquipoServicio
+Servicio.hasMany(EquipoServicio, {
+  foreignKey: 'servicio_id',
+  as: 'equipos'
+});
+EquipoServicio.belongsTo(Servicio, {
+  foreignKey: 'servicio_id',
+  as: 'servicio'
+});
+
+// Relaciones Sede -> EquipoServicio
+Sede.hasMany(EquipoServicio, {
+  foreignKey: 'sede_id',
+  as: 'equiposServicio'
+});
+EquipoServicio.belongsTo(Sede, {
+  foreignKey: 'sede_id',
+  as: 'sede'
+});
+
+// Relaciones Servicio -> Reclamo
+Servicio.hasMany(Reclamo, {
+  foreignKey: 'servicio_id',
+  as: 'reclamos'
+});
+Reclamo.belongsTo(Servicio, {
+  foreignKey: 'servicio_id',
+  as: 'servicio'
+});
+
+// Relaciones Sede -> Reclamo
+Sede.hasMany(Reclamo, {
+  foreignKey: 'sede_id',
+  as: 'reclamos'
+});
+Reclamo.belongsTo(Sede, {
+  foreignKey: 'sede_id',
+  as: 'sede'
+});
+
+// Relaciones EquipoServicio -> Reclamo
+EquipoServicio.hasMany(Reclamo, {
+  foreignKey: 'equipo_id',
+  as: 'reclamos'
+});
+Reclamo.belongsTo(EquipoServicio, {
+  foreignKey: 'equipo_id',
+  as: 'equipo'
+});
+
+// Relaciones Personal (Creado Por) -> Reclamo
+Personal.hasMany(Reclamo, {
+  foreignKey: 'creado_por_id',
+  as: 'reclamosCreados'
+});
+Reclamo.belongsTo(Personal, {
+  foreignKey: 'creado_por_id',
+  as: 'creador'
+});
+
+// Relaciones Personal (Asignado A) -> Reclamo
+Personal.hasMany(Reclamo, {
+  foreignKey: 'asignado_a_id',
+  as: 'reclamosAsignados'
+});
+Reclamo.belongsTo(Personal, {
+  foreignKey: 'asignado_a_id',
+  as: 'tecnicoAsignado'
 });
 
 // Relaciones Sede -> Servicio (muchos a muchos)
@@ -485,6 +567,16 @@ VisitaInforme.belongsTo(Personal, {
   as: 'tecnico'
 });
 
+// VisitaInforme -> Personal (Editor - quien editó el informe)
+Personal.hasMany(VisitaInforme, {
+  foreignKey: 'editado_por_id',
+  as: 'informesEditados'
+});
+VisitaInforme.belongsTo(Personal, {
+  foreignKey: 'editado_por_id',
+  as: 'editor'
+});
+
 // VisitaInforme -> VisitaProblemaResuelto
 VisitaInforme.hasMany(VisitaProblemaResuelto, {
   foreignKey: 'informe_id',
@@ -591,6 +683,8 @@ const models = {
   TipoServicio,
   Servicio,
   SoporteNivel,
+  EquipoServicio,
+  Reclamo,
 
   // Remitos y movimientos
   Remito,
@@ -644,6 +738,8 @@ export {
   TipoServicio,
   Servicio,
   SoporteNivel,
+  EquipoServicio,
+  Reclamo,
   Remito,
   RemitoDetalle,
   HistorialMovimiento,

@@ -147,7 +147,17 @@ class SedeService {
           through: {
             attributes: ['fecha_contratacion', 'fecha_vencimiento', 'activo']
           },
-          include: ['proveedor', 'tipoServicio'],
+          include: [
+            'proveedor',
+            'tipoServicio',
+            {
+              model: SoporteNivel,
+              as: 'nivelessoporte',
+              where: { activo: true },
+              required: false,
+              order: [['nivel', 'ASC']]
+            }
+          ],
           required: false
         },
         {

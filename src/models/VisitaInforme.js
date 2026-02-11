@@ -60,6 +60,28 @@ const VisitaInforme = sequelize.define('VisitaInforme', {
         type: DataTypes.STRING(100),
         allowNull: true,
         comment: 'Nombre o email de quien agregó los comentarios'
+    },
+    editado_por_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        comment: 'ID del usuario que editó el informe (null si nunca fue editado)'
+    },
+    fecha_ultima_edicion: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Fecha y hora de la última edición del informe'
+    },
+    veces_editado: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: 'Contador de veces que se editó el informe'
+    },
+    historial_cambios: {
+        type: DataTypes.JSONB,
+        allowNull: false,
+        defaultValue: [],
+        comment: 'Array de objetos con historial de cambios: [{ fecha, usuario, cambios: { campo: { antes, despues } } }]'
     }
 }, {
     tableName: 'visita_informes',

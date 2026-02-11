@@ -17,12 +17,29 @@ const EjecutivoCuentas = sequelize.define('EjecutivoCuentas', {
       key: 'id'
     }
   },
+  tipo_servicio_id: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    references: {
+      model: 'tipos_servicio',
+      key: 'id'
+    }
+  },
   nombre: {
     type: DataTypes.STRING(100),
     allowNull: false,
     validate: {
       notEmpty: {
         msg: 'El nombre del ejecutivo es requerido'
+      }
+    }
+  },
+  apellido: {
+    type: DataTypes.STRING(100),
+    allowNull: true, // Temporalmente null para datos existentes
+    validate: {
+      notEmpty: {
+        msg: 'El apellido del ejecutivo es requerido'
       }
     }
   },
