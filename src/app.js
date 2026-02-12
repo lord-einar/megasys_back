@@ -47,7 +47,12 @@ const corsOptions = {
     }
 
     // En producción, usar lista de orígenes permitidos (separados por coma)
-    const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+    // Valores por defecto para producción si no se configura CORS_ORIGIN
+    const defaultOrigins = process.env.NODE_ENV === 'production'
+      ? 'https://portalit.grupomegatlon.com.ar,http://localhost:5173'
+      : 'http://localhost:5173';
+
+    const allowedOrigins = (process.env.CORS_ORIGIN || defaultOrigins)
       .split(',')
       .map(o => o.trim());
 
@@ -55,7 +60,7 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    logger.warn('Origen bloqueado por CORS:', { origin, allowedOrigins });
+    logger.warn('Origen bloqueado por CORS:', { origin, allowedOrigins, env: process.env.NODE_ENV });
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
