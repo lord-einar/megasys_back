@@ -1,5 +1,5 @@
 // src/modules/personal/services/personalService.js
-import { Personal, Sede, Rol, PersonalSede, Remito, sequelize } from '../../../models/index.js';
+import { Personal, Sede, Rol, PersonalSede, Remito, Empresa, sequelize } from '../../../models/index.js';
 import logger from '../../../shared/utils/logger.js';
 import { Op } from 'sequelize';
 import { randomUUID as uuidv4 } from 'node:crypto';
@@ -34,6 +34,7 @@ class PersonalService {
       search = '',
       activo = null,
       sede_id = null,
+      empresa_id = null,
       rol_id = null,
       personal_id = null
     } = filters;
@@ -78,7 +79,11 @@ class PersonalService {
       {
         model: Sede,
         as: 'sede',
-        attributes: ['id', 'nombre_sede', 'localidad', 'provincia']
+        attributes: ['id', 'nombre_sede', 'localidad', 'provincia', 'empresa_id'],
+        ...(empresa_id && {
+          where: { empresa_id },
+          required: true
+        })
       }
     ];
 
@@ -789,6 +794,90 @@ class PersonalService {
 
       return null; // Retornar null pero no fallar la autenticación
     }
+  }
+
+  /**
+   * Exportar personal a CSV
+   * @param {Object} filters - Filtros para aplicar
+   * @returns {Array} - Array de objetos con los datos para exportar
+   */
+  async exportar(filters = {}) {
+    const {
+      search = '',
+      activo = true,
+      sede_id = null,
+      empresa_id = null,
+      rol_id = null
+    } = filters;
+
+    const whereClause = {};
+
+    if (search) {
+      whereClause[Op.or] = [
+        { nombre: { [Op.iLike]: `%${search}%` } },
+        { apellido: { [Op.iLike]: `%${search}%` } },
+        { email: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
+    // Por defecto, mostrar solo personal activo
+    if (activo !== null && activo !== undefined) {
+      whereClause.activo = activo === 'true' || activo === true;
+    } else {
+      whereClause.activo = true;
+    }
+
+    if (rol_id) {
+      whereClause.rol_id = rol_id;
+    }
+
+    let include = [
+      {
+        model: Rol,
+        as: 'rol',
+        attributes: ['id', 'nombre']
+      },
+      {
+        model: Sede,
+        as: 'sede',
+        attributes: ['id', 'nombre_sede', 'empresa_id'],
+        include: [
+          {
+            model: Empresa,
+            as: 'empresa',
+            attributes: ['id', 'nombre_empresa']
+          }
+        ],
+        ...(empresa_id && {
+          where: { empresa_id },
+          required: true
+        })
+      }
+    ];
+
+    if (sede_id) {
+      // Si se especifica sede_id, modificar el where de sede
+      const sedeInclude = include.find(inc => inc.as === 'sede');
+      sedeInclude.where = { ...sedeInclude.where, id: sede_id };
+      sedeInclude.required = true;
+    }
+
+    const personal = await Personal.findAll({
+      where: whereClause,
+      include,
+      order: [['apellido', 'ASC'], ['nombre', 'ASC']]
+    });
+
+    // Mapear a formato de exportación
+    return personal.map(persona => ({
+      nombre: persona.nombre,
+      apellido: persona.apellido,
+      email: persona.email,
+      telefono: persona.telefono || '',
+      cargo: persona.rol?.nombre || '',
+      sede: persona.sede?.nombre_sede || '',
+      empresa: persona.sede?.empresa?.nombre_empresa || ''
+    }));
   }
 }
 

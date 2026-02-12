@@ -263,6 +263,45 @@ class PersonalController {
       error(res, err.message || 'Error en la búsqueda', 500);
     }
   });
+
+  /**
+   * Exportar personal a CSV
+   */
+  exportar = asyncHandler(async (req, res) => {
+    try {
+      const data = await personalService.exportar(req.query);
+
+      // Generar CSV
+      const headers = ['Nombre', 'Apellido', 'Email', 'Teléfono', 'Cargo', 'Sede', 'Empresa'];
+      const csvRows = [headers.join(',')];
+
+      data.forEach(row => {
+        const values = [
+          row.nombre,
+          row.apellido,
+          row.email,
+          row.telefono,
+          row.cargo,
+          row.sede,
+          row.empresa
+        ].map(value => `"${value}"`); // Envolver en comillas para manejar comas
+
+        csvRows.push(values.join(','));
+      });
+
+      const csv = csvRows.join('\n');
+
+      // Configurar headers para descarga
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="personal_${new Date().toISOString().split('T')[0]}.csv"`);
+
+      // Agregar BOM para UTF-8 (ayuda con caracteres especiales en Excel)
+      res.send('\ufeff' + csv);
+    } catch (err) {
+      logger.error('Error exportando personal:', err);
+      error(res, err.message || 'Error al exportar personal', 500);
+    }
+  });
 }
 
 export default new PersonalController();

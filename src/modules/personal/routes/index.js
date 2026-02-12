@@ -149,6 +149,11 @@ const validarPaginacion = [
     .isUUID()
     .withMessage('Sede ID debe ser un UUID válido'),
 
+  query('empresa_id')
+    .optional()
+    .isUUID()
+    .withMessage('Empresa ID debe ser un UUID válido'),
+
   query('rol_id')
     .optional()
     .isUUID()
@@ -190,6 +195,24 @@ const validarBusqueda = [
 // =====================================================
 // RUTAS PRINCIPALES DE PERSONAL
 // =====================================================
+
+/**
+ * @route   GET /api/personal/export
+ * @desc    Exportar listado de personal a CSV
+ * @access  Private (Read permission - Todos)
+ */
+router.get('/export',
+  requirePermission('personal', 'read'),
+  [
+    query('search').optional().trim(),
+    query('sede_id').optional().isUUID(),
+    query('empresa_id').optional().isUUID(),
+    query('rol_id').optional().isUUID(),
+    query('activo').optional().isBoolean()
+  ],
+  validate,
+  personalController.exportar
+);
 
 /**
  * @route   GET /api/personal
