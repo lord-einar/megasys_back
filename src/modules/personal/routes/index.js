@@ -145,17 +145,17 @@ const validarPaginacion = [
     .withMessage('Búsqueda no puede exceder 100 caracteres'),
 
   query('sede_id')
-    .optional()
+    .optional({ checkFalsy: true })
     .isUUID()
     .withMessage('Sede ID debe ser un UUID válido'),
 
   query('empresa_id')
-    .optional()
+    .optional({ checkFalsy: true })
     .isUUID()
     .withMessage('Empresa ID debe ser un UUID válido'),
 
   query('rol_id')
-    .optional()
+    .optional({ checkFalsy: true })
     .isUUID()
     .withMessage('Rol ID debe ser un UUID válido'),
 
@@ -204,11 +204,11 @@ const validarBusqueda = [
 router.get('/export',
   requirePermission('personal', 'read'),
   [
-    query('search').optional().trim(),
-    query('sede_id').optional().isUUID(),
-    query('empresa_id').optional().isUUID(),
-    query('rol_id').optional().isUUID(),
-    query('activo').optional().isBoolean()
+    query('search').optional({ checkFalsy: true }).trim(),
+    query('sede_id').optional({ checkFalsy: true }).isUUID(),
+    query('empresa_id').optional({ checkFalsy: true }).isUUID(),
+    query('rol_id').optional({ checkFalsy: true }).isUUID(),
+    query('activo').optional({ checkFalsy: true }).isBoolean()
   ],
   validate,
   personalController.exportar
