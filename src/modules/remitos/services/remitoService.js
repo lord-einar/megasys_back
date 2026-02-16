@@ -1019,7 +1019,8 @@ class RemitoService {
     }
 
     // Solo se puede procesar devolución en estados válidos
-    const estadosPermitidos = ['entregado', 'completado', 'devuelto_parcial'];
+    // Se incluye 'devuelto' para poder corregir inconsistencias históricas
+    const estadosPermitidos = ['entregado', 'completado', 'devuelto_parcial', 'devuelto'];
     if (!estadosPermitidos.includes(remito.estado)) {
       throw new Error(`No se puede procesar devolución en estado "${remito.estado}". Estados permitidos: ${estadosPermitidos.join(', ')}`);
     }
