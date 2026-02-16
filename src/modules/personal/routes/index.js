@@ -311,12 +311,12 @@ router.get('/:id/remitos',
   validarId,
   [
     query('tipo')
-      .optional()
+      .optional({ checkFalsy: true })
       .isIn(['todos', 'solicitados', 'asignados'])
       .withMessage('Tipo debe ser: todos, solicitados o asignados'),
 
     query('estado')
-      .optional()
+      .optional({ checkFalsy: true })
       .isIn(['preparado', 'en_transito', 'entregado', 'completado', 'devuelto', 'cancelado'])
       .withMessage('Estado debe ser: preparado, en_transito, entregado, completado, devuelto o cancelado'),
 

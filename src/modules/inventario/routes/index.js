@@ -180,12 +180,12 @@ const validarPaginacion = [
     .withMessage('Tipo artículo ID debe ser un UUID válido'),
   
   query('estado')
-    .optional()
+    .optional({ checkFalsy: true })
     .isIn(VALID_STATES)
     .withMessage(`Estado debe ser uno de: ${VALID_STATES.join(', ')}`),
-  
+
   query('disponible_solo')
-    .optional()
+    .optional({ checkFalsy: true })
     .isIn(['true', 'false'])
     .withMessage('Disponible solo debe ser true o false')
     .toBoolean()

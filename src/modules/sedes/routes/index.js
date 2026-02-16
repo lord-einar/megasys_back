@@ -257,7 +257,7 @@ router.get('/:id/inventario',
   validarId,
   [
     query('estado')
-      .optional()
+      .optional({ checkFalsy: true })
       .isIn(['disponible', 'en_uso', 'mantenimiento', 'dado_de_baja'])
       .withMessage('Estado debe ser: disponible, en_uso, mantenimiento o dado_de_baja'),
 
