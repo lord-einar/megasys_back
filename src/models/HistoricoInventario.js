@@ -1,5 +1,5 @@
 // src/models/HistoricoInventario.js
-import { DataTypes } from 'sequelize';
+import { DataTypes, Op } from 'sequelize';
 import { sequelize } from '../shared/utils/database.js';
 import { randomUUID as uuidv4 } from 'node:crypto';
 
@@ -158,7 +158,7 @@ const HistoricoInventario = sequelize.define('HistoricoInventario', {
     porFecha: (fechaInicio, fechaFin) => ({
       where: {
         fecha_movimiento: {
-          [sequelize.Sequelize.Op.between]: [fechaInicio, fechaFin]
+          [Op.between]: [fechaInicio, fechaFin]
         }
       }
     })
@@ -166,7 +166,7 @@ const HistoricoInventario = sequelize.define('HistoricoInventario', {
 });
 
 // Métodos de instancia
-HistoricoInventario.prototype.getDescripcion = function() {
+HistoricoInventario.prototype.getDescripcion = function () {
   const tipoMsg = {
     'transferencia': 'Transferencia',
     'prestamo': 'Préstamo',
@@ -175,15 +175,15 @@ HistoricoInventario.prototype.getDescripcion = function() {
   return `${tipoMsg[this.tipo_movimiento]} - ${this.sede_origen_id} → ${this.sede_destino_id}`;
 };
 
-HistoricoInventario.prototype.esTransferencia = function() {
+HistoricoInventario.prototype.esTransferencia = function () {
   return this.tipo_movimiento === 'transferencia';
 };
 
-HistoricoInventario.prototype.esPrestamo = function() {
+HistoricoInventario.prototype.esPrestamo = function () {
   return this.tipo_movimiento === 'prestamo' && this.es_prestamo;
 };
 
-HistoricoInventario.prototype.esDevolucion = function() {
+HistoricoInventario.prototype.esDevolucion = function () {
   return this.tipo_movimiento === 'devolucion';
 };
 

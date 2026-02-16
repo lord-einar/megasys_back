@@ -536,10 +536,11 @@ class RemitoService {
       const esPrestamoBool = es_prestamo === 'true' || es_prestamo === true;
 
       // Subquery: EXISTS (SELECT 1 FROM remito_detalles WHERE remito_id = remitos.id AND es_prestamo = true)
-      whereClause[sequelize.Sequelize.Op.and] = sequelize.literal(
+      // Subquery: EXISTS (SELECT 1 FROM remito_detalles WHERE remito_id = remitos.id AND es_prestamo = true)
+      whereClause[Op.and] = Sequelize.literal(
         esPrestamoBool
-          ? `EXISTS (SELECT 1 FROM remito_detalles WHERE remito_id = remitos.id AND es_prestamo = true)`
-          : `NOT EXISTS (SELECT 1 FROM remito_detalles WHERE remito_id = remitos.id AND es_prestamo = true) OR NOT EXISTS (SELECT 1 FROM remito_detalles WHERE remito_id = remitos.id)`
+          ? `EXISTS (SELECT 1 FROM remito_detalles WHERE remito_id = "Remito".id AND es_prestamo = true)`
+          : `NOT EXISTS (SELECT 1 FROM remito_detalles WHERE remito_id = "Remito".id AND es_prestamo = true)`
       );
     }
 
