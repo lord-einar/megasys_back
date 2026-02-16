@@ -141,6 +141,18 @@ router.post(
 );
 
 /**
+ * POST /remitos/:id/procesar-devolucion
+ * Procesar devolución granular de préstamos
+ * Para cada artículo se puede elegir: devolver o extender préstamo
+ * Body: { items: [{ detalle_id, accion: 'devolver'|'extender', nueva_fecha?: 'YYYY-MM-DD' }] }
+ * Requiere: Grupo "Infraestructura" (Super_admin) O ser el técnico asignado al remito
+ */
+router.post(
+  '/:id/procesar-devolucion',
+  remitoController.procesarDevolucion.bind(remitoController)
+);
+
+/**
  * POST /remitos/:id/reenviar-emails
  * Reenviar emails del remito (a infraestructura y solicitante)
  * Requiere: Autenticación

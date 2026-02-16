@@ -242,6 +242,75 @@ class RemitoController {
   }
 
   /**
+   * POST /remitos/:id/procesar-devolucion
+   * Procesar devolución de préstamos con control granular por artículo
+   * Body: { items: [{ detalle_id, accion: 'devolver'|'extender', nueva_fecha?: 'YYYY-MM-DD' }] }
+   */
+  async procesarDevolucion(req, res) {
+    try {
+      const { id: remitoId } = req.params;
+      const { items } = req.body;
+      const usuarioEmail = req.user.email;
+
+      if (!Array.isArray(items) || items.length === 0) {
+        return error(res, 'Debes especificar al menos un artículo para procesar', 400);
+      }
+
+      // Verificar permisos: super_admin O técnico asignado
+      const userRole = roleService.getUserRole(req.user.groups || []);
+      const isSuperAdmin = userRole === 'super_admin';
+
+      if (!isSuperAdmin) {
+        const remitoOriginal = await Remito.findByPk(remitoId, {
+          include: [{
+            model: Personal,
+            as: 'tecnicoAsignado',
+            attributes: ['id', 'email']
+          }]
+        });
+
+        if (!remitoOriginal) {
+          return error(res, 'El remito no existe', 404);
+        }
+
+        const esTecnicoAsignado = remitoOriginal.tecnicoAsignado &&
+          remitoOriginal.tecnicoAsignado.email.toLowerCase() === usuarioEmail.toLowerCase();
+
+        if (!esTecnicoAsignado) {
+          return error(res, 'No tienes permisos para procesar devoluciones de este remito.', 403);
+        }
+      }
+
+      logger.info('Procesando devolución de préstamos:', {
+        remitoId,
+        itemsCount: items.length,
+        usuario: usuarioEmail,
+        rol: userRole
+      });
+
+      const resultado = await remitoService.procesarDevolucion(
+        remitoId,
+        items,
+        usuarioEmail,
+        {
+          ipAddress: req.ip,
+          userAgent: req.get('user-agent')
+        }
+      );
+
+      return success(res, resultado, 'Devolución procesada exitosamente');
+    } catch (err) {
+      logger.error('Error procesando devolución:', err);
+
+      if (err.message === 'El remito no existe') {
+        return error(res, err.message, 404);
+      }
+
+      return error(res, err.message || 'Error al procesar devolución', 400);
+    }
+  }
+
+  /**
    * GET /remitos/articulos-disponibles
    * Listar artículos disponibles para agregar a un remito
    * Filtra por tipo_articulo_id y sede_id con paginación

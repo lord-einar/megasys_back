@@ -675,7 +675,7 @@ class RemitoService {
   async cambiarEstado(remitoId, nuevoEstado, usuarioId, options = {}) {
     const { transaction: externalTransaction, userRoles = [], usuarioEmail = null, userAgent = null, ipAddress = null, privilegioApp = null } = options;
 
-    const estadosValidos = ['preparado', 'en_transito', 'entregado', 'completado', 'devuelto', 'cancelado'];
+    const estadosValidos = ['preparado', 'en_transito', 'entregado', 'completado', 'devuelto_parcial', 'devuelto', 'cancelado'];
     if (!estadosValidos.includes(nuevoEstado)) {
       throw new Error(`Estado "${nuevoEstado}" no es válido`);
     }
@@ -701,8 +701,9 @@ class RemitoService {
     const transicionesValidas = {
       'preparado': ['en_transito', 'cancelado'],
       'en_transito': ['entregado', 'cancelado'],
-      'entregado': ['completado', 'devuelto', 'cancelado'],
-      'completado': ['devuelto'],
+      'entregado': ['completado', 'devuelto_parcial', 'devuelto', 'cancelado'],
+      'completado': ['devuelto_parcial', 'devuelto'],
+      'devuelto_parcial': ['devuelto_parcial', 'devuelto'],
       'devuelto': [],
       'cancelado': []
     };
@@ -731,74 +732,42 @@ class RemitoService {
 
         // LÓGICA DE ACTUALIZACIÓN DE INVENTARIO SEGÚN ESTADO
         // Si se cancela, se deben liberar los artículos (volver a disponible en origen)
-        // Si se marca como devuelto, se deben marcar items como devueltos y liberar inventario
-        if (nuevoEstado === 'cancelado' || nuevoEstado === 'devuelto') {
+        if (nuevoEstado === 'cancelado') {
           const remitoConDetalles = await Remito.findByPk(remitoId, {
             include: [{ model: RemitoDetalle, as: 'detalles' }],
             transaction
           });
 
           for (const detalle of remitoConDetalles.detalles) {
-            // Caso CANCELADO: Revertir todo (como si nunca hubiera salido)
-            if (nuevoEstado === 'cancelado') {
-              // Volver a estado disponible y sede origen
-              await Inventario.update(
-                {
-                  estado: 'disponible',
-                  sede_id: remito.sede_origen_id
-                },
-                { where: { id: detalle.inventario_id }, transaction }
-              );
+            // Volver a estado disponible y sede origen
+            await Inventario.update(
+              {
+                estado: 'disponible',
+                sede_id: remito.sede_origen_id
+              },
+              { where: { id: detalle.inventario_id }, transaction }
+            );
 
-              // Marcar detalle como no devuelto (por si acaso)
-              await detalle.update({ devuelto: false }, { transaction });
+            // Marcar detalle como no devuelto (por si acaso)
+            await detalle.update({ devuelto: false }, { transaction });
 
-              // Historial de cancelación
-              await HistorialMovimiento.create({
-                inventario_id: detalle.inventario_id,
-                remito_id: remito.id,
-                sede_origen_id: remito.sede_destino_id, // Estaba en destino (técnicamente) o en tránsito
-                sede_destino_id: remito.sede_origen_id,
-                tipo_movimiento: 'transferencia',
-                fecha_movimiento: new Date(),
-                observaciones: `Remito ${remito.numero_remito} CANCELADO - Reversión de movimiento`
-              }, { transaction });
-            }
-
-            // Caso DEVUELTO: Solo afecta a PRÉSTAMOS
-            // Si es transferencia, ya se quedó en destino, el estado devuelto solo cierra el remito
-            else if (nuevoEstado === 'devuelto' && detalle.es_prestamo && !detalle.devuelto) {
-              // Actualizar inventario: volver a origen y disponible
-              await Inventario.update(
-                {
-                  estado: 'disponible',
-                  sede_id: remito.sede_origen_id
-                },
-                { where: { id: detalle.inventario_id }, transaction }
-              );
-
-              // Marcar detalle como devuelto
-              await detalle.update(
-                {
-                  devuelto: true,
-                  fecha_devolucion_real: new Date()
-                },
-                { transaction }
-              );
-
-              // Historial de devolución
-              await HistorialMovimiento.create({
-                inventario_id: detalle.inventario_id,
-                remito_id: remito.id,
-                sede_origen_id: remito.sede_destino_id,
-                sede_destino_id: remito.sede_origen_id,
-                tipo_movimiento: 'devolucion',
-                fecha_movimiento: new Date(),
-                observaciones: `Devolución manual por cambio de estado de remito ${remito.numero_remito}`
-              }, { transaction });
-            }
+            // Historial de cancelación
+            await HistorialMovimiento.create({
+              inventario_id: detalle.inventario_id,
+              remito_id: remito.id,
+              sede_origen_id: remito.sede_destino_id,
+              sede_destino_id: remito.sede_origen_id,
+              tipo_movimiento: 'transferencia',
+              fecha_movimiento: new Date(),
+              observaciones: `Remito ${remito.numero_remito} CANCELADO - Reversión de movimiento`
+            }, { transaction });
           }
         }
+
+        // NOTA: La lógica de devolución de préstamos se maneja exclusivamente
+        // via el endpoint /procesar-devolucion para control granular por artículo.
+        // El estado 'devuelto' solo se establece desde procesarDevolucion
+        // cuando todos los artículos préstamo han sido devueltos.
 
         logger.info('Estado de remito actualizado:', {
           remitoId,
@@ -1002,6 +971,197 @@ class RemitoService {
       remitoDevolucionId: result.data.id,
       articulosDevueltos: detallesADevolver.length
     });
+
+    return result.data;
+  }
+
+  /**
+   * Procesar devolución de préstamos con control granular por artículo
+   * 
+   * Cada artículo puede ser:
+   * - 'devolver': Se marca como devuelto, inventario vuelve a origen y estado disponible
+   * - 'extender': Se actualiza la fecha de devolución esperada
+   * 
+   * El estado del remito se determina automáticamente:
+   * - Todos devueltos → 'devuelto'
+   * - Algunos devueltos → 'devuelto_parcial'
+   * 
+   * @param {string} remitoId - ID del remito
+   * @param {Array} items - Array de { detalle_id, accion: 'devolver'|'extender', nueva_fecha?: string }
+   * @param {string} usuarioEmail - Email del usuario que procesa
+   * @param {Object} options - Opciones adicionales
+   */
+  async procesarDevolucion(remitoId, items, usuarioEmail, options = {}) {
+    const { transaction: externalTransaction, ipAddress = null, userAgent = null } = options;
+
+    // Validar que hay items
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new Error('Debes especificar al menos un artículo para procesar');
+    }
+
+    // Validar acciones válidas
+    for (const item of items) {
+      if (!['devolver', 'extender'].includes(item.accion)) {
+        throw new Error(`Acción "${item.accion}" no es válida. Use "devolver" o "extender"`);
+      }
+      if (item.accion === 'extender' && !item.nueva_fecha) {
+        throw new Error('Debe especificar una nueva fecha al extender un préstamo');
+      }
+    }
+
+    // Obtener remito con detalles
+    const remito = await Remito.findByPk(remitoId, {
+      include: [{ model: RemitoDetalle, as: 'detalles' }]
+    });
+
+    if (!remito) {
+      throw new Error('El remito no existe');
+    }
+
+    // Solo se puede procesar devolución en estados válidos
+    const estadosPermitidos = ['entregado', 'completado', 'devuelto_parcial'];
+    if (!estadosPermitidos.includes(remito.estado)) {
+      throw new Error(`No se puede procesar devolución en estado "${remito.estado}". Estados permitidos: ${estadosPermitidos.join(', ')}`);
+    }
+
+    // Verificar que al menos un item sea de préstamo no devuelto
+    const itemsDevolver = items.filter(i => i.accion === 'devolver');
+    if (itemsDevolver.length === 0) {
+      // Solo extensiones, no hay nada que devolver realmente
+      // Pero igual procesamos las extensiones
+    }
+
+    const result = await TransactionWrapper.execute({
+      operation: async (transaction) => {
+        let articulosDevueltos = 0;
+        let articulosExtendidos = 0;
+
+        for (const item of items) {
+          const detalle = remito.detalles.find(d => d.id === item.detalle_id);
+
+          if (!detalle) {
+            throw new Error(`Detalle ${item.detalle_id} no encontrado en este remito`);
+          }
+
+          if (!detalle.es_prestamo) {
+            throw new Error(`El artículo ${item.detalle_id} no es un préstamo`);
+          }
+
+          if (detalle.devuelto) {
+            throw new Error(`El artículo ${item.detalle_id} ya fue devuelto`);
+          }
+
+          if (item.accion === 'devolver') {
+            // Actualizar inventario: volver a sede origen y estado disponible
+            await Inventario.update(
+              {
+                estado: 'disponible',
+                sede_id: remito.sede_origen_id
+              },
+              { where: { id: detalle.inventario_id }, transaction }
+            );
+
+            // Marcar detalle como devuelto
+            await detalle.update(
+              {
+                devuelto: true,
+                fecha_devolucion_real: new Date()
+              },
+              { transaction }
+            );
+
+            // Crear historial de devolución
+            await HistorialMovimiento.create({
+              inventario_id: detalle.inventario_id,
+              remito_id: remito.id,
+              sede_origen_id: remito.sede_destino_id,
+              sede_destino_id: remito.sede_origen_id,
+              tipo_movimiento: 'devolucion',
+              fecha_movimiento: new Date(),
+              observaciones: `Devolución procesada manualmente - Remito ${remito.numero_remito}`
+            }, { transaction });
+
+            articulosDevueltos++;
+          } else if (item.accion === 'extender') {
+            // Actualizar fecha de devolución esperada
+            let fechaParsed;
+            if (typeof item.nueva_fecha === 'string' && item.nueva_fecha.match(/^\d{4}-\d{2}-\d{2}$/)) {
+              const [year, month, day] = item.nueva_fecha.split('-');
+              fechaParsed = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            } else {
+              fechaParsed = new Date(item.nueva_fecha);
+            }
+
+            if (isNaN(fechaParsed.getTime())) {
+              throw new Error(`Fecha "${item.nueva_fecha}" no es válida`);
+            }
+
+            await detalle.update(
+              { fecha_devolucion_esperada: fechaParsed },
+              { transaction }
+            );
+
+            articulosExtendidos++;
+          }
+        }
+
+        // Determinar nuevo estado del remito basado en préstamos pendientes
+        // Recargar detalles para tener estado actualizado
+        const detallesActualizados = await RemitoDetalle.findAll({
+          where: { remito_id: remitoId },
+          transaction
+        });
+
+        const prestamos = detallesActualizados.filter(d => d.es_prestamo);
+        const prestamosDevueltos = prestamos.filter(d => d.devuelto);
+
+        let nuevoEstado;
+        if (prestamos.length === 0) {
+          // No hay préstamos (solo transferencias), no cambiar estado
+          nuevoEstado = remito.estado;
+        } else if (prestamosDevueltos.length === prestamos.length) {
+          // Todos los préstamos devueltos
+          nuevoEstado = 'devuelto';
+        } else if (prestamosDevueltos.length > 0) {
+          // Algunos devueltos
+          nuevoEstado = 'devuelto_parcial';
+        } else {
+          // Ninguno devuelto (solo se extendieron fechas)
+          nuevoEstado = remito.estado;
+        }
+
+        // Actualizar estado del remito si cambió
+        if (nuevoEstado !== remito.estado) {
+          await remito.update({ estado: nuevoEstado }, { transaction });
+        }
+
+        return {
+          remito_id: remitoId,
+          numero_remito: remito.numero_remito,
+          estado_anterior: remito.estado,
+          estado_nuevo: nuevoEstado,
+          articulos_devueltos: articulosDevueltos,
+          articulos_extendidos: articulosExtendidos,
+          prestamos_pendientes: prestamos.length - prestamosDevueltos.length
+        };
+      },
+      usuarioEmail: usuarioEmail || 'sistema@megatlon.com.ar',
+      modulo: 'remitos',
+      accion: 'procesar_devolucion',
+      recurso: 'Remito',
+      recursoId: remitoId,
+      descripcion: `Procesó devolución del remito ${remito.numero_remito}: ${itemsDevolver.length} devuelto(s), ${items.length - itemsDevolver.length} extendido(s)`,
+      valoresNuevos: {
+        items_procesados: items.length,
+        items_devueltos: itemsDevolver.length,
+        items_extendidos: items.length - itemsDevolver.length
+      },
+      ipAddress,
+      userAgent,
+      transaction: externalTransaction
+    });
+
+    logger.info('Devolución de préstamos procesada:', result.data);
 
     return result.data;
   }

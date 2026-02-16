@@ -87,13 +87,13 @@ const Remito = sequelize.define('Remito', {
     }
   },
   estado: {
-    type: DataTypes.ENUM('preparado', 'en_transito', 'entregado', 'completado', 'devuelto', 'cancelado'),
+    type: DataTypes.ENUM('preparado', 'en_transito', 'entregado', 'completado', 'devuelto_parcial', 'devuelto', 'cancelado'),
     allowNull: false,
     defaultValue: 'preparado',
     validate: {
       isIn: {
-        args: [['preparado', 'en_transito', 'entregado', 'completado', 'devuelto', 'cancelado']],
-        msg: 'El estado debe ser: preparado, en_transito, entregado, completado, devuelto o cancelado'
+        args: [['preparado', 'en_transito', 'entregado', 'completado', 'devuelto_parcial', 'devuelto', 'cancelado']],
+        msg: 'El estado debe ser: preparado, en_transito, entregado, completado, devuelto_parcial, devuelto o cancelado'
       }
     }
   },
@@ -180,35 +180,35 @@ const Remito = sequelize.define('Remito', {
 });
 
 // Métodos de instancia
-Remito.prototype.puedeEditarse = function() {
+Remito.prototype.puedeEditarse = function () {
   return this.estado === 'preparado';
 };
 
-Remito.prototype.puedeEnviarse = function() {
+Remito.prototype.puedeEnviarse = function () {
   return this.estado === 'preparado';
 };
 
-Remito.prototype.puedeCompletarse = function() {
+Remito.prototype.puedeCompletarse = function () {
   return this.estado === 'entregado';
 };
 
-Remito.prototype.puedeDevolverse = function() {
+Remito.prototype.puedeDevolverse = function () {
   return this.estado === 'entregado';
 };
 
-Remito.prototype.puedeCancelarse = function() {
+Remito.prototype.puedeCancelarse = function () {
   return ['preparado', 'en_transito', 'entregado'].includes(this.estado);
 };
 
-Remito.prototype.estaCancelado = function() {
+Remito.prototype.estaCancelado = function () {
   return this.estado === 'cancelado';
 };
 
-Remito.prototype.estaCompleto = function() {
+Remito.prototype.estaCompleto = function () {
   return ['completado', 'devuelto', 'cancelado'].includes(this.estado);
 };
 
-Remito.prototype.getDescripcion = function() {
+Remito.prototype.getDescripcion = function () {
   return `Remito ${this.numero_remito} - ${this.estado}`;
 };
 
