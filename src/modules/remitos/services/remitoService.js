@@ -729,6 +729,77 @@ class RemitoService {
           { transaction }
         );
 
+        // LÓGICA DE ACTUALIZACIÓN DE INVENTARIO SEGÚN ESTADO
+        // Si se cancela, se deben liberar los artículos (volver a disponible en origen)
+        // Si se marca como devuelto, se deben marcar items como devueltos y liberar inventario
+        if (nuevoEstado === 'cancelado' || nuevoEstado === 'devuelto') {
+          const remitoConDetalles = await Remito.findByPk(remitoId, {
+            include: [{ model: RemitoDetalle, as: 'detalles' }],
+            transaction
+          });
+
+          for (const detalle of remitoConDetalles.detalles) {
+            // Caso CANCELADO: Revertir todo (como si nunca hubiera salido)
+            if (nuevoEstado === 'cancelado') {
+              // Volver a estado disponible y sede origen
+              await Inventario.update(
+                {
+                  estado: 'disponible',
+                  sede_id: remito.sede_origen_id
+                },
+                { where: { id: detalle.inventario_id }, transaction }
+              );
+
+              // Marcar detalle como no devuelto (por si acaso)
+              await detalle.update({ devuelto: false }, { transaction });
+
+              // Historial de cancelación
+              await HistorialMovimiento.create({
+                inventario_id: detalle.inventario_id,
+                remito_id: remito.id,
+                sede_origen_id: remito.sede_destino_id, // Estaba en destino (técnicamente) o en tránsito
+                sede_destino_id: remito.sede_origen_id,
+                tipo_movimiento: 'transferencia',
+                fecha_movimiento: new Date(),
+                observaciones: `Remito ${remito.numero_remito} CANCELADO - Reversión de movimiento`
+              }, { transaction });
+            }
+
+            // Caso DEVUELTO: Solo afecta a PRÉSTAMOS
+            // Si es transferencia, ya se quedó en destino, el estado devuelto solo cierra el remito
+            else if (nuevoEstado === 'devuelto' && detalle.es_prestamo && !detalle.devuelto) {
+              // Actualizar inventario: volver a origen y disponible
+              await Inventario.update(
+                {
+                  estado: 'disponible',
+                  sede_id: remito.sede_origen_id
+                },
+                { where: { id: detalle.inventario_id }, transaction }
+              );
+
+              // Marcar detalle como devuelto
+              await detalle.update(
+                {
+                  devuelto: true,
+                  fecha_devolucion_real: new Date()
+                },
+                { transaction }
+              );
+
+              // Historial de devolución
+              await HistorialMovimiento.create({
+                inventario_id: detalle.inventario_id,
+                remito_id: remito.id,
+                sede_origen_id: remito.sede_destino_id,
+                sede_destino_id: remito.sede_origen_id,
+                tipo_movimiento: 'devolucion',
+                fecha_movimiento: new Date(),
+                observaciones: `Devolución manual por cambio de estado de remito ${remito.numero_remito}`
+              }, { transaction });
+            }
+          }
+        }
+
         logger.info('Estado de remito actualizado:', {
           remitoId,
           estadoAnterior,
