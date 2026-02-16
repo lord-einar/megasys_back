@@ -6,7 +6,6 @@ import { sequelize, Personal, Rol, Remito, Inventario, TipoArticulo, RemitoDetal
 import { GUID_TO_GROUP_MAP } from '../../auth/config/roles.js';
 import roleService from '../../auth/services/roleService.js';
 import emailService from '../../../shared/services/emailService.js';
-import personalService from '../../personal/services/personalService.js';
 
 class RemitoController {
   /**
@@ -113,49 +112,8 @@ class RemitoController {
         return error(res, 'El nuevo estado es requerido', 400);
       }
 
-      // El usuarioId viene del token JWT (homeAccountId de Entra ID)
-      // Si no existe en Personal, intentar buscarlo por email para auto-provisioning
-      let personal = null;
-
-      // Primero intentar buscar por email (para casos ya registrados)
-      personal = await Personal.findOne({
-        where: { email: req.user.email.toLowerCase(), activo: true },
-        include: [{
-          model: Rol,
-          as: 'rol',
-          attributes: ['nombre']
-        }]
-      });
-
-      // Si no existe, intentar auto-provisionar
-      if (!personal) {
-        logger.info('Personal no encontrado, intentando auto-provisioning:', {
-          email: req.user.email
-        });
-
-        try {
-          // personalService ya importado al inicio del archivo
-          await personalService.autoProvisionarPersonal(req.user, {
-            role: req.user.role || 'user',
-            permissions: []
-          });
-
-          // Intentar buscar nuevamente después de auto-provisioning
-          personal = await Personal.findOne({
-            where: { email: req.user.email.toLowerCase(), activo: true },
-            include: [{
-              model: Rol,
-              as: 'rol',
-              attributes: ['nombre']
-            }]
-          });
-        } catch (provisioningError) {
-          logger.warn('Error en auto-provisioning para cambio de estado:', {
-            email: req.user.email,
-            error: provisioningError.message
-          });
-        }
-      }
+      // Resolver personal (busca por email o auto-provisiona desde Azure AD)
+      const personal = await remitoService.resolverPersonal(req.user);
 
       if (!personal) {
         logger.warn('Personal no encontrado incluso después de auto-provisioning:', {

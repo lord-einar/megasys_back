@@ -87,7 +87,7 @@ class EmpresaService {
   /**
    * Crear nueva empresa
    */
-  async crearEmpresa(datosEmpresa) {
+  async crearEmpresa(datosEmpresa, options = {}) {
     try {
       const empresa = await Empresa.create({
         nombre_empresa: datosEmpresa.nombre,
@@ -97,7 +97,7 @@ class EmpresaService {
         telefono: datosEmpresa.telefono,
         email: datosEmpresa.email,
         activo: datosEmpresa.activo !== false
-      });
+      }, options);
 
       logger.info('Nueva empresa creada', { empresaId: empresa.id, nombre: empresa.nombre_empresa });
       return empresa;
@@ -110,9 +110,9 @@ class EmpresaService {
   /**
    * Actualizar empresa
    */
-  async actualizarEmpresa(empresaId, datosEmpresa) {
+  async actualizarEmpresa(empresaId, datosEmpresa, options = {}) {
     try {
-      const empresa = await Empresa.findByPk(empresaId);
+      const empresa = await Empresa.findByPk(empresaId, options);
 
       if (!empresa) {
         throw new Error('Empresa no encontrada');
@@ -126,7 +126,7 @@ class EmpresaService {
         telefono: datosEmpresa.telefono || empresa.telefono,
         email: datosEmpresa.email || empresa.email,
         activo: datosEmpresa.activo !== undefined ? datosEmpresa.activo : empresa.activo
-      });
+      }, options);
 
       logger.info('Empresa actualizada', { empresaId });
       return empresa;
@@ -139,15 +139,15 @@ class EmpresaService {
   /**
    * Eliminar empresa
    */
-  async eliminarEmpresa(empresaId) {
+  async eliminarEmpresa(empresaId, options = {}) {
     try {
-      const empresa = await Empresa.findByPk(empresaId);
+      const empresa = await Empresa.findByPk(empresaId, options);
 
       if (!empresa) {
         throw new Error('Empresa no encontrada');
       }
 
-      await empresa.destroy();
+      await empresa.destroy(options);
 
       logger.info('Empresa eliminada', { empresaId });
       return { success: true, message: 'Empresa eliminada correctamente' };

@@ -5,10 +5,12 @@ import {
   Inventario,
   HistorialMovimiento,
   Personal,
+  Rol,
   Sede,
   TipoArticulo,
   sequelize
 } from '../../../models/index.js';
+import personalService from '../../personal/services/personalService.js';
 import logger from '../../../shared/utils/logger.js';
 import { Op, Sequelize } from 'sequelize';
 import pdfService from '../../../shared/services/pdfService.js';
@@ -1837,6 +1839,52 @@ class RemitoService {
       });
       throw error;
     }
+  }
+
+  /**
+   * Resolver personal asociado a un usuario autenticado.
+   * Si no existe en la BD, intenta auto-provisioning desde Azure AD.
+   * @param {Object} user - Datos del usuario autenticado (email, role, groups, etc.)
+   * @returns {Promise<Object|null>} Registro de Personal con rol incluido, o null si no se pudo resolver
+   */
+  async resolverPersonal(user) {
+    // Buscar por email
+    let personal = await Personal.findOne({
+      where: { email: user.email.toLowerCase(), activo: true },
+      include: [{
+        model: Rol,
+        as: 'rol',
+        attributes: ['nombre']
+      }]
+    });
+
+    if (personal) return personal;
+
+    // Intentar auto-provisioning
+    logger.info('Personal no encontrado, intentando auto-provisioning:', { email: user.email });
+
+    try {
+      await personalService.autoProvisionarPersonal(user, {
+        role: user.role || 'user',
+        permissions: []
+      });
+
+      personal = await Personal.findOne({
+        where: { email: user.email.toLowerCase(), activo: true },
+        include: [{
+          model: Rol,
+          as: 'rol',
+          attributes: ['nombre']
+        }]
+      });
+    } catch (provisioningError) {
+      logger.warn('Error en auto-provisioning:', {
+        email: user.email,
+        error: provisioningError.message
+      });
+    }
+
+    return personal;
   }
 }
 

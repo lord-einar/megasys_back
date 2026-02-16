@@ -144,9 +144,12 @@ class ReclamoService {
       if (!tecnico) throw new Error('Técnico asignado no encontrado');
     }
 
-    // Generar número de reclamo único
-    const count = await Reclamo.count();
-    const numero_reclamo = `REC-${String(count + 1).padStart(6, '0')}`;
+    // Generar número de reclamo único (dentro de la transacción para evitar race conditions)
+    const [maxResult] = await sequelize.query(
+      `SELECT COALESCE(MAX(CAST(SUBSTRING(numero_reclamo FROM 5) AS INTEGER)), 0) + 1 AS next_num FROM reclamos`,
+      { type: sequelize.constructor.QueryTypes.SELECT, ...options }
+    );
+    const numero_reclamo = `REC-${String(maxResult.next_num).padStart(6, '0')}`;
 
     const nuevoReclamo = await Reclamo.create({
       numero_reclamo,
