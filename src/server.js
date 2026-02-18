@@ -45,6 +45,21 @@ const initializeServer = async () => {
       } catch (schedulerError) {
         logger.error('Error iniciando scheduler de visitas:', schedulerError);
       }
+
+      // Iniciar Cron Job para Sincronización Entra ID (3:00 AM todos los días)
+      try {
+        const cron = await import('node-cron');
+        const entraSyncService = await import('./modules/personal/services/entraSyncService.js');
+
+        cron.schedule('0 3 * * *', async () => {
+          logger.info('⏰ Ejecutando cron job: Sincronización Entra ID');
+          await entraSyncService.default.syncGerentes();
+        });
+
+        logger.info('⏰ Cron job de Entra ID configurado (03:00 AM)');
+      } catch (cronError) {
+        logger.error('Error iniciando cron job Entra ID:', cronError);
+      }
     });
 
     // Manejo de errores del servidor

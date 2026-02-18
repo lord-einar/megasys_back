@@ -3,6 +3,7 @@ import personalService from '../services/personalService.js';
 import { success, error, paginated } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/utils/asyncHandler.js';
 import logger from '../../../shared/utils/logger.js';
+import entraSyncService from '../services/entraSyncService.js';
 import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
 
 class PersonalController {
@@ -300,6 +301,23 @@ class PersonalController {
     } catch (err) {
       logger.error('Error exportando personal:', err);
       error(res, err.message || 'Error al exportar personal', 500);
+    }
+  });
+
+  /**
+   * Sincronizar manualmente con Entra ID
+   */
+  syncEntra = asyncHandler(async (req, res) => {
+    try {
+      const result = await entraSyncService.syncGerentes();
+      if (result.success) {
+        success(res, result.stats, 'Sincronización con Entra ID completada exitosamente');
+      } else {
+        error(res, result.error || 'Error durante la sincronización', 500);
+      }
+    } catch (err) {
+      logger.error('Error en sincronización manual:', err);
+      error(res, err.message || 'Error al sincronizar con Entra ID', 500);
     }
   });
 }

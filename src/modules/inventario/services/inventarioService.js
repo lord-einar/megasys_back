@@ -1,9 +1,10 @@
 // src/modules/inventario/services/inventarioService.js
-import { Inventario, TipoArticulo, Sede, HistorialMovimiento, sequelize, RemitoDetalle, Remito } from '../../../models/index.js';
+import { Inventario, TipoArticulo, Sede, HistorialMovimiento, sequelize, RemitoDetalle, Remito, Garantia } from '../../../models/index.js';
 import logger from '../../../shared/utils/logger.js';
 import { Op } from 'sequelize';
 import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
 import CommonValidators from '../../../shared/validators/commonValidators.js';
+import garantiaService from './garantiaService.js';
 
 class InventarioService {
   /**
@@ -134,6 +135,11 @@ class InventarioService {
           attributes: ['id', 'nombre_sede', 'localidad', 'provincia']
         },
         {
+          model: Garantia,
+          as: 'garantias',
+          order: [['fecha_fin', 'DESC']]
+        },
+        {
           model: HistorialMovimiento,
           as: 'historialMovimientosInventario',
           include: [
@@ -146,6 +152,12 @@ class InventarioService {
               model: Sede,
               as: 'sedeDestinoMovimiento',
               attributes: ['id', 'nombre_sede']
+            },
+            {
+              model: Remito,
+              as: 'remitoMovimiento',
+              attributes: ['id', 'numero_remito'],
+              required: false
             }
           ],
           order: [['fecha_movimiento', 'DESC']],
@@ -158,8 +170,23 @@ class InventarioService {
       return null;
     }
 
-    // Si el artículo está en préstamo, buscar el remito activo
     const itemJson = item.toJSON();
+
+    // Agregar resumen de garantía
+    if (itemJson.garantias && itemJson.garantias.length > 0) {
+      const activas = itemJson.garantias.filter(g => g.estado === 'activa');
+      const diasRestantes = item.garantia_fecha_fin
+        ? Math.ceil((new Date(item.garantia_fecha_fin) - new Date()) / (1000 * 60 * 60 * 24))
+        : null;
+      itemJson.resumenGarantia = {
+        total: itemJson.garantias.length,
+        activas: activas.length,
+        mejorFechaFin: item.garantia_fecha_fin || null,
+        diasRestantes
+      };
+    }
+
+    // Si el artículo está en préstamo, buscar el remito activo
     if (item.estado === 'en_prestamo') {
       // RemitoDetalle, Remito y Sede ya importados al inicio del archivo
 
@@ -224,7 +251,11 @@ class InventarioService {
       estado = 'disponible',
       fecha_adquisicion,
       valor_adquisicion,
-      observaciones
+      observaciones,
+      procesador,
+      memoria,
+      disco,
+      sistema_operativo
     } = datosNuevo;
 
     // Validaciones previas (fuera de la transacción)
@@ -243,7 +274,11 @@ class InventarioService {
       estado,
       fecha_adquisicion,
       valor_adquisicion,
-      observaciones: observaciones?.trim()
+      observaciones: observaciones?.trim(),
+      procesador: procesador?.trim(),
+      memoria: memoria?.trim(),
+      disco: disco?.trim(),
+      sistema_operativo: sistema_operativo?.trim()
     };
 
     // Ejecutar dentro de transacción con auditoría
@@ -261,6 +296,10 @@ class InventarioService {
           fecha_adquisicion,
           valor_adquisicion,
           observaciones: observaciones?.trim(),
+          procesador: procesador?.trim(),
+          memoria: memoria?.trim(),
+          disco: disco?.trim(),
+          sistema_operativo: sistema_operativo?.trim(),
           activo: true
         }, { transaction });
 
@@ -295,7 +334,18 @@ class InventarioService {
       userAgent: metadatos?.userAgent
     });
 
-    return resultado.data;
+    // Fire-and-forget: consultar garantía si hay identificador
+    const itemCreado = resultado.data;
+    if (itemCreado?.id && (numero_serie || service_tag)) {
+      garantiaService.consultarYGuardar(itemCreado.id).catch(err => {
+        logger.error('Error en consulta de garantía fire-and-forget:', {
+          inventarioId: itemCreado.id,
+          error: err.message
+        });
+      });
+    }
+
+    return itemCreado;
   }
 
   /**
@@ -319,7 +369,11 @@ class InventarioService {
       estado: item.estado,
       fecha_adquisicion: item.fecha_adquisicion,
       valor_adquisicion: item.valor_adquisicion,
-      observaciones: item.observaciones
+      observaciones: item.observaciones,
+      procesador: item.procesador,
+      memoria: item.memoria,
+      disco: item.disco,
+      sistema_operativo: item.sistema_operativo
     };
 
     // Validaciones previas (fuera de la transacción)
@@ -636,6 +690,12 @@ class InventarioService {
           model: Sede,
           as: 'sedeDestinoMovimiento',
           attributes: ['id', 'nombre_sede']
+        },
+        {
+          model: Remito,
+          as: 'remitoMovimiento',
+          attributes: ['id', 'numero_remito'],
+          required: false
         }
       ],
       order: [['fecha_movimiento', 'DESC']],

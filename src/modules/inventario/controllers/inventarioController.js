@@ -1,5 +1,6 @@
 // src/modules/inventario/controllers/inventarioController.js
 import inventarioService from '../services/inventarioService.js';
+import garantiaService from '../services/garantiaService.js';
 import { success, error, paginated } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/utils/asyncHandler.js';
 import logger from '../../../shared/utils/logger.js';
@@ -178,6 +179,44 @@ class InventarioController {
     } catch (err) {
       logger.error('Error buscando inventario:', { error: err.message, termino });
       return error(res, err.message || 'Error en la búsqueda', 400);
+    }
+  });
+  /**
+   * Obtener garantías de un artículo
+   */
+  obtenerGarantias = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    try {
+      const resultado = await garantiaService.obtenerPorInventario(id);
+      success(res, resultado, 'Garantías obtenidas correctamente');
+    } catch (err) {
+      logger.error('Error obteniendo garantías:', { error: err.message, id });
+
+      if (err.message.includes('no encontrado')) {
+        return error(res, err.message, 404);
+      }
+
+      return error(res, err.message || 'Error al obtener garantías', 500);
+    }
+  });
+
+  /**
+   * Refrescar garantía de un artículo (re-consultar API)
+   */
+  refrescarGarantia = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    try {
+      const userEmail = req.user?.email || 'sistema@desarrollolocal.com';
+      const resultado = await garantiaService.refrescar(id, userEmail);
+      success(res, resultado, 'Garantía refrescada correctamente');
+    } catch (err) {
+      logger.error('Error refrescando garantía:', { error: err.message, id });
+
+      if (err.message.includes('no encontrado')) {
+        return error(res, err.message, 404);
+      }
+
+      return error(res, err.message || 'Error al refrescar garantía', 500);
     }
   });
 }

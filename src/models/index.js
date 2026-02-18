@@ -31,6 +31,7 @@ import VisitaChecklistItem from './VisitaChecklistItem.js';
 import CategoriaProblema from './CategoriaProblema.js';
 import EquipoServicio from './EquipoServicio.js';
 import Reclamo from './Reclamo.js';
+import Garantia from './Garantia.js';
 
 // =====================================================
 // DEFINICIÓN DE RELACIONES
@@ -148,6 +149,16 @@ Sede.hasMany(Inventario, {
 Inventario.belongsTo(Sede, {
   foreignKey: 'sede_id',
   as: 'sedePrincipal'
+});
+
+// Relaciones Inventario -> Garantia
+Inventario.hasMany(Garantia, {
+  foreignKey: 'inventario_id',
+  as: 'garantias'
+});
+Garantia.belongsTo(Inventario, {
+  foreignKey: 'inventario_id',
+  as: 'inventario'
 });
 
 // Relaciones Proveedor -> EjecutivoCuentas
@@ -685,6 +696,7 @@ const models = {
   SoporteNivel,
   EquipoServicio,
   Reclamo,
+  Garantia,
 
   // Remitos y movimientos
   Remito,
@@ -740,6 +752,7 @@ export {
   SoporteNivel,
   EquipoServicio,
   Reclamo,
+  Garantia,
   Remito,
   RemitoDetalle,
   HistorialMovimiento,

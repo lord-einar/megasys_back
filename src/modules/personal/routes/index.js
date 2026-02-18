@@ -273,6 +273,16 @@ router.post('/',
 );
 
 /**
+ * @route   POST /api/personal/sync-entra
+ * @desc    Sincronizar manualmente con Entra ID
+ * @access  Private (Create permission - Infraestructura)
+ */
+router.post('/sync-entra',
+  requirePermission('personal', 'create'),
+  personalController.syncEntra
+);
+
+/**
  * @route   PUT /api/personal/:id
  * @desc    Actualizar persona existente
  * @access  Private (Update permission - Infraestructura y Mesa de ayuda)

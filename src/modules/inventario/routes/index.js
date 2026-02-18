@@ -326,6 +326,30 @@ router.patch('/:id/estado',
 );
 
 /**
+ * @route   GET /api/inventario/:id/garantias
+ * @desc    Obtener garantías de un artículo
+ * @access  Private (Read permission - Todos)
+ */
+router.get('/:id/garantias',
+  validarId,
+  validate,
+  inventarioController.obtenerGarantias
+);
+
+/**
+ * @route   POST /api/inventario/:id/garantias/refrescar
+ * @desc    Re-consultar garantía del fabricante
+ * @access  Private (Update permission - Infraestructura y Soporte)
+ */
+router.post('/:id/garantias/refrescar',
+  authenticate,
+  requirePermission('inventario', 'update'),
+  validarId,
+  validate,
+  inventarioController.refrescarGarantia
+);
+
+/**
  * @route   GET /api/inventario/:id/historial
  * @desc    Obtener historial de movimientos de un item
  * @access  Private (Read permission - Todos)

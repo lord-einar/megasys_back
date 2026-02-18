@@ -123,6 +123,35 @@ const Inventario = sequelize.define('Inventario', {
   observaciones: {
     type: DataTypes.TEXT,
     allowNull: true
+  },
+  garantia_estado: {
+    type: DataTypes.ENUM('sin_consultar', 'consultando', 'con_garantia', 'sin_garantia', 'error'),
+    defaultValue: 'sin_consultar',
+    allowNull: false
+  },
+  garantia_consultada_en: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  garantia_fecha_fin: {
+    type: DataTypes.DATEONLY,
+    allowNull: true
+  },
+  procesador: {
+    type: DataTypes.STRING(100),
+    allowNull: true
+  },
+  memoria: {
+    type: DataTypes.STRING(50),
+    allowNull: true
+  },
+  disco: {
+    type: DataTypes.STRING(100),
+    allowNull: true
+  },
+  sistema_operativo: {
+    type: DataTypes.STRING(100),
+    allowNull: true
   }
 }, {
   tableName: 'inventario',
