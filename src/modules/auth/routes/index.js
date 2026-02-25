@@ -16,9 +16,4 @@ router.get('/permissions', authenticate, authController.getPermissions);
 router.get('/photo/:userId', authenticate, authController.getPhoto);
 router.get('/photo-base64', authenticate, authController.getPhotoBase64);
 
-// DEV ONLY: Bypass login
-if (process.env.NODE_ENV === 'development') {
-  router.post('/dev-login', authController.devLogin);
-}
-
 export default router;

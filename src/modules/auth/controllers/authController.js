@@ -349,48 +349,6 @@ class AuthController {
       error(res, 'Error al analizar grupos', 500);
     }
   });
-  /**
-   * DEV ONLY: Bypass login for development
-   */
-  devLogin = asyncHandler(async (req, res) => {
-    if (process.env.NODE_ENV !== 'development') {
-      return error(res, 'Endpoint solo disponible en desarrollo', 403);
-    }
-
-    try {
-      // Usuario simulado (Super Admin / Infraestructura)
-      const mockUser = {
-        id: 'dev-user-id',
-        email: 'dev@megatlon.com.ar',
-        name: 'Usuario Desarrollo',
-        tenantId: 'dev-tenant',
-        groups: ['edc49d22-9ee8-4d90-a8b2-41cf64db1eed'], // Grupo Infraestructura
-        groupNames: ['Infraestructura'],
-        privilegioApp: 'super_admin'
-      };
-
-      // Generar token
-      const token = authService.generateJWT(mockUser);
-
-      // Auto-provisionar Personal si no existe
-      try {
-        const roleInfo = roleService.getRoleAndPermissions(mockUser.groups);
-        await personalService.autoProvisionarPersonal(mockUser, roleInfo);
-      } catch (provError) {
-        logger.warn('Error provisionando usuario dev:', provError);
-      }
-
-      success(res, {
-        user: mockUser,
-        token,
-        accessToken: 'mock-access-token'
-      }, 'Login de desarrollo exitoso');
-
-    } catch (err) {
-      logger.error('Error en devLogin:', err);
-      error(res, 'Error en login de desarrollo', 500);
-    }
-  });
 }
 
 export default new AuthController();

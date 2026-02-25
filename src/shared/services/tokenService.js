@@ -6,7 +6,7 @@
 import jwt from 'jsonwebtoken';
 import logger from '../utils/logger.js';
 
-const TOKEN_SECRET = process.env.JWT_SECRET || 'default-secret-change-in-production';
+const TOKEN_SECRET = process.env.CONFIRMATION_TOKEN_SECRET || process.env.JWT_SECRET || 'default-confirmation-secret-change-in-production';
 const TOKEN_EXPIRATION = process.env.CONFIRMATION_TOKEN_EXPIRES || '30d';
 
 class TokenService {
