@@ -25,6 +25,9 @@ storage/
 *.backup
 backups/
 
+# Archivos de desarrollo local (docs, scripts debug, legado Azure, backups SQL)
+utils_dev/
+
 # Archivos temporales de deployment
 .railway/
 .vercel/

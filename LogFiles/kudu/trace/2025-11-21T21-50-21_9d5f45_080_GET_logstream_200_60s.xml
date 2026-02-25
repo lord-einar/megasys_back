@@ -1,8 +1,0 @@
-<step title="Incoming Request" date="2025-11-21T21:50:21.819" instance="9d5f45" url="/logstream" method="GET" type="request" pid="833,1,3" Host="megasys-api-staging.scm.azurewebsites.net" User-Agent="AZURECLI/2.80.0 (DEB)" Accept-Encoding="identity" Authorization="Bea..." x-ms-client-request-id="1088f296-c724-11f0-a833-d03745c626be" X-ARR-LOG-ID="1088f296-c724-11f0-a833-d03745c626be" CLIENT-IP="186.158.120.171:3914" X-SITE-DEPLOYMENT-ID="megasys-api__4993" WAS-DEFAULT-HOSTNAME="megasys-api-staging.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/logstream" X-Client-IP="186.158.120.171" X-Client-Port="3914" >
-  <step title="Cleanup Xml Logs" date="2025-11-21T21:50:21.828" >
-    <step title="Cleanup Infos" date="2025-11-21T21:50:21.858" totalFiles="218" totalCleanup="58" /><!-- duration: 35ms -->
-  </step><!-- duration: 82ms -->
-  <step title="LogStreamHandlerMiddleware.Invoke" date="2025-11-21T21:50:21.936" /><!-- duration: 53ms -->
-  <step title="Error occurred" date="2025-11-21T21:51:21.993" type="error" text="LogStreamManager: ProcessRequest end" /><!-- duration: 2ms -->
-  <step title="Outgoing response" date="2025-11-21T21:51:22.006" type="response" statusCode="200" statusText="OK" /><!-- duration: 3ms -->
-</step><!-- duration: 60192ms -->
