@@ -7,6 +7,20 @@ import { GUID_TO_GROUP_MAP } from '../../auth/config/roles.js';
 import roleService from '../../auth/services/roleService.js';
 import emailService from '../../../shared/services/emailService.js';
 
+// Cache en memoria para artículos disponibles (evita table scan en cada apertura del selector)
+const _articulosCache = new Map();
+const ARTICULOS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+
+function _invalidarCacheArticulos(sedeId = null) {
+  if (sedeId) {
+    for (const key of _articulosCache.keys()) {
+      if (key.startsWith(`${sedeId}:`)) _articulosCache.delete(key);
+    }
+  } else {
+    _articulosCache.clear();
+  }
+}
+
 class RemitoController {
   /**
    * POST /remitos
@@ -26,6 +40,9 @@ class RemitoController {
       });
 
       const remito = await remitoService.crear(datosNueva, usuarioEmail, { usuarioId });
+
+      // Invalidar cache de artículos disponibles (los artículos pasan a estado en_uso/en_prestamo)
+      _invalidarCacheArticulos(datosNueva.sede_origen_id);
 
       return success(res, remito, `Remito ${remito.numero_remito} creado exitosamente`, 201);
     } catch (err) {
@@ -298,6 +315,9 @@ class RemitoController {
         }
       );
 
+      // Invalidar cache de artículos disponibles (artículos devueltos vuelven a estar disponibles)
+      _invalidarCacheArticulos();
+
       return success(res, resultado, 'Devolución procesada exitosamente');
     } catch (err) {
       logger.error('Error procesando devolución:', err);
@@ -323,7 +343,14 @@ class RemitoController {
         return error(res, 'La sede es requerida', 400);
       }
 
-      logger.info('Obteniendo artículos disponibles:', {
+      const cacheKey = `${sede_id}:${tipo_articulo_id || 'all'}:${page}:${limit}`;
+      const cached = _articulosCache.get(cacheKey);
+      if (cached && Date.now() < cached.expires) {
+        logger.info('Artículos disponibles desde cache:', { cacheKey });
+        return success(res, cached.data, 'Artículos disponibles obtenidos correctamente');
+      }
+
+      logger.info('Obteniendo artículos disponibles (DB):', {
         tipoArticuloId: tipo_articulo_id,
         sedeId: sede_id,
         page,
@@ -358,7 +385,7 @@ class RemitoController {
         subQuery: false
       });
 
-      return success(res, {
+      const responseData = {
         rows,
         total: count,
         pagination: {
@@ -367,7 +394,11 @@ class RemitoController {
           total: count,
           pages: Math.ceil(count / parseInt(limit))
         }
-      }, 'Artículos disponibles obtenidos correctamente');
+      };
+
+      _articulosCache.set(cacheKey, { data: responseData, expires: Date.now() + ARTICULOS_CACHE_TTL_MS });
+
+      return success(res, responseData, 'Artículos disponibles obtenidos correctamente');
     } catch (err) {
       logger.error('Error obteniendo artículos disponibles:', err);
       return error(res, 'Error al obtener artículos', 500);

@@ -18,6 +18,7 @@ import emailService from '../../../shared/services/emailService.js';
 import tokenService from '../../../shared/services/tokenService.js';
 import CommonValidators from '../../../shared/validators/commonValidators.js';
 import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
+import AuditService from '../../../shared/services/auditService.js';
 
 /**
  * Servicio de gestión de remitos
@@ -1061,6 +1062,18 @@ class RemitoService {
               },
               { where: { id: detalle.inventario_id }, transaction }
             );
+
+            // Auditoría individual por artículo devuelto (inventario module)
+            await AuditService.registrarAccion({
+              usuario_email: usuarioEmail,
+              modulo: 'inventario',
+              accion: 'devolver_prestamo',
+              recurso: 'Inventario',
+              recurso_id: detalle.inventario_id,
+              descripcion: `Artículo devuelto via remito ${remito.numero_remito}`,
+              valores_anteriores: { estado: 'en_prestamo', sede_id: remito.sede_destino_id },
+              valores_nuevos: { estado: 'disponible', sede_id: remito.sede_origen_id }
+            });
 
             // Marcar detalle como devuelto
             await detalle.update(

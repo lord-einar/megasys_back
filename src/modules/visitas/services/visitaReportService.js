@@ -427,8 +427,10 @@ class VisitaReportService {
         try {
             const where = this._construirFiltros(filtros);
 
+            const limite = parseInt(filtros.limit) || 2000;
             const visitas = await Visita.findAll({
                 where,
+                limit: limite,
                 include: [
                     {
                         model: VisitaInforme,
@@ -489,8 +491,10 @@ class VisitaReportService {
         try {
             const where = this._construirFiltros(filtros);
 
+            const limite = parseInt(filtros.limit) || 2000;
             const visitas = await Visita.findAll({
                 where,
+                limit: limite,
                 include: [
                     {
                         model: Sede,

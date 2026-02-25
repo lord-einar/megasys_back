@@ -1,7 +1,7 @@
 // src/modules/remitos/routes/index.js
 import express from 'express';
 import { authenticate } from '../../auth/middleware/authMiddleware.js';
-import { requireDatabaseRole } from '../../auth/middleware/roleMiddleware.js';
+import { requireDatabaseRole, requireRole } from '../../auth/middleware/roleMiddleware.js';
 import { publicEndpointLimiter } from '../../../shared/middleware/rateLimiter.js';
 import remitoController from '../controllers/remitoController.js';
 
@@ -103,9 +103,11 @@ router.get('/:id', remitoController.obtener.bind(remitoController));
  * PATCH /remitos/:id/estado
  * Cambiar estado del remito
  * Requiere: Rol "Infraestructura" O ser el técnico asignado al remito
+ * Mínimo: rol "support" (Soporte/Infraestructura) — la validación fina ocurre en el servicio
  */
 router.patch(
   '/:id/estado',
+  requireRole('support'),
   remitoController.cambiarEstado.bind(remitoController)
 );
 
@@ -134,9 +136,11 @@ router.post(
  * POST /remitos/:id/devolver
  * Generar remito de devolución automático
  * Requiere: Grupo "Infraestructura" (Super_admin) O ser el técnico asignado al remito
+ * Mínimo: rol "support" — la validación fina (super_admin o tecnico asignado) ocurre en el controller
  */
 router.post(
   '/:id/devolver',
+  requireRole('support'),
   remitoController.generarDevolucion.bind(remitoController)
 );
 
@@ -146,9 +150,11 @@ router.post(
  * Para cada artículo se puede elegir: devolver o extender préstamo
  * Body: { items: [{ detalle_id, accion: 'devolver'|'extender', nueva_fecha?: 'YYYY-MM-DD' }] }
  * Requiere: Grupo "Infraestructura" (Super_admin) O ser el técnico asignado al remito
+ * Mínimo: rol "support" — la validación fina (super_admin o tecnico asignado) ocurre en el controller
  */
 router.post(
   '/:id/procesar-devolucion',
+  requireRole('support'),
   remitoController.procesarDevolucion.bind(remitoController)
 );
 
@@ -166,11 +172,12 @@ router.post(
 /**
  * PATCH /remitos/:id/asignar-receptor
  * Asignar receptor alternativo para un remito en tránsito
- * Requiere: Autenticación (Infraestructura o Sistemas)
+ * Requiere: Grupo "Infraestructura" (super_admin)
  * Body: { receptor_nombre: string, receptor_email: string }
  */
 router.patch(
   '/:id/asignar-receptor',
+  requireRole('super_admin'),
   remitoController.asignarReceptor.bind(remitoController)
 );
 
