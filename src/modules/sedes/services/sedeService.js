@@ -1,5 +1,5 @@
 // src/modules/sedes/services/sedeService.js
-import { Sede, Personal, Inventario, Servicio, Empresa, sequelize, Remito, RemitoDetalle, TipoArticulo, SoporteNivel } from '../../../models/index.js';
+import { Sede, Personal, Inventario, Servicio, Empresa, sequelize, Remito, RemitoDetalle, TipoArticulo, Proveedor, TipoServicio, SoporteNivel } from '../../../models/index.js';
 import logger from '../../../shared/utils/logger.js';
 import { Op } from 'sequelize';
 
@@ -148,15 +148,20 @@ class SedeService {
             attributes: ['fecha_contratacion', 'fecha_vencimiento', 'activo']
           },
           include: [
-            'proveedor',
-            'tipoServicio',
             {
-              model: SoporteNivel,
-              as: 'nivelessoporte',
-              where: { activo: true },
-              required: false,
-              order: [['nivel', 'ASC']]
-            }
+              model: Proveedor,
+              as: 'proveedor',
+              attributes: ['id', 'empresa'],
+              include: [
+                {
+                  model: SoporteNivel,
+                  as: 'soporteNiveles',
+                  where: { activo: true },
+                  required: false
+                }
+              ]
+            },
+            'tipoServicio'
           ],
           required: false
         },
@@ -627,14 +632,20 @@ class SedeService {
     const servicios = await sede.getServicios({
       where: whereServicio,
       include: [
-        'proveedor',
-        'tipoServicio',
         {
-          model: SoporteNivel,
-          as: 'nivelessoporte',
-          where: { activo: true },
-          required: false
-        }
+          model: Proveedor,
+          as: 'proveedor',
+          attributes: ['id', 'empresa'],
+          include: [
+            {
+              model: SoporteNivel,
+              as: 'soporteNiveles',
+              where: { activo: true },
+              required: false
+            }
+          ]
+        },
+        'tipoServicio'
       ],
       joinTableAttributes: ['fecha_contratacion', 'fecha_vencimiento', 'activo']
     });

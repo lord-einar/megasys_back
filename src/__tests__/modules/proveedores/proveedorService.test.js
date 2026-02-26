@@ -41,6 +41,9 @@ await jest.unstable_mockModule(modelsPath, () => ({
   TipoServicio: {
     findAll: jest.fn()
   },
+  SoporteNivel: {
+    findAll: jest.fn()
+  },
   sequelize: mockSequelize
 }));
 
@@ -81,8 +84,8 @@ describe('ProveedorService', () => {
 
   describe('listar()', () => {
     const mockProveedores = [
-      { id: '1', empresa: 'Proveedor A', email: 'provA@test.com', activo: true },
-      { id: '2', empresa: 'Proveedor B', email: 'provB@test.com', activo: true }
+      { id: '1', empresa: 'Proveedor A', activo: true },
+      { id: '2', empresa: 'Proveedor B', activo: true }
     ];
 
     beforeEach(() => {
@@ -116,7 +119,7 @@ describe('ProveedorService', () => {
       );
     });
 
-    it('debe filtrar por búsqueda (search)', async () => {
+    it('debe filtrar por búsqueda (search) solo por empresa', async () => {
       await proveedorService.listar({ search: 'Proveedor A' });
 
       expect(Proveedor.findAndCountAll).toHaveBeenCalled();
@@ -161,11 +164,11 @@ describe('ProveedorService', () => {
     const mockProveedor = {
       id: 'uuid-prov',
       empresa: 'Proveedor Test',
-      email: 'test@prov.com',
       activo: true,
       ejecutivos: [],
       servicios: [],
-      toJSON: function() { return this; }
+      soporteNiveles: [],
+      toJSON: function () { return this; }
     };
 
     it('debe obtener proveedor con detalles completos', async () => {
@@ -194,11 +197,7 @@ describe('ProveedorService', () => {
   describe('crear()', () => {
     const datosNuevo = {
       empresa: 'Nuevo Proveedor',
-      email: 'nuevo@prov.com',
-      telefono: '1234567890',
-      direccion: 'Calle 123',
-      web: 'www.nuevo.com',
-      activo: true
+      direccion: 'Calle 123'
     };
 
     beforeEach(() => {
@@ -213,19 +212,24 @@ describe('ProveedorService', () => {
       });
     });
 
-    it('debe crear proveedor exitosamente', async () => {
+    it('debe crear proveedor exitosamente solo con empresa', async () => {
       const result = await proveedorService.crear(datosNuevo);
 
       expect(result).toBeDefined();
       expect(result.id).toBe('uuid-nuevo');
-      expect(Proveedor.create).toHaveBeenCalled();
+      expect(Proveedor.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          empresa: 'Nuevo Proveedor',
+          direccion: 'Calle 123'
+        }),
+        expect.any(Object)
+      );
     });
 
     it('debe normalizar strings (trim)', async () => {
       const datosConEspacios = {
-        ...datosNuevo,
         empresa: '  Nuevo Proveedor  ',
-        email: '  nuevo@prov.com  '
+        direccion: '  Calle 123  '
       };
 
       await proveedorService.crear(datosConEspacios);
@@ -233,19 +237,18 @@ describe('ProveedorService', () => {
       expect(Proveedor.create).toHaveBeenCalledWith(
         expect.objectContaining({
           empresa: 'Nuevo Proveedor',
-          email: 'nuevo@prov.com'
+          direccion: 'Calle 123'
         }),
         expect.any(Object)
       );
     });
 
-
-    it('debe manejar campos opcionales (email, telefono, web)', async () => {
-      const datosSinOpcionales = {
+    it('debe crear proveedor con solo empresa (sin dirección)', async () => {
+      const datosSinDireccion = {
         empresa: 'Proveedor Mínimo'
       };
 
-      await proveedorService.crear(datosSinOpcionales);
+      await proveedorService.crear(datosSinDireccion);
 
       expect(Proveedor.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -260,7 +263,7 @@ describe('ProveedorService', () => {
     const proveedorId = 'uuid-prov';
     const datosActualizacion = {
       empresa: 'Proveedor Actualizado',
-      email: 'actualizado@prov.com'
+      direccion: 'Nueva Dirección'
     };
 
     let mockProveedor;
@@ -269,7 +272,6 @@ describe('ProveedorService', () => {
       mockProveedor = {
         id: proveedorId,
         empresa: 'Proveedor Viejo',
-        email: 'viejo@prov.com',
         activo: true,
         update: jest.fn().mockResolvedValue(undefined)
       };
@@ -300,7 +302,7 @@ describe('ProveedorService', () => {
     it('debe normalizar strings (trim)', async () => {
       const datosConEspacios = {
         empresa: '  Proveedor Actualizado  ',
-        email: '  actualizado@prov.com  '
+        direccion: '  Nueva Dirección  '
       };
 
       await proveedorService.actualizar(proveedorId, datosConEspacios);
@@ -308,7 +310,7 @@ describe('ProveedorService', () => {
       expect(mockProveedor.update).toHaveBeenCalledWith(
         expect.objectContaining({
           empresa: 'Proveedor Actualizado',
-          email: 'actualizado@prov.com'
+          direccion: 'Nueva Dirección'
         }),
         expect.any(Object)
       );

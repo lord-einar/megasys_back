@@ -1,5 +1,5 @@
 // src/modules/proveedores/services/proveedorService.js
-import { Proveedor, EjecutivoCuentas, Servicio, TipoServicio, SoporteNivel, sequelize } from '../../../models/index.js';
+import { Proveedor, EjecutivoCuentas, Servicio, TipoServicio, SoporteNivel, Sede, Empresa, sequelize } from '../../../models/index.js';
 import logger from '../../../shared/utils/logger.js';
 import { Op } from 'sequelize';
 
@@ -20,8 +20,7 @@ class ProveedorService {
 
     if (search) {
       whereClause[Op.or] = [
-        { empresa: { [Op.iLike]: `%${search}%` } },
-        { email: { [Op.iLike]: `%${search}%` } }
+        { empresa: { [Op.iLike]: `%${search}%` } }
       ];
     }
 
@@ -42,7 +41,7 @@ class ProveedorService {
           as: 'ejecutivos',
           where: { activo: true },
           required: false,
-          attributes: ['id', 'nombre', 'email', 'telefono']
+          attributes: ['id', 'nombre', 'apellido', 'email', 'telefono']
         }
       ]
     });
@@ -90,13 +89,33 @@ class ProveedorService {
               attributes: ['id', 'nombre']
             },
             {
-              model: SoporteNivel,
-              as: 'nivelessoporte',
-              where: { activo: true },
-              required: false,
-              attributes: ['id', 'nivel', 'email', 'telefono', 'web', 'activo']
+              model: Sede,
+              as: 'sedesServicio',
+              attributes: ['id', 'nombre_sede'],
+              through: { attributes: [] },
+              include: [
+                {
+                  model: Empresa,
+                  as: 'empresa',
+                  attributes: ['id', 'nombre_empresa']
+                }
+              ]
             }
           ]
+        },
+        {
+          model: SoporteNivel,
+          as: 'soporteNiveles',
+          where: { activo: true },
+          required: false,
+          include: [
+            {
+              model: TipoServicio,
+              as: 'tipoServicio',
+              attributes: ['id', 'nombre']
+            }
+          ],
+          order: [['nivel', 'ASC']]
         }
       ]
     });
@@ -105,10 +124,10 @@ class ProveedorService {
   }
 
   /**
-   * Crear nuevo proveedor
+   * Crear nuevo proveedor (solo empresa y dirección opcional)
    */
   async crear(datosProveedor, options = {}) {
-    const { empresa, direccion, telefono, email } = datosProveedor;
+    const { empresa, direccion } = datosProveedor;
 
     // Verificar si ya existe
     const proveedorExistente = await Proveedor.findOne({
@@ -124,9 +143,7 @@ class ProveedorService {
 
     const nuevoProveedor = await Proveedor.create({
       empresa: empresa.trim(),
-      direccion: direccion?.trim(),
-      telefono: telefono?.trim(),
-      email: email?.trim()
+      direccion: direccion?.trim()
     }, options);
 
     logger.info('Nuevo proveedor creado:', {

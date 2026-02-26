@@ -26,25 +26,6 @@ const Proveedor = sequelize.define('Proveedor', {
     type: DataTypes.STRING(200),
     allowNull: true
   },
-  telefono: {
-    type: DataTypes.STRING(20),
-    allowNull: true,
-    validate: {
-      is: {
-        args: /^[\+]?[0-9\s\-\(\)]+$/,
-        msg: 'El formato del teléfono no es válido'
-      }
-    }
-  },
-  email: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-    validate: {
-      isEmail: {
-        msg: 'Debe ser un email válido'
-      }
-    }
-  },
   activo: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,

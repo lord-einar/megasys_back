@@ -1,5 +1,5 @@
 // src/modules/proveedores/services/servicioService.js
-import { Servicio, Proveedor, TipoServicio, SoporteNivel, EquipoServicio, Sede } from '../../../models/index.js';
+import { Servicio, Proveedor, TipoServicio, SoporteNivel, EquipoServicio, Sede, Empresa } from '../../../models/index.js';
 import logger from '../../../shared/utils/logger.js';
 import { Op } from 'sequelize';
 
@@ -43,6 +43,19 @@ class ServicioService {
           model: TipoServicio,
           as: 'tipoServicio',
           attributes: ['id', 'nombre']
+        },
+        {
+          model: Sede,
+          as: 'sedesServicio',
+          attributes: ['id', 'nombre_sede'],
+          through: { attributes: [] },
+          include: [
+            {
+              model: Empresa,
+              as: 'empresa',
+              attributes: ['id', 'nombre_empresa']
+            }
+          ]
         }
       ]
     });
@@ -64,17 +77,19 @@ class ServicioService {
       include: [
         {
           model: Proveedor,
-          as: 'proveedor'
+          as: 'proveedor',
+          include: [
+            {
+              model: SoporteNivel,
+              as: 'soporteNiveles',
+              where: { activo: true },
+              required: false
+            }
+          ]
         },
         {
           model: TipoServicio,
           as: 'tipoServicio'
-        },
-        {
-          model: SoporteNivel,
-          as: 'nivelessoporte',
-          where: { activo: true },
-          required: false
         },
         {
           model: EquipoServicio,

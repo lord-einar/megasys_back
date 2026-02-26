@@ -21,6 +21,8 @@ router.use(authenticate);
 
 // Validaciones comunes
 const validarUUID = [param('id').isUUID().withMessage('ID debe ser un UUID válido')];
+const validarProveedorUUID = [param('proveedorId').isUUID().withMessage('ID de proveedor debe ser un UUID válido')];
+const validarTipoServicioUUID = [param('tipoServicioId').isUUID().withMessage('ID de tipo de servicio debe ser un UUID válido')];
 
 // =====================================================
 // RUTAS ESPECÍFICAS (DEBEN IR ANTES DE LAS GENÉRICAS)
@@ -188,38 +190,56 @@ router.delete('/servicios/:id',
 );
 
 // =====================================================
-// NIVELES DE SOPORTE
+// NIVELES DE SOPORTE (anidados bajo proveedor)
+// Ruta base: /:proveedorId/soporte
 // =====================================================
 
-router.get('/soporte-niveles',
+// Listar todos los niveles de soporte de un proveedor
+router.get('/:proveedorId/soporte',
   requirePermission('proveedores', 'read'),
+  validarProveedorUUID,
   [
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
-    query('search').optional().trim(),
-    query('activo').optional().isBoolean(),
-    query('servicio_id').optional({ nullable: true, checkFalsy: true }).isUUID()
+    query('activo').optional().isBoolean()
   ],
   validate,
-  soporteNivelController.listar
+  soporteNivelController.listarPorProveedor
 );
 
-router.get('/soporte-niveles/:id',
+// Obtener un nivel de soporte por ID (debe ir ANTES de /:tipoServicioId para evitar conflicto de rutas)
+router.get('/:proveedorId/soporte/nivel/:id',
   requirePermission('proveedores', 'read'),
+  validarProveedorUUID,
   validarUUID,
   validate,
   soporteNivelController.obtener
 );
 
-router.post('/soporte-niveles',
-  requirePermission('proveedores', 'create'),
+// Listar niveles de soporte de un proveedor para un tipo de servicio específico
+router.get('/:proveedorId/soporte/:tipoServicioId',
+  requirePermission('proveedores', 'read'),
+  validarProveedorUUID,
+  validarTipoServicioUUID,
   [
-    body('servicio_id').notEmpty().isUUID(),
+    query('page').optional().isInt({ min: 1 }),
+    query('limit').optional().isInt({ min: 1, max: 100 }),
+    query('activo').optional().isBoolean()
+  ],
+  validate,
+  soporteNivelController.listarPorProveedorYTipo
+);
+
+// Crear nivel de soporte para un proveedor + tipo de servicio
+router.post('/:proveedorId/soporte/:tipoServicioId',
+  requirePermission('proveedores', 'create'),
+  validarProveedorUUID,
+  validarTipoServicioUUID,
+  [
     body('nivel').notEmpty().isInt({ min: 1, max: 10 }),
     body('email').optional({ checkFalsy: true }).trim().isEmail().withMessage('Email debe ser válido'),
     body('telefono').optional({ checkFalsy: true }).trim(),
     body('web').optional({ checkFalsy: true }).trim().isURL().withMessage('Web debe ser una URL válida'),
-    // Validación personalizada: al menos uno de los tres debe estar presente
     body().custom((value, { req }) => {
       const { email, telefono, web } = req.body;
       if (!email && !telefono && !web) {
@@ -232,18 +252,18 @@ router.post('/soporte-niveles',
   soporteNivelController.crear
 );
 
-router.put('/soporte-niveles/:id',
+// Actualizar nivel de soporte
+router.put('/:proveedorId/soporte/nivel/:id',
   requirePermission('proveedores', 'update'),
+  validarProveedorUUID,
   validarUUID,
   [
     body('nivel').optional().isInt({ min: 1, max: 10 }),
     body('email').optional({ checkFalsy: true }).trim().isEmail().withMessage('Email debe ser válido'),
     body('telefono').optional({ checkFalsy: true }).trim(),
     body('web').optional({ checkFalsy: true }).trim().isURL().withMessage('Web debe ser una URL válida'),
-    // Validación personalizada: al menos uno de los tres debe estar presente
     body().custom((value, { req }) => {
       const { email, telefono, web } = req.body;
-      // Si se están enviando estos campos, al menos uno debe tener valor
       if ((email !== undefined || telefono !== undefined || web !== undefined) && !email && !telefono && !web) {
         throw new Error('Debe proporcionar al menos un medio de contacto: email, teléfono o web');
       }
@@ -254,8 +274,10 @@ router.put('/soporte-niveles/:id',
   soporteNivelController.actualizar
 );
 
-router.delete('/soporte-niveles/:id',
+// Eliminar nivel de soporte (soft delete)
+router.delete('/:proveedorId/soporte/nivel/:id',
   requirePermission('proveedores', 'delete'),
+  validarProveedorUUID,
   validarUUID,
   validate,
   soporteNivelController.eliminar
@@ -417,9 +439,7 @@ router.post('/',
   requirePermission('proveedores', 'create'),
   [
     body('empresa').trim().notEmpty().isLength({ min: 2, max: 100 }),
-    body('direccion').optional().trim().isLength({ max: 200 }),
-    body('telefono').optional().trim().matches(/^[\+]?[0-9\s\-\(\)]+$/),
-    body('email').optional().trim().isEmail()
+    body('direccion').optional().trim().isLength({ max: 200 })
   ],
   validate,
   proveedorController.crear
@@ -431,8 +451,6 @@ router.put('/:id',
   [
     body('empresa').optional().trim().isLength({ min: 2, max: 100 }),
     body('direccion').optional().trim().isLength({ max: 200 }),
-    body('telefono').optional().trim().matches(/^[\+]?[0-9\s\-\(\)]+$/),
-    body('email').optional().trim().isEmail(),
     body('activo').optional().isBoolean()
   ],
   validate,

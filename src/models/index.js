@@ -191,14 +191,24 @@ Servicio.belongsTo(Proveedor, {
   as: 'proveedor'
 });
 
-// Relaciones Servicio -> SoporteNivel
-Servicio.hasMany(SoporteNivel, {
-  foreignKey: 'servicio_id',
-  as: 'nivelessoporte'
+// Relaciones Proveedor -> SoporteNivel
+Proveedor.hasMany(SoporteNivel, {
+  foreignKey: 'proveedor_id',
+  as: 'soporteNiveles'
 });
-SoporteNivel.belongsTo(Servicio, {
-  foreignKey: 'servicio_id',
-  as: 'servicio'
+SoporteNivel.belongsTo(Proveedor, {
+  foreignKey: 'proveedor_id',
+  as: 'proveedor'
+});
+
+// Relaciones TipoServicio -> SoporteNivel
+TipoServicio.hasMany(SoporteNivel, {
+  foreignKey: 'tipo_servicio_id',
+  as: 'soporteNiveles'
+});
+SoporteNivel.belongsTo(TipoServicio, {
+  foreignKey: 'tipo_servicio_id',
+  as: 'tipoServicio'
 });
 
 // Relaciones TipoServicio -> EjecutivoCuentas

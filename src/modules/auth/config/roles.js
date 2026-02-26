@@ -57,9 +57,9 @@ const PERMISSIONS = {
   // Permisos para Proveedores
   proveedores: {
     read: ['super_admin', 'helpdesk', 'support'],
-    create: ['super_admin'],
-    update: ['super_admin'],
-    delete: ['super_admin']
+    create: ['super_admin', 'helpdesk'],
+    update: ['super_admin', 'helpdesk'],
+    delete: ['super_admin', 'helpdesk']
   },
 
   // Permisos administrativos

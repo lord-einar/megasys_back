@@ -9,11 +9,19 @@ const SoporteNivel = sequelize.define('SoporteNivel', {
     primaryKey: true,
     defaultValue: () => uuidv4()
   },
-  servicio_id: {
+  proveedor_id: {
     type: DataTypes.UUID,
     allowNull: false,
     references: {
-      model: 'servicios',
+      model: 'proveedores',
+      key: 'id'
+    }
+  },
+  tipo_servicio_id: {
+    type: DataTypes.UUID,
+    allowNull: false,
+    references: {
+      model: 'tipos_servicio',
       key: 'id'
     }
   },
@@ -33,7 +41,7 @@ const SoporteNivel = sequelize.define('SoporteNivel', {
   },
   email: {
     type: DataTypes.STRING(100),
-    allowNull: false,
+    allowNull: true,
     validate: {
       isEmail: {
         msg: 'Debe ser un email válido'
@@ -69,7 +77,7 @@ const SoporteNivel = sequelize.define('SoporteNivel', {
   indexes: [
     {
       unique: true,
-      fields: ['servicio_id', 'nivel']
+      fields: ['proveedor_id', 'tipo_servicio_id', 'nivel']
     }
   ]
 });
