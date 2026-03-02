@@ -199,7 +199,13 @@ class VisitaReportService {
                 joinConditions.push("v.estado != 'cancelada'");
             }
 
-            const whereConditions = ['s.es_prueba = false'];
+            const whereConditions = [
+                's.es_prueba = false',
+                // Excluir sedes no cubiertas por el equipo técnico local
+                "s.provincia NOT IN ('Córdoba', 'Neuquén')",
+                "s.localidad NOT IN ('Rosario')",
+                "s.pais != 'Uruguay'"
+            ];
             if (filtros.sede_ids) {
                 whereConditions.push('s.id::text = :sede_id_filter');
                 replacements.sede_id_filter = Array.isArray(filtros.sede_ids)
