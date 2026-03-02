@@ -162,33 +162,71 @@ class VisitaReportService {
     }
 
     /**
-     * Obtener distribución de visitas por sede (excluir sedes de prueba)
+     * Obtener distribución de visitas por sede (incluye sedes con 0 visitas)
+     * Usa LEFT JOIN desde sedes para mostrar todas, aunque no tengan visitas.
+     * Los filtros van en la cláusula ON del JOIN para que las sedes sin visitas
+     * matching sigan apareciendo con count=0.
      */
     async obtenerDistribucionPorSede(filtros = {}) {
         try {
-            const where = this._construirFiltros(filtros);
+            const hoy = new Date();
+            hoy.setHours(23, 59, 59, 999);
 
-            const resultado = await Visita.findAll({
-                attributes: [
-                    [sequelize.fn('COUNT', sequelize.col('Visita.id')), 'count']
-                ],
-                where,
-                include: [{
-                    model: Sede,
-                    as: 'sedePrincipal',
-                    attributes: ['id', 'nombre_sede'],
-                    where: { es_prueba: false },
-                    required: true
-                }],
-                group: ['sedePrincipal.id', 'sedePrincipal.nombre_sede'],
-                order: [[sequelize.fn('COUNT', sequelize.col('Visita.id')), 'DESC']],
-                raw: true
+            const joinConditions = ['v.sede_id = s.id', 'v.fecha <= :hoy'];
+            const replacements = { hoy };
+
+            if (filtros.fecha_desde) {
+                joinConditions.push('v.fecha >= :fecha_desde');
+                replacements.fecha_desde = filtros.fecha_desde;
+            }
+            if (filtros.fecha_hasta) {
+                joinConditions.push('v.fecha <= :fecha_hasta');
+                replacements.fecha_hasta = filtros.fecha_hasta;
+            }
+            if (filtros.tecnico_ids) {
+                joinConditions.push('v.tecnico_asignado_id::text = :tecnico_id');
+                replacements.tecnico_id = Array.isArray(filtros.tecnico_ids)
+                    ? filtros.tecnico_ids[0] : filtros.tecnico_ids;
+            }
+            if (filtros.tipo) {
+                joinConditions.push('v.tipo = :tipo');
+                replacements.tipo = filtros.tipo;
+            }
+            if (filtros.estado) {
+                joinConditions.push('v.estado = :estado');
+                replacements.estado = filtros.estado;
+            } else {
+                joinConditions.push("v.estado != 'cancelada'");
+            }
+
+            const whereConditions = ['s.es_prueba = false'];
+            if (filtros.sede_ids) {
+                whereConditions.push('s.id::text = :sede_id_filter');
+                replacements.sede_id_filter = Array.isArray(filtros.sede_ids)
+                    ? filtros.sede_ids[0] : filtros.sede_ids;
+            }
+
+            const sql = `
+                SELECT
+                    s.id   AS sede_id,
+                    s.nombre_sede,
+                    COUNT(v.id) AS count
+                FROM sedes s
+                LEFT JOIN visitas v ON (${joinConditions.join(' AND ')})
+                WHERE ${whereConditions.join(' AND ')}
+                GROUP BY s.id, s.nombre_sede
+                ORDER BY COUNT(v.id) DESC, s.nombre_sede ASC
+            `;
+
+            const resultado = await sequelize.query(sql, {
+                replacements,
+                type: sequelize.QueryTypes.SELECT
             });
 
             return resultado.map(r => ({
-                name: r['sedePrincipal.nombre_sede'],
+                name: r.nombre_sede,
                 value: parseInt(r.count),
-                sede_id: r['sedePrincipal.id']
+                sede_id: r.sede_id
             }));
         } catch (error) {
             logger.error('Error obteniendo distribución por sede:', error);
