@@ -129,16 +129,17 @@ class ProveedorService {
   async crear(datosProveedor, options = {}) {
     const { empresa, direccion } = datosProveedor;
 
-    // Verificar si ya existe
+    // Verificar si ya existe (activo o inactivo)
     const proveedorExistente = await Proveedor.findOne({
-      where: {
-        empresa: empresa.trim()
-      },
+      where: { empresa: empresa.trim() },
       ...options
     });
 
     if (proveedorExistente) {
-      throw new Error('Ya existe un proveedor con este nombre de empresa');
+      if (!proveedorExistente.activo) {
+        throw new Error('Este proveedor existe pero está inactivo. Puede reactivarlo desde el listado de proveedores.');
+      }
+      throw new Error('Ya existe un proveedor activo con este nombre de empresa');
     }
 
     const nuevoProveedor = await Proveedor.create({
