@@ -204,7 +204,8 @@ class VisitaReportService {
                 // Excluir sedes no cubiertas por el equipo técnico local
                 "s.provincia NOT IN ('Córdoba', 'Neuquén')",
                 "s.localidad NOT IN ('Rosario')",
-                "s.pais != 'Uruguay'"
+                "s.pais != 'Uruguay'",
+                "s.nombre_sede NOT IN ('Central', 'Depósito')"
             ];
             if (filtros.sede_ids) {
                 whereConditions.push('s.id::text = :sede_id_filter');
