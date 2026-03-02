@@ -30,6 +30,7 @@ class ServicioService {
 
     const { count, rows } = await Servicio.findAndCountAll({
       where: whereClause,
+      distinct: true,
       limit: parseInt(limit),
       offset,
       order: [['nombre', 'ASC']],
