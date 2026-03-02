@@ -1,5 +1,6 @@
 // src/shared/middleware/rateLimiter.js
 import rateLimit from 'express-rate-limit';
+import jwt from 'jsonwebtoken';
 import logger from '../utils/logger.js';
 
 /**
@@ -8,21 +9,15 @@ import logger from '../utils/logger.js';
  */
 const getClientIp = (req) => {
   try {
-    // Intentar obtener de X-Forwarded-For (puede ser una lista)
     const xForwardedFor = req.get('x-forwarded-for');
     if (xForwardedFor) {
-      // Tomar la primera IP de la lista y eliminar puerto si existe
       const ip = xForwardedFor.split(',')[0].trim();
       return ip.split(':')[0];
     }
-
-    // Intentar obtener de X-Real-IP
     const xRealIp = req.get('x-real-ip');
     if (xRealIp) {
       return xRealIp.split(':')[0];
     }
-
-    // Fallback a req.ip
     const reqIp = req.ip || 'unknown';
     return reqIp.split(':')[0];
   } catch (error) {
@@ -32,28 +27,39 @@ const getClientIp = (req) => {
 };
 
 /**
- * Rate limiter general - para la mayoría de rutas autenticadas
+ * Extrae el identificador de usuario del JWT para limitar por usuario en vez de por IP.
+ * Se decodifica sin verificar (la verificación real ocurre en authMiddleware).
+ * Fallback a IP si no hay token válido (rutas públicas).
+ */
+const getUserKey = (req) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      const decoded = jwt.decode(authHeader.substring(7));
+      const userId = decoded?.preferred_username || decoded?.email || decoded?.sub;
+      if (userId) return `user:${userId}`;
+    } catch { /* fall through */ }
+  }
+  return `ip:${getClientIp(req)}`;
+};
+
+/**
+ * Rate limiter general - para la mayoría de rutas autenticadas.
+ * Limita por usuario (extraído del JWT) para evitar que usuarios en la misma
+ * red corporativa (misma IP pública) compartan el límite entre sí.
  */
 export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: process.env.NODE_ENV === 'development' ? 1000 : 100, // desarrollo: 1000, producción: 100
-  message: {
-    success: false,
-    message: 'Demasiadas peticiones desde esta IP, intenta de nuevo en 15 minutos.',
-    timestamp: new Date().toISOString()
-  },
+  max: process.env.NODE_ENV === 'development' ? 2000 : 500,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req, res) => {
-    // Usar la función para extraer IP limpia
-    return getClientIp(req);
-  },
+  keyGenerator: getUserKey,
   handler: (req, res) => {
-    const clientIp = getClientIp(req);
-    logger.warn(`Rate limit general excedido para IP: ${clientIp} en ruta: ${req.path}`);
+    const key = getUserKey(req);
+    logger.warn(`Rate limit general excedido para ${key} en ruta: ${req.path}`);
     res.status(429).json({
       success: false,
-      message: 'Demasiadas peticiones desde esta IP, intenta de nuevo en 15 minutos.',
+      message: 'Demasiadas peticiones, intenta de nuevo en 15 minutos.',
       timestamp: new Date().toISOString()
     });
   }
