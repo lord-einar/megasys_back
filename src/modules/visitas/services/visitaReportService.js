@@ -564,6 +564,16 @@ class VisitaReportService {
                 this.obtenerListaVisitas(filtros)
             ]);
 
+            // Agregar casos cerrados por sede a partir de la lista ya filtrada
+            const casosPorSedeMap = {};
+            listaCasos.forEach(caso => {
+                const nombre = caso.sede || 'Sin sede';
+                casosPorSedeMap[nombre] = (casosPorSedeMap[nombre] || 0) + 1;
+            });
+            const casosPorSede = Object.entries(casosPorSedeMap)
+                .map(([name, value]) => ({ name, value }))
+                .sort((a, b) => b.value - a.value);
+
             return {
                 metricas: estadisticasGenerales,
                 graficos: {
@@ -572,7 +582,8 @@ class VisitaReportService {
                     categorias: problemasCategorias,
                     problemasUsuario,
                     estados: distribucionEstados,
-                    tipos: distribucionTipos
+                    tipos: distribucionTipos,
+                    casosPorSede
                 },
                 casos: listaCasos,
                 visitas: listaVisitas
