@@ -67,6 +67,10 @@ const SoporteNivel = sequelize.define('SoporteNivel', {
       }
     }
   },
+  comentario: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
   activo: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,

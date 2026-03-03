@@ -240,6 +240,7 @@ router.post('/:proveedorId/soporte/:tipoServicioId',
     body('email').optional({ checkFalsy: true }).trim().isEmail().withMessage('Email debe ser válido'),
     body('telefono').optional({ checkFalsy: true }).trim(),
     body('web').optional({ checkFalsy: true }).trim().isURL().withMessage('Web debe ser una URL válida'),
+    body('comentario').optional({ checkFalsy: true }).trim(),
     body().custom((value, { req }) => {
       const { email, telefono, web } = req.body;
       if (!email && !telefono && !web) {
@@ -262,6 +263,7 @@ router.put('/:proveedorId/soporte/nivel/:id',
     body('email').optional({ checkFalsy: true }).trim().isEmail().withMessage('Email debe ser válido'),
     body('telefono').optional({ checkFalsy: true }).trim(),
     body('web').optional({ checkFalsy: true }).trim().isURL().withMessage('Web debe ser una URL válida'),
+    body('comentario').optional({ checkFalsy: true }).trim(),
     body().custom((value, { req }) => {
       const { email, telefono, web } = req.body;
       if ((email !== undefined || telefono !== undefined || web !== undefined) && !email && !telefono && !web) {
