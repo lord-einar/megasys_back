@@ -1,6 +1,7 @@
 import express from 'express';
 const router = express.Router();
 import visitaController from '../controllers/visitaController.js';
+import visitaImagenController, { uploadMiddleware } from '../controllers/visitaImagenController.js';
 import { authenticate } from '../../auth/middleware/authMiddleware.js';
 import { requireRole } from '../../auth/middleware/roleMiddleware.js';
 import { publicEndpointLimiter } from '../../../shared/middleware/rateLimiter.js';
@@ -94,5 +95,9 @@ router.post('/:id/realizada', requireRole('support'), validarMarcarRealizada, vi
 router.post('/:id/cancelar', requireRole('support'), validarCancelar, visitaController.cancelar);
 router.post('/:id/reprogramar', requireRole('support'), validarReprogramar, visitaController.reprogramar);
 router.post('/:id/aviso', requireRole('support'), param('id').isUUID(), validate, visitaController.enviarAviso);
+
+// Imágenes de visita
+router.post('/:id/imagenes', requireRole('support'), uploadMiddleware, visitaImagenController.subir);
+router.delete('/:id/imagenes/:imagenId', requireRole('support'), param('id').isUUID(), param('imagenId').isUUID(), validate, visitaImagenController.eliminar);
 
 export default router;

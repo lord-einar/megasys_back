@@ -254,6 +254,62 @@ class StorageService {
       throw error;
     }
   }
+
+  /**
+   * Sube una imagen a Cloudflare R2
+   * @param {Buffer} buffer - Buffer de la imagen
+   * @param {string} filename - Nombre con extensión (ej: 'uuid.jpg')
+   * @param {string} folder - Carpeta (ej: 'visitas/imagenes')
+   * @param {string} mimeType - MIME type de la imagen
+   * @returns {Promise<string>} URL pública del archivo
+   */
+  async uploadImage(buffer, filename, folder = 'visitas/imagenes', mimeType = 'image/jpeg') {
+    if (!this.enabled) {
+      throw new Error('Storage service no está habilitado. Verifica la configuración de R2.');
+    }
+
+    try {
+      const key = `${folder}/${filename}`;
+
+      const command = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+        Body: buffer,
+        ContentType: mimeType,
+        CacheControl: 'public, max-age=31536000',
+      });
+
+      await this.s3Client.send(command);
+
+      const url = this.publicUrl
+        ? `${this.publicUrl}/${key}`
+        : `https://${this.accountId}.r2.cloudflarestorage.com/${this.bucketName}/${key}`;
+
+      logger.info(`Imagen subida a R2: ${key}`, { size: buffer.length });
+      return url;
+    } catch (error) {
+      logger.error('Error subiendo imagen a R2:', { error: error.message, filename, folder });
+      throw error;
+    }
+  }
+
+  /**
+   * Elimina una imagen de R2
+   */
+  async deleteImage(filename, folder = 'visitas/imagenes') {
+    if (!this.enabled) return false;
+
+    try {
+      const key = `${folder}/${filename}`;
+      const command = new DeleteObjectCommand({ Bucket: this.bucketName, Key: key });
+      await this.s3Client.send(command);
+      logger.info(`Imagen eliminada de R2: ${key}`);
+      return true;
+    } catch (error) {
+      logger.error('Error eliminando imagen de R2:', { error: error.message, filename });
+      throw error;
+    }
+  }
 }
 
 export default new StorageService();

@@ -4,6 +4,7 @@ import {
     VisitaRecurrencia,
     VisitaSolicitudPrevia,
     VisitaInforme,
+    VisitaImagen,
     VisitaProblemaResuelto,
     VisitaChecklistItem,
     CategoriaProblema,
@@ -139,6 +140,11 @@ class VisitaService {
                                 model: Personal,
                                 as: 'editor',
                                 attributes: ['id', 'nombre', 'apellido', 'email']
+                            },
+                            {
+                                model: VisitaImagen,
+                                as: 'imagenes',
+                                order: [['createdAt', 'ASC']]
                             }
                         ]
                     }
