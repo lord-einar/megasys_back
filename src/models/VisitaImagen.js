@@ -40,7 +40,8 @@ const VisitaImagen = sequelize.define('VisitaImagen', {
     references: { model: 'personal', key: 'id' }
   }
 }, {
-  tableName: 'visita_imagenes'
+  tableName: 'visita_imagenes',
+  underscored: true
 });
 
 export default VisitaImagen;

@@ -40,11 +40,11 @@ module.exports = {
         references: { model: 'personal', key: 'id' },
         onDelete: 'SET NULL'
       },
-      createdAt: {
+      created_at: {
         type: Sequelize.DATE,
         allowNull: false
       },
-      updatedAt: {
+      updated_at: {
         type: Sequelize.DATE,
         allowNull: false
       }
