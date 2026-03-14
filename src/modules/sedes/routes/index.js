@@ -6,6 +6,7 @@ import validate from '../../../shared/middleware/validation.js';
 import { body, param, query } from 'express-validator';
 import sedeController from '../controllers/SedeController.js';
 import sedeAsignacionController from '../controllers/sedeAsignacionController.js';
+import sedeImagenController, { uploadMiddleware } from '../controllers/sedeImagenController.js';
 
 const router = express.Router();
 
@@ -434,6 +435,50 @@ router.get('/asignaciones/personal/:personalId',
   ],
   validate,
   sedeAsignacionController.obtenerSedesAsignadas
+);
+
+// =====================================================
+// RUTAS DE IMÁGENES DE SEDES
+// =====================================================
+
+/**
+ * @route   GET /api/sedes/:id/imagenes
+ * @desc    Listar imágenes de una sede
+ * @access  Private (Read permission)
+ */
+router.get('/:id/imagenes',
+  requirePermission('sedes', 'read'),
+  validarId,
+  validate,
+  sedeImagenController.listar
+);
+
+/**
+ * @route   POST /api/sedes/:id/imagenes
+ * @desc    Subir imagen a una sede
+ * @access  Private (Update permission - Soporte e Infraestructura)
+ */
+router.post('/:id/imagenes',
+  requirePermission('sedes', 'update'),
+  validarId,
+  validate,
+  uploadMiddleware,
+  sedeImagenController.subir
+);
+
+/**
+ * @route   DELETE /api/sedes/:id/imagenes/:imagenId
+ * @desc    Eliminar imagen de una sede
+ * @access  Private (Update permission - Soporte e Infraestructura)
+ */
+router.delete('/:id/imagenes/:imagenId',
+  requirePermission('sedes', 'update'),
+  [
+    param('id').isUUID().withMessage('ID de sede debe ser un UUID válido'),
+    param('imagenId').isUUID().withMessage('ID de imagen debe ser un UUID válido')
+  ],
+  validate,
+  sedeImagenController.eliminar
 );
 
 export default router;

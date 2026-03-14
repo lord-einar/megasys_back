@@ -29,6 +29,7 @@ import VisitaInforme from './VisitaInforme.js';
 import VisitaProblemaResuelto from './VisitaProblemaResuelto.js';
 import VisitaChecklistItem from './VisitaChecklistItem.js';
 import VisitaImagen from './VisitaImagen.js';
+import SedeImagen from './SedeImagen.js';
 import CategoriaProblema from './CategoriaProblema.js';
 import EquipoServicio from './EquipoServicio.js';
 import Reclamo from './Reclamo.js';
@@ -614,6 +615,20 @@ VisitaImagen.belongsTo(VisitaInforme, {
   foreignKey: 'informe_id',
   as: 'informe'
 });
+
+// Sede -> SedeImagen
+Sede.hasMany(SedeImagen, {
+  foreignKey: 'sede_id',
+  as: 'imagenes'
+});
+SedeImagen.belongsTo(Sede, {
+  foreignKey: 'sede_id',
+  as: 'sede'
+});
+SedeImagen.belongsTo(Personal, {
+  foreignKey: 'subido_por_id',
+  as: 'subidoPor'
+});
 VisitaProblemaResuelto.belongsTo(VisitaInforme, {
   foreignKey: 'informe_id',
   as: 'informe'
@@ -739,6 +754,7 @@ const models = {
   VisitaProblemaResuelto,
   VisitaChecklistItem,
   VisitaImagen,
+  SedeImagen,
   CategoriaProblema
 };
 
@@ -788,5 +804,6 @@ export {
   VisitaProblemaResuelto,
   VisitaChecklistItem,
   VisitaImagen,
+  SedeImagen,
   CategoriaProblema
 };
