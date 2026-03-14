@@ -36,7 +36,22 @@ class SedeImagenController {
         order: [['created_at', 'ASC']]
       });
 
-      return success(res, imagenes);
+      const imagenesConUrl = await Promise.all(
+        imagenes.map(async img => {
+          const plain = img.toJSON();
+          try {
+            plain.signed_url = await storageService.getSignedImageUrl(
+              img.filename,
+              `sedes/imagenes/${sedeId}`
+            );
+          } catch {
+            plain.signed_url = null;
+          }
+          return plain;
+        })
+      );
+
+      return success(res, imagenesConUrl);
     } catch (err) {
       logger.error('Error listando imágenes de sede:', err);
       return error(res, err.message || 'Error al obtener las imágenes', 500);
@@ -78,8 +93,13 @@ class SedeImagenController {
         subido_por_id: usuarioId
       });
 
+      let signed_url = null;
+      try {
+        signed_url = await storageService.getSignedImageUrl(filename, folder);
+      } catch { /* no bloquear si falla la firma */ }
+
       logger.info('Imagen de sede subida:', { sedeId, imagenId: imagen.id, filename });
-      return success(res, imagen, 201);
+      return success(res, { ...imagen.toJSON(), signed_url }, 201);
 
     } catch (err) {
       logger.error('Error subiendo imagen de sede:', err);

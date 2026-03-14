@@ -13,6 +13,7 @@ import {
     Rol,
     sequelize
 } from '../../../models/index.js';
+import storageService from '../../../shared/services/storageService.js';
 // Servicios
 import visitaEmailService from './emailService.js';
 import logger from '../../../shared/utils/logger.js';
@@ -152,7 +153,25 @@ class VisitaService {
             });
 
             if (!visita) throw new Error('Visita no encontrada');
-            return visita;
+
+            // Enriquecer imágenes del informe con URLs firmadas
+            const plain = visita.toJSON();
+            if (plain.informe?.imagenes?.length) {
+                plain.informe.imagenes = await Promise.all(
+                    plain.informe.imagenes.map(async img => {
+                        try {
+                            img.signed_url = await storageService.getSignedImageUrl(
+                                img.filename,
+                                `visitas/imagenes/${id}`
+                            );
+                        } catch {
+                            img.signed_url = null;
+                        }
+                        return img;
+                    })
+                );
+            }
+            return plain;
         } catch (error) {
             logger.error(`Error obteniendo visita ${id}:`, error);
             throw error;

@@ -72,8 +72,13 @@ class VisitaImagenController {
         subido_por_id: usuarioId
       });
 
+      let signed_url = null;
+      try {
+        signed_url = await storageService.getSignedImageUrl(filename, folder);
+      } catch { /* no bloquear si falla la firma */ }
+
       logger.info('Imagen de visita subida:', { visitaId, imagenId: imagen.id, filename });
-      return success(res, imagen, 201);
+      return success(res, { ...imagen.toJSON(), signed_url }, 201);
 
     } catch (err) {
       logger.error('Error subiendo imagen de visita:', err);

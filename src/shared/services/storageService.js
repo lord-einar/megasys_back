@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand, HeadObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import logger from '../utils/logger.js';
 
 class StorageService {
@@ -309,6 +310,19 @@ class StorageService {
       logger.error('Error eliminando imagen de R2:', { error: error.message, filename });
       throw error;
     }
+  }
+
+  /**
+   * Genera una URL firmada temporal para acceder a una imagen privada de R2.
+   * @param {string} filename - Nombre del archivo
+   * @param {string} folder - Carpeta (ej: 'sedes/imagenes/{sedeId}')
+   * @param {number} expiresIn - Segundos de validez (default 3600 = 1 hora)
+   */
+  async getSignedImageUrl(filename, folder, expiresIn = 3600) {
+    if (!this.enabled) throw new Error('Storage service no está habilitado.');
+    const key = `${folder}/${filename}`;
+    const command = new GetObjectCommand({ Bucket: this.bucketName, Key: key });
+    return getSignedUrl(this.s3Client, command, { expiresIn });
   }
 }
 
