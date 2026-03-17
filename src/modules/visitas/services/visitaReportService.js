@@ -347,55 +347,54 @@ class VisitaReportService {
         try {
             const where = this._construirFiltros(filtros);
 
-            const resultado = await VisitaProblemaResuelto.findAll({
-                where: { causado_por_usuario: true },
-                attributes: ['id', 'descripcion'],
-                include: [{
-                    model: VisitaInforme,
-                    as: 'informe',
-                    attributes: [],
-                    required: true,
-                    include: [{
-                        model: Visita,
-                        as: 'visita',
-                        where,
+            const visitas = await Visita.findAll({
+                where,
+                attributes: ['id', 'fecha'],
+                include: [
+                    {
+                        model: VisitaInforme,
+                        as: 'informe',
                         required: true,
-                        attributes: ['fecha'],
-                        include: [
-                            {
-                                model: Sede,
-                                as: 'sedePrincipal',
-                                where: { es_prueba: false },
-                                attributes: ['nombre_sede'],
-                                required: true
-                            },
-                            {
-                                model: Personal,
-                                as: 'tecnicoAsignado',
-                                attributes: ['nombre', 'apellido']
-                            }
-                        ]
-                    }]
-                }],
-                order: [[
-                    { model: VisitaInforme, as: 'informe' },
-                    { model: Visita, as: 'visita' },
-                    'fecha', 'DESC'
-                ]]
+                        attributes: ['id'],
+                        include: [{
+                            model: VisitaProblemaResuelto,
+                            as: 'problemasResueltos',
+                            required: true,
+                            where: { causado_por_usuario: true },
+                            attributes: ['descripcion']
+                        }]
+                    },
+                    {
+                        model: Sede,
+                        as: 'sedePrincipal',
+                        where: { es_prueba: false },
+                        attributes: ['nombre_sede'],
+                        required: true
+                    },
+                    {
+                        model: Personal,
+                        as: 'tecnicoAsignado',
+                        attributes: ['nombre', 'apellido']
+                    }
+                ],
+                order: [['fecha', 'DESC']]
             });
 
-            return resultado.map(r => {
-                const plain = r.toJSON();
-                const visita = plain.informe?.visita;
-                return {
-                    descripcion: plain.descripcion,
-                    fecha: visita?.fecha,
-                    sede: visita?.sedePrincipal?.nombre_sede || 'Sin sede',
-                    tecnico: visita?.tecnicoAsignado
-                        ? `${visita.tecnicoAsignado.nombre} ${visita.tecnicoAsignado.apellido}`
-                        : 'No asignado'
-                };
+            const resultado = [];
+            visitas.forEach(v => {
+                const plain = v.toJSON();
+                (plain.informe?.problemasResueltos || []).forEach(p => {
+                    resultado.push({
+                        descripcion: p.descripcion,
+                        fecha: plain.fecha,
+                        sede: plain.sedePrincipal?.nombre_sede || 'Sin sede',
+                        tecnico: plain.tecnicoAsignado
+                            ? `${plain.tecnicoAsignado.nombre} ${plain.tecnicoAsignado.apellido}`
+                            : 'No asignado'
+                    });
+                });
             });
+            return resultado;
         } catch (error) {
             logger.error('Error obteniendo detalle de problemas de usuario:', error);
             throw error;
