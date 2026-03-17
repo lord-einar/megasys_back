@@ -9,7 +9,8 @@ export const INVENTORY_STATES = {
   EN_USO: 'en_uso',
   EN_PRESTAMO: 'en_prestamo',
   MANTENIMIENTO: 'mantenimiento',
-  DADO_DE_BAJA: 'dado_de_baja'
+  DADO_DE_BAJA: 'dado_de_baja',
+  PRODUCTO_PROVEEDOR: 'producto_proveedor'
 };
 
 // Array de valores válidos para validación
@@ -21,7 +22,8 @@ export const STATE_DESCRIPTIONS = {
   [INVENTORY_STATES.EN_USO]: 'El artículo se encuentra en uso actualmente',
   [INVENTORY_STATES.EN_PRESTAMO]: 'El artículo está siendo prestado',
   [INVENTORY_STATES.MANTENIMIENTO]: 'El artículo está en mantenimiento',
-  [INVENTORY_STATES.DADO_DE_BAJA]: 'El artículo ha sido dado de baja'
+  [INVENTORY_STATES.DADO_DE_BAJA]: 'El artículo ha sido dado de baja',
+  [INVENTORY_STATES.PRODUCTO_PROVEEDOR]: 'Producto perteneciente a un proveedor'
 };
 
 // Transiciones permitidas entre estados (validación de lógica de negocio)
@@ -46,5 +48,10 @@ export const STATE_TRANSITIONS = {
     INVENTORY_STATES.DISPONIBLE,
     INVENTORY_STATES.DADO_DE_BAJA
   ],
-  [INVENTORY_STATES.DADO_DE_BAJA]: [] // No se puede salir de este estado
+  [INVENTORY_STATES.DADO_DE_BAJA]: [], // No se puede salir de este estado
+  [INVENTORY_STATES.PRODUCTO_PROVEEDOR]: [
+    INVENTORY_STATES.DISPONIBLE,
+    INVENTORY_STATES.EN_USO,
+    INVENTORY_STATES.DADO_DE_BAJA
+  ]
 };
