@@ -341,6 +341,68 @@ class VisitaReportService {
     }
 
     /**
+     * Obtener detalle de problemas causados por usuario (fecha, sede, descripcion)
+     */
+    async obtenerProblemasUsuarioDetalle(filtros = {}) {
+        try {
+            const where = this._construirFiltros(filtros);
+
+            const resultado = await VisitaProblemaResuelto.findAll({
+                where: { causado_por_usuario: true },
+                attributes: ['id', 'descripcion'],
+                include: [{
+                    model: VisitaInforme,
+                    as: 'informe',
+                    attributes: [],
+                    required: true,
+                    include: [{
+                        model: Visita,
+                        as: 'visita',
+                        where,
+                        required: true,
+                        attributes: ['fecha'],
+                        include: [
+                            {
+                                model: Sede,
+                                as: 'sedePrincipal',
+                                where: { es_prueba: false },
+                                attributes: ['nombre_sede'],
+                                required: true
+                            },
+                            {
+                                model: Personal,
+                                as: 'tecnicoAsignado',
+                                attributes: ['nombre', 'apellido']
+                            }
+                        ]
+                    }]
+                }],
+                order: [[
+                    { model: VisitaInforme, as: 'informe' },
+                    { model: Visita, as: 'visita' },
+                    'fecha', 'DESC'
+                ]]
+            });
+
+            return resultado.map(r => {
+                const plain = r.toJSON();
+                const visita = plain.informe?.visita;
+                return {
+                    descripcion: plain.descripcion,
+                    fecha: visita?.fecha,
+                    sede: visita?.sedePrincipal?.nombre_sede || 'Sin sede',
+                    tecnico: visita?.tecnicoAsignado
+                        ? `${visita.tecnicoAsignado.nombre} ${visita.tecnicoAsignado.apellido}`
+                        : 'No asignado'
+                };
+            });
+        } catch (error) {
+            logger.error('Error obteniendo detalle de problemas de usuario:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Obtener distribución de problemas causados por usuario (excluir sedes de prueba)
      */
     async obtenerProblemasUsuario(filtros = {}) {
@@ -593,6 +655,7 @@ class VisitaReportService {
                 distribucionTecnicos,
                 problemasCategorias,
                 problemasUsuario,
+                problemasUsuarioDetalle,
                 distribucionEstados,
                 distribucionTipos,
                 listaCasos,
@@ -603,6 +666,7 @@ class VisitaReportService {
                 this.obtenerDistribucionPorTecnico(filtros),
                 this.obtenerProblemasPorCategoria(filtros),
                 this.obtenerProblemasUsuario(filtros),
+                this.obtenerProblemasUsuarioDetalle(filtros),
                 this.obtenerDistribucionEstados(filtros),
                 this.obtenerDistribucionTipos(filtros),
                 this.obtenerListaCasosCerrados(filtros),
@@ -626,6 +690,7 @@ class VisitaReportService {
                     tecnicos: distribucionTecnicos,
                     categorias: problemasCategorias,
                     problemasUsuario,
+                    problemasUsuarioDetalle,
                     estados: distribucionEstados,
                     tipos: distribucionTipos,
                     casosPorSede
