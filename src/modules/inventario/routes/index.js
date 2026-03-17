@@ -75,7 +75,34 @@ const validarInventarioCreate = [
     .optional({ checkFalsy: true })
     .trim()
     .isLength({ max: 1000 })
-    .withMessage('Observaciones no pueden exceder 1000 caracteres')
+    .withMessage('Observaciones no pueden exceder 1000 caracteres'),
+
+  body('pulgadas')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ max: 20 })
+    .withMessage('Pulgadas no puede exceder 20 caracteres'),
+
+  body('tipo_conector')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ max: 255 })
+    .withMessage('Tipo de conector no puede exceder 255 caracteres'),
+
+  body('puertos_ethernet')
+    .optional({ checkFalsy: true })
+    .isInt({ min: 0 })
+    .withMessage('Puertos ethernet debe ser un número entero positivo'),
+
+  body('puertos_sfp')
+    .optional({ checkFalsy: true })
+    .isInt({ min: 0 })
+    .withMessage('Puertos SFP debe ser un número entero positivo'),
+
+  body('poe')
+    .optional()
+    .isBoolean()
+    .withMessage('PoE debe ser true o false')
 ];
 
 const validarInventarioUpdate = [
@@ -137,7 +164,34 @@ const validarInventarioUpdate = [
   body('activo')
     .optional()
     .isBoolean()
-    .withMessage('Activo debe ser true o false')
+    .withMessage('Activo debe ser true o false'),
+
+  body('pulgadas')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ max: 20 })
+    .withMessage('Pulgadas no puede exceder 20 caracteres'),
+
+  body('tipo_conector')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ max: 255 })
+    .withMessage('Tipo de conector no puede exceder 255 caracteres'),
+
+  body('puertos_ethernet')
+    .optional({ checkFalsy: true })
+    .isInt({ min: 0 })
+    .withMessage('Puertos ethernet debe ser un número entero positivo'),
+
+  body('puertos_sfp')
+    .optional({ checkFalsy: true })
+    .isInt({ min: 0 })
+    .withMessage('Puertos SFP debe ser un número entero positivo'),
+
+  body('poe')
+    .optional()
+    .isBoolean()
+    .withMessage('PoE debe ser true o false')
 ];
 
 const validarCambioEstado2025 = [

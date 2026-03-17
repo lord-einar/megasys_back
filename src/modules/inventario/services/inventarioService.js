@@ -255,7 +255,12 @@ class InventarioService {
       procesador,
       memoria,
       disco,
-      sistema_operativo
+      sistema_operativo,
+      pulgadas,
+      tipo_conector,
+      puertos_ethernet,
+      puertos_sfp,
+      poe
     } = datosNuevo;
 
     // Validaciones previas (fuera de la transacción)
@@ -278,7 +283,12 @@ class InventarioService {
       procesador: procesador?.trim(),
       memoria: memoria?.trim(),
       disco: disco?.trim(),
-      sistema_operativo: sistema_operativo?.trim()
+      sistema_operativo: sistema_operativo?.trim(),
+      pulgadas: pulgadas?.trim(),
+      tipo_conector: tipo_conector?.trim(),
+      puertos_ethernet,
+      puertos_sfp,
+      poe
     };
 
     // Ejecutar dentro de transacción con auditoría
@@ -300,6 +310,11 @@ class InventarioService {
           memoria: memoria?.trim(),
           disco: disco?.trim(),
           sistema_operativo: sistema_operativo?.trim(),
+          pulgadas: pulgadas?.trim(),
+          tipo_conector: tipo_conector?.trim(),
+          puertos_ethernet,
+          puertos_sfp,
+          poe,
           activo: true
         }, { transaction });
 
@@ -373,7 +388,12 @@ class InventarioService {
       procesador: item.procesador,
       memoria: item.memoria,
       disco: item.disco,
-      sistema_operativo: item.sistema_operativo
+      sistema_operativo: item.sistema_operativo,
+      pulgadas: item.pulgadas,
+      tipo_conector: item.tipo_conector,
+      puertos_ethernet: item.puertos_ethernet,
+      puertos_sfp: item.puertos_sfp,
+      poe: item.poe
     };
 
     // Validaciones previas (fuera de la transacción)

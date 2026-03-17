@@ -152,6 +152,29 @@ const Inventario = sequelize.define('Inventario', {
   sistema_operativo: {
     type: DataTypes.STRING(100),
     allowNull: true
+  },
+  // Monitor fields
+  pulgadas: {
+    type: DataTypes.STRING(20),
+    allowNull: true
+  },
+  tipo_conector: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  // Switch fields
+  puertos_ethernet: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  puertos_sfp: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  poe: {
+    type: DataTypes.BOOLEAN,
+    allowNull: true,
+    defaultValue: false
   }
 }, {
   tableName: 'inventario',
