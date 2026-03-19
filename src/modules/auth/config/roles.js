@@ -68,6 +68,11 @@ const PERMISSIONS = {
     user_management: ['super_admin'],
     audit_logs: ['super_admin', 'helpdesk'],
     reports: ['super_admin']
+  },
+
+  // Permisos para CRM (Dynamics 365)
+  crm: {
+    read: ['super_admin', 'helpdesk', 'support']
   }
 };
 

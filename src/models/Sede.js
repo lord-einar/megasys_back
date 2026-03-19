@@ -101,6 +101,12 @@ const Sede = sequelize.define('Sede', {
     defaultValue: false,
     allowNull: false,
     comment: 'Indica si la sede es de prueba (excluida de estadísticas y reportes)'
+  },
+  crm_account_id: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    defaultValue: null,
+    comment: 'ID de la cuenta en Dynamics 365 CRM vinculada a esta sede'
   }
 }, {
   tableName: 'sedes',

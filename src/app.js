@@ -172,6 +172,9 @@ const initializeRoutes = async () => {
   // Rutas de visitas (DESPUÉS de las rutas específicas)
   await loadRoutes('./modules/visitas/routes/index.js', '/api/visitas');
 
+  // Rutas de CRM (Dynamics 365)
+  await loadRoutes('./modules/crm/routes/index.js', '/api/crm');
+
   logger.info('✅ Todas las rutas han sido procesadas');
 };
 
