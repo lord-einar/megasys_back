@@ -84,6 +84,8 @@ const mapCaso = (incident) => ({
     modificadoEn: incident.modifiedon,
     resueltoEn: null,
     origen: incident['caseorigincode@OData.Community.Display.V1.FormattedValue'] ?? null,
+    estadoCierre: incident['new_estadodecierre@OData.Community.Display.V1.FormattedValue'] ?? incident.new_estadodecierre ?? null,
+    estadoCierreCodigo: incident.new_estadodecierre,
 });
 
 /**
@@ -108,6 +110,7 @@ const INCIDENT_SELECT = [
     'incidentid', 'title', 'description', 'statecode', 'statuscode', 'prioritycode',
     'casetypecode', 'ticketnumber', '_customerid_value', '_ownerid_value',
     '_new_areaaescalar_value', 'createdon', 'modifiedon', 'caseorigincode',
+    'new_estadodecierre',
 ].join(',');
 
 /**
@@ -116,7 +119,7 @@ const INCIDENT_SELECT = [
  * @param {object} paginacion - { page, limit }
  */
 const listarCasos = async (filtros = {}, paginacion = {}) => {
-    const { estado, prioridad, accountId, busqueda } = filtros;
+    const { estado, prioridad, accountId, busqueda, diasMinimos } = filtros;
     const { limit = 50 } = paginacion;
 
     const filters = [];
@@ -134,8 +137,20 @@ const listarCasos = async (filtros = {}, paginacion = {}) => {
     if (prioridad === 'normal') filters.push('prioritycode eq 2');
     if (prioridad === 'low') filters.push('prioritycode eq 3');
 
+    // Filtro por antigüedad mínima (casos creados hace más de X días)
+    if (diasMinimos && Number(diasMinimos) > 0) {
+        const fecha = new Date(Date.now() - Number(diasMinimos) * 24 * 60 * 60 * 1000);
+        const fechaISO = fecha.toISOString().split('T')[0];
+        filters.push(`createdon le ${fechaISO}`);
+    }
+
     if (accountId) filters.push(`_customerid_value eq '${accountId}'`);
     if (busqueda) filters.push(`contains(title,'${busqueda.replace(/'/g, "''")}')`);
+
+    // Si se pide solo casos con tareas abiertas, usamos enfoque diferente
+    if (filtros.soloConTareasAbiertas === 'true') {
+        return listarCasosConTareasAbiertas(filters, limit);
+    }
 
     let path = `/incidents?$select=${INCIDENT_SELECT}&$orderby=createdon desc&$top=${limit}`;
     if (filters.length > 0) path += `&$filter=${filters.join(' and ')}`;
@@ -158,14 +173,127 @@ const listarCasos = async (filtros = {}, paginacion = {}) => {
 };
 
 /**
- * Obtiene el detalle completo de un caso por ID.
+ * Obtiene el detalle completo de un caso por ID, incluyendo sus tareas.
  * @param {string} incidentId - GUID del incident
  */
 const obtenerCaso = async (incidentId) => {
     const path = `/incidents(${incidentId})?$select=${INCIDENT_SELECT}`;
     logger.info(`[CRM] obtenerCaso → ${incidentId}`);
     const data = await dataverseGet(path);
-    return mapCaso(data);
+    const caso = mapCaso(data);
+
+    // Obtener tareas asociadas al caso
+    try {
+        caso.tareas = await listarTareasPorCaso(incidentId);
+    } catch (err) {
+        logger.warn(`[CRM] No se pudieron cargar tareas del caso ${incidentId}:`, err.message);
+        caso.tareas = [];
+    }
+
+    return caso;
+};
+
+// ─── TAREAS (tasks) ──────────────────────────────────────────────────────────
+
+const TASK_SELECT = [
+    'activityid', 'subject', 'description', 'statecode', 'statuscode',
+    'scheduledend', 'createdon', 'modifiedon',
+    '_ownerid_value', '_regardingobjectid_value',
+].join(',');
+
+/**
+ * Convierte una task de Dataverse al formato de la app.
+ */
+const mapTarea = (task) => ({
+    id: task.activityid,
+    asunto: task.subject,
+    descripcion: task.description,
+    estadoCodigo: task.statecode, // 0=Abierta, 1=Completada, 2=Cancelada
+    estado: task['statecode@OData.Community.Display.V1.FormattedValue'] ?? task.statecode,
+    statusCode: task.statuscode,
+    statusLabel: task['statuscode@OData.Community.Display.V1.FormattedValue'] ?? task.statuscode,
+    vencimiento: task.scheduledend,
+    creadoEn: task.createdon,
+    modificadoEn: task.modifiedon,
+    asignadoA: task['_ownerid_value@OData.Community.Display.V1.FormattedValue'],
+});
+
+/**
+ * Lista las tareas asociadas a un caso (incident).
+ * @param {string} incidentId - GUID del incident
+ */
+const listarTareasPorCaso = async (incidentId) => {
+    const path = `/tasks?$select=${TASK_SELECT}&$filter=_regardingobjectid_value eq '${incidentId}'&$orderby=createdon desc&$top=50`;
+    logger.info(`[CRM] listarTareasPorCaso → ${incidentId}`);
+    const data = await dataverseGet(path);
+    return (data.value ?? []).map(mapTarea);
+};
+
+/**
+ * Lista casos que tienen al menos una tarea abierta (statecode=0).
+ * Trae todos los casos y luego filtra los que tienen tareas abiertas.
+ */
+const listarCasosConTareasAbiertas = async (incidentFilters, limit) => {
+    // 1. Traer los casos normalmente
+    let path = `/incidents?$select=${INCIDENT_SELECT}&$orderby=createdon desc&$top=${limit}`;
+    if (incidentFilters.length > 0) path += `&$filter=${incidentFilters.join(' and ')}`;
+
+    logger.info(`[CRM] listarCasosConTareasAbiertas`);
+    const data = await dataverseGet(path);
+    const todosCasos = (data.value ?? []).map(mapCaso);
+
+    if (todosCasos.length === 0) {
+        return { casos: [], pagination: { total: 0, page: 1, limit: Number(limit), totalPages: 1 } };
+    }
+
+    // 2. Traer tareas abiertas de esos casos (en lotes para no exceder URL)
+    const casoIds = todosCasos.map(c => c.id);
+    const tareasAbiertas = new Set();
+
+    // Procesar en lotes de 15 IDs
+    for (let i = 0; i < casoIds.length; i += 15) {
+        const lote = casoIds.slice(i, i + 15);
+        const idFilter = lote.map(id => `_regardingobjectid_value eq '${id}'`).join(' or ');
+        const taskPath = `/tasks?$select=activityid,_regardingobjectid_value&$filter=statecode eq 0 and (${idFilter})&$top=500`;
+        const taskData = await dataverseGet(taskPath);
+        (taskData.value ?? []).forEach(t => tareasAbiertas.add(t._regardingobjectid_value));
+    }
+
+    // 3. Filtrar solo casos que tienen tareas abiertas
+    const casos = todosCasos.filter(c => tareasAbiertas.has(c.id));
+
+    return {
+        casos,
+        pagination: { total: casos.length, page: 1, limit: Number(limit), totalPages: 1 },
+    };
+};
+
+/**
+ * DEBUG: Busca tareas de un caso probando distintas formas.
+ */
+const debugTareasPorCaso = async (incidentId) => {
+    // 1. Buscar tareas con regardingobjectid
+    const path1 = `/tasks?$select=activityid,subject,_regardingobjectid_value&$filter=_regardingobjectid_value eq '${incidentId}'&$top=5`;
+    const r1 = await dataverseGet(path1);
+
+    // 2. Buscar CUALQUIER tarea reciente para ver la estructura
+    const path2 = `/tasks?$select=activityid,subject,_regardingobjectid_value&$top=3&$orderby=createdon desc`;
+    const r2 = await dataverseGet(path2);
+
+    // 3. Buscar actividades del caso vía navigation property
+    let r3 = null;
+    try {
+        const path3 = `/incidents(${incidentId})/Incident_Tasks?$select=activityid,subject&$top=5`;
+        r3 = await dataverseGet(path3);
+    } catch (e) {
+        r3 = { error: e.message };
+    }
+
+    return {
+        filtroRegarding: { count: (r1.value ?? []).length, data: r1.value ?? [] },
+        tareasRecientes: { count: (r2.value ?? []).length, data: r2.value ?? [] },
+        navigationProperty: r3?.value ?? r3,
+    };
 };
 
 /**
@@ -232,4 +360,5 @@ export default {
     listarCasosPorSede,
     obtenerResumen,
     listarAccounts,
+    debugTareasPorCaso,
 };

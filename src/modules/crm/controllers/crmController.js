@@ -13,9 +13,9 @@ class CrmController {
      */
     async listarCasos(req, res) {
         try {
-            const { estado, prioridad, accountId, busqueda, page = 1, limit = 20 } = req.query;
+            const { estado, prioridad, accountId, busqueda, diasMinimos, incluirResueltos, soloConTareasAbiertas, page = 1, limit = 20 } = req.query;
             const resultado = await crmService.listarCasos(
-                { estado, prioridad, accountId, busqueda },
+                { estado, prioridad, accountId, busqueda, diasMinimos, incluirResueltos, soloConTareasAbiertas },
                 { page: parseInt(page), limit: parseInt(limit) }
             );
             return success(res, resultado);
@@ -46,10 +46,10 @@ class CrmController {
     async listarCasosPorSede(req, res) {
         try {
             const { accountId } = req.params;
-            const { page = 1, limit = 20, estado, prioridad } = req.query;
+            const { page = 1, limit = 20, estado, prioridad, incluirResueltos } = req.query;
             const resultado = await crmService.listarCasosPorSede(
                 accountId,
-                { estado, prioridad },
+                { estado, prioridad, incluirResueltos },
                 { page: parseInt(page), limit: parseInt(limit) }
             );
             return success(res, resultado);
