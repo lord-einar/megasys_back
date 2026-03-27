@@ -60,6 +60,49 @@ const dataverseGet = async (path) => {
     return data;
 };
 
+/**
+ * Ejecuta una petición PATCH a la Dataverse API.
+ * @param {string} path - Ruta relativa, ej: '/tasks(guid)'
+ * @param {object} body - Datos a enviar
+ * @returns {Promise<void>}
+ */
+const dataversePatch = async (path, body) => {
+    const baseUrl = `${DYNAMICS_URL}/api/data/${API_VERSION}`;
+
+    const doRequest = async () => {
+        const token = await crmAuthService.getAccessToken();
+        const res = await fetch(`${baseUrl}${path}`, {
+            method: 'PATCH',
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'OData-MaxVersion': '4.0',
+                'OData-Version': '4.0',
+                'Content-Type': 'application/json',
+                'If-Match': '*',
+            },
+            body: JSON.stringify(body),
+        });
+
+        if (res.status === 401) {
+            crmAuthService.invalidateToken();
+            return null;
+        }
+
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`Dataverse API error ${res.status}: ${text}`);
+        }
+
+        return true;
+    };
+
+    let result = await doRequest();
+    if (result === null) {
+        result = await doRequest();
+        if (result === null) throw new Error('No se pudo autenticar con Dynamics 365 (401)');
+    }
+};
+
 // ─── Mapeo de datos ───────────────────────────────────────────────────────────
 
 /**
@@ -145,7 +188,15 @@ const listarCasos = async (filtros = {}, paginacion = {}) => {
     }
 
     if (accountId) filters.push(`_customerid_value eq '${accountId}'`);
-    if (busqueda) filters.push(`contains(title,'${busqueda.replace(/'/g, "''")}')`);
+    if (busqueda) {
+        const escaped = busqueda.replace(/'/g, "''");
+        // Si parece un número de ticket (CAS-XXXXXX-...), buscar por ticketnumber exacto
+        if (/^CAS-/i.test(busqueda)) {
+            filters.push(`ticketnumber eq '${escaped}'`);
+        } else {
+            filters.push(`contains(title,'${escaped}')`);
+        }
+    }
 
     // Si se pide solo casos con tareas abiertas, usamos enfoque diferente
     if (filtros.soloConTareasAbiertas === 'true') {
@@ -216,6 +267,7 @@ const mapTarea = (task) => ({
     creadoEn: task.createdon,
     modificadoEn: task.modifiedon,
     asignadoA: task['_ownerid_value@OData.Community.Display.V1.FormattedValue'],
+    asignadoAId: task._ownerid_value,
 });
 
 /**
@@ -354,11 +406,102 @@ const listarAccounts = async (query = '') => {
     return (data.value ?? []).map(mapAccount);
 };
 
+// ─── OPERACIONES DE ESCRITURA ────────────────────────────────────────────────
+
+/**
+ * Ejecuta una petición POST a la Dataverse API.
+ * @param {string} path - Ruta relativa, ej: '/annotations'
+ * @param {object} body - Datos a enviar
+ * @returns {Promise<object|null>} Respuesta parseada o null si 204
+ */
+const dataversePost = async (path, body) => {
+    const baseUrl = `${DYNAMICS_URL}/api/data/${API_VERSION}`;
+
+    const doRequest = async () => {
+        const token = await crmAuthService.getAccessToken();
+        const res = await fetch(`${baseUrl}${path}`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'OData-MaxVersion': '4.0',
+                'OData-Version': '4.0',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+        });
+
+        if (res.status === 401) {
+            crmAuthService.invalidateToken();
+            return null;
+        }
+
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`Dataverse API error ${res.status}: ${text}`);
+        }
+
+        if (res.status === 204) return {};
+        return res.json();
+    };
+
+    let result = await doRequest();
+    if (result === null) {
+        result = await doRequest();
+        if (result === null) throw new Error('No se pudo autenticar con Dynamics 365 (401)');
+    }
+    return result;
+};
+
+/**
+ * Completa una tarea en Dynamics 365 (statecode=1, statuscode=5).
+ * @param {string} tareaId - GUID de la tarea (activityid)
+ * @returns {Promise<void>}
+ */
+const completarTarea = async (tareaId) => {
+    logger.info(`[CRM] completarTarea → ${tareaId}`);
+    await dataversePatch(`/tasks(${tareaId})`, {
+        statecode: 1,   // Completed
+        statuscode: 5,  // Completed
+    });
+};
+
+/**
+ * Cancela una tarea en Dynamics 365 (statecode=2, statuscode=6).
+ * @param {string} tareaId - GUID de la tarea (activityid)
+ * @returns {Promise<void>}
+ */
+const cancelarTarea = async (tareaId) => {
+    logger.info(`[CRM] cancelarTarea → ${tareaId}`);
+    await dataversePatch(`/tasks(${tareaId})`, {
+        statecode: 2,   // Cancelled
+        statuscode: 6,  // Cancelled
+    });
+};
+
+/**
+ * Agrega una nota (annotation) a una tarea en Dynamics 365.
+ * @param {string} tareaId - GUID de la tarea (activityid)
+ * @param {string} texto - Texto de la nota
+ * @param {string} [asunto] - Asunto de la nota
+ * @returns {Promise<void>}
+ */
+const agregarNotaTarea = async (tareaId, texto, asunto = 'Observación - MegaSys') => {
+    logger.info(`[CRM] agregarNotaTarea → ${tareaId}: ${asunto}`);
+    await dataversePost('/annotations', {
+        subject: asunto,
+        notetext: texto,
+        'objectid_task@odata.bind': `/tasks(${tareaId})`,
+    });
+};
+
 export default {
     listarCasos,
     obtenerCaso,
     listarCasosPorSede,
     obtenerResumen,
     listarAccounts,
+    completarTarea,
+    cancelarTarea,
+    agregarNotaTarea,
     debugTareasPorCaso,
 };

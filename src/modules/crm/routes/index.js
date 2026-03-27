@@ -21,6 +21,11 @@ router.get('/cuentas/:accountId/casos', crmController.listarCasosPorSede.bind(cr
 router.get('/casos', crmController.listarCasos.bind(crmController));
 router.get('/casos/:id', crmController.obtenerCaso.bind(crmController));
 
+// Tareas - operaciones de escritura
+router.patch('/tareas/:tareaId/completar', crmController.completarTarea.bind(crmController));
+router.patch('/tareas/:tareaId/cancelar', crmController.cancelarTarea.bind(crmController));
+router.post('/tareas/:tareaId/nota', crmController.agregarNotaTarea.bind(crmController));
+
 // Vincular/desvincular sede con cuenta CRM
 router.patch('/sedes/:sedeId/vincular', crmController.vincularSede.bind(crmController));
 router.delete('/sedes/:sedeId/vincular', crmController.desvincularSede.bind(crmController));

@@ -176,6 +176,29 @@ class VisitaEmailService {
             ${extraHTML}
           </div>
 
+          ${(informe.casos_crm_estado && informe.casos_crm_estado.length > 0) ? `
+          <div class="section">
+            <div class="section-title">📋 Tareas CRM</div>
+            <table style="width:100%; border-collapse: collapse; margin: 10px 0;">
+              <thead>
+                <tr style="background: #f1f5f9;">
+                  <th style="padding: 8px 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Caso / Tarea</th>
+                  <th style="padding: 8px 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Estado</th>
+                  <th style="padding: 8px 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Observación</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${informe.casos_crm_estado.map(c => `
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 12px;"><strong style="color: #2563eb;">${c.numeroCaso}</strong><br/><span style="font-size: 12px; color: #334155;">${c.tareaAsunto || c.titulo}</span></td>
+                    <td style="padding: 8px 12px;"><span style="padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; ${c.estado === 'realizado' ? 'background: #d1fae5; color: #065f46;' : c.estado === 'cancelada' ? 'background: #fee2e2; color: #991b1b;' : 'background: #fef3c7; color: #92400e;'}">${c.estado === 'realizado' ? 'Completada' : c.estado === 'cancelada' ? 'Cancelada' : 'Postergada'}</span></td>
+                    <td style="padding: 8px 12px; font-size: 13px; color: #475569;">${c.observacion || '-'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>` : ''}
+
           ${(informe.casos_resueltos && informe.casos_resueltos.length > 0) ? `
           <div class="section">
             <div class="section-title">🎫 Casos/Tickets Resueltos</div>

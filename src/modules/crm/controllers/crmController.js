@@ -46,10 +46,10 @@ class CrmController {
     async listarCasosPorSede(req, res) {
         try {
             const { accountId } = req.params;
-            const { page = 1, limit = 20, estado, prioridad, incluirResueltos } = req.query;
+            const { page = 1, limit = 20, estado, prioridad, incluirResueltos, soloConTareasAbiertas } = req.query;
             const resultado = await crmService.listarCasosPorSede(
                 accountId,
-                { estado, prioridad, incluirResueltos },
+                { estado, prioridad, incluirResueltos, soloConTareasAbiertas },
                 { page: parseInt(page), limit: parseInt(limit) }
             );
             return success(res, resultado);
@@ -139,6 +139,52 @@ class CrmController {
         } catch (err) {
             logger.error('[CRM] Error desvincularSede:', err);
             return error(res, err.message || 'Error desvinculando sede de CRM', 500);
+        }
+    }
+    /**
+     * PATCH /api/crm/tareas/:tareaId/completar
+     */
+    async completarTarea(req, res) {
+        try {
+            const { tareaId } = req.params;
+            await crmService.completarTarea(tareaId);
+            return success(res, { mensaje: 'Tarea completada exitosamente' });
+        } catch (err) {
+            logger.error('[CRM] Error completarTarea:', err);
+            return error(res, err.message || 'Error completando tarea en CRM', 500);
+        }
+    }
+
+    /**
+     * PATCH /api/crm/tareas/:tareaId/cancelar
+     */
+    async cancelarTarea(req, res) {
+        try {
+            const { tareaId } = req.params;
+            await crmService.cancelarTarea(tareaId);
+            return success(res, { mensaje: 'Tarea cancelada exitosamente' });
+        } catch (err) {
+            logger.error('[CRM] Error cancelarTarea:', err);
+            return error(res, err.message || 'Error cancelando tarea en CRM', 500);
+        }
+    }
+
+    /**
+     * POST /api/crm/tareas/:tareaId/nota
+     * Body: { texto, asunto? }
+     */
+    async agregarNotaTarea(req, res) {
+        try {
+            const { tareaId } = req.params;
+            const { texto, asunto } = req.body;
+            if (!texto || !texto.trim()) {
+                return error(res, 'El texto de la nota es requerido', 400);
+            }
+            await crmService.agregarNotaTarea(tareaId, texto.trim(), asunto);
+            return success(res, { mensaje: 'Nota agregada exitosamente' });
+        } catch (err) {
+            logger.error('[CRM] Error agregarNotaTarea:', err);
+            return error(res, err.message || 'Error agregando nota en CRM', 500);
         }
     }
 }

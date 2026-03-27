@@ -456,6 +456,7 @@ class VisitaService {
                         checklist_items: datosInforme.checklist_items,
                         checklist_extra: datosInforme.checklist_extra,
                         casos_resueltos: datosInforme.casos_resueltos,
+                        casos_crm_estado: datosInforme.casos_crm_estado || [],
                         observaciones: datosInforme.observaciones,
                         editado_por_id: usuarioId,
                         fecha_ultima_edicion: new Date(),
@@ -470,6 +471,7 @@ class VisitaService {
                         checklist_items: datosInforme.checklist_items,
                         checklist_extra: datosInforme.checklist_extra,
                         casos_resueltos: datosInforme.casos_resueltos,
+                        casos_crm_estado: datosInforme.casos_crm_estado || [],
                         observaciones: datosInforme.observaciones
                     }, { transaction });
                 }
@@ -582,6 +584,7 @@ class VisitaService {
             checklist_items: informe.checklist_items,
             checklist_extra: informe.checklist_extra,
             casos_resueltos: informe.casos_resueltos,
+            casos_crm_estado: informe.casos_crm_estado || [],
             observaciones: informe.observaciones,
             comentarios_responsable_sede: informe.comentarios_responsable_sede,
             problemasResueltos: datosInforme.problemas_resueltos || [],

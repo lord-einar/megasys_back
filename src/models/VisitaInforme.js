@@ -42,6 +42,12 @@ const VisitaInforme = sequelize.define('VisitaInforme', {
         defaultValue: [],
         comment: 'Array de IDs de casos resueltos'
     },
+    casos_crm_estado: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+        defaultValue: [],
+        comment: 'Estado de casos CRM vinculados: [{ numeroCaso, titulo, estado: "realizado"|"postergado", observacion }]'
+    },
     observaciones: {
         type: DataTypes.TEXT,
         allowNull: true
