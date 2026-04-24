@@ -143,7 +143,14 @@ class PersonalService {
         {
           model: Sede,
           as: 'sede',
-          attributes: ['id', 'nombre_sede', 'localidad', 'provincia']
+          attributes: ['id', 'nombre_sede', 'localidad', 'provincia', 'empresa_id'],
+          include: [
+            {
+              model: Empresa,
+              as: 'empresa',
+              attributes: ['id', 'nombre_empresa']
+            }
+          ]
         },
         {
           model: PersonalSede,

@@ -65,7 +65,9 @@ class PersonalController {
       if (!persona) {
         return error(res, 'Persona no encontrada', 404);
       }
-      success(res, persona, 'Persona obtenida correctamente');
+      const estadisticas = await personalService.calcularEstadisticasRemitos(persona);
+      const personaConStats = { ...persona.toJSON(), estadisticas };
+      success(res, personaConStats, 'Persona obtenida correctamente');
     } catch (err) {
       logger.error('Error en obtener personal:', err);
       error(res, err.message || 'Error al obtener la persona', 500);
