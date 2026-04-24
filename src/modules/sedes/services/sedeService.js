@@ -1,5 +1,5 @@
 // src/modules/sedes/services/sedeService.js
-import { Sede, Personal, Inventario, Servicio, Empresa, sequelize, Remito, RemitoDetalle, TipoArticulo, Proveedor, TipoServicio, SoporteNivel } from '../../../models/index.js';
+import { Sede, Personal, PersonalSede, Rol, Inventario, Servicio, Empresa, sequelize, Remito, RemitoDetalle, TipoArticulo, Proveedor, TipoServicio, SoporteNivel } from '../../../models/index.js';
 import logger from '../../../shared/utils/logger.js';
 import { Op } from 'sequelize';
 
@@ -142,6 +142,26 @@ class SedeService {
           required: false
         },
         {
+          model: PersonalSede,
+          as: 'personalAsignado',
+          where: { activo: true },
+          required: false,
+          include: [
+            {
+              model: Rol,
+              as: 'rol',
+              where: { nombre: 'Tecnico sede' },
+              required: true,
+              attributes: ['id', 'nombre']
+            },
+            {
+              model: Personal,
+              as: 'personal',
+              attributes: ['id', 'nombre', 'apellido', 'email', 'telefono']
+            }
+          ]
+        },
+        {
           model: Servicio,
           as: 'servicios',
           through: {
@@ -238,6 +258,7 @@ class SedeService {
 
     // Convertir a JSON y agregar prestamosEnSede
     const sedeJson = sede.toJSON();
+    sedeJson.tecnicoAsignado = sedeJson.personalAsignado?.[0]?.personal || null;
     sedeJson.prestamosEnSede = prestamosEnSede.map(detalle => ({
       inventario: detalle.inventarioDetalle,
       remito: {
