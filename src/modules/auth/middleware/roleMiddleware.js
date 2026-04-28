@@ -180,16 +180,52 @@ const requireDatabaseRole = (roleNames) => {
   };
 };
 
+/**
+ * Middleware para verificar que el usuario pertenezca a alguno de los
+ * grupos Azure indicados. Se usa en flujos donde la decisión depende
+ * del área (ej: solicitudes de compra: Infraestructura / RRHH / Compras),
+ * no de la jerarquía de roles.
+ * @param  {...string} groupNames - Nombres de grupos Azure permitidos
+ */
+const requireGroup = (...groupNames) => {
+  return (req, res, next) => {
+    try {
+      if (!req.user) {
+        return error(res, 'Usuario no autenticado', 401);
+      }
+
+      const groups = req.user.groups || [];
+      const hasAnyGroup = groupNames.some(group => roleService.hasGroup(groups, group));
+
+      if (!hasAnyGroup) {
+        logger.warn('Acceso denegado por grupo:', {
+          userId: req.user.id,
+          email: req.user.email,
+          gruposRequeridos: groupNames
+        });
+        return error(res, `Se requiere pertenecer a: ${groupNames.join(' / ')}`, 403);
+      }
+
+      next();
+    } catch (err) {
+      logger.error('Error en middleware de grupo:', err);
+      return error(res, 'Error al verificar grupo', 500);
+    }
+  };
+};
+
 export {
   requirePermission,
   requireRole,
   enrichUserWithRole,
-  requireDatabaseRole
+  requireDatabaseRole,
+  requireGroup
 };
 
 export default {
   requirePermission,
   requireRole,
   enrichUserWithRole,
-  requireDatabaseRole
+  requireDatabaseRole,
+  requireGroup
 };

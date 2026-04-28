@@ -144,7 +144,9 @@ class RoleService {
       assignedRole: this.getUserRole(azureGroups),
       hasInfraestructura: this.hasGroup(azureGroups, 'Infraestructura'),
       hasMesaAyuda: this.hasGroup(azureGroups, 'Mesa de ayuda'),
-      hasSoporte: this.hasGroup(azureGroups, 'Soporte')
+      hasSoporte: this.hasGroup(azureGroups, 'Soporte'),
+      hasRRHH: this.hasGroup(azureGroups, 'RRHH'),
+      hasCompras: this.hasGroup(azureGroups, 'Compras')
     };
 
     logger.info('📊 Análisis de grupos del usuario:', analysis);
