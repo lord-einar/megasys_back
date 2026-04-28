@@ -175,6 +175,9 @@ const initializeRoutes = async () => {
   // Rutas de CRM (Dynamics 365)
   await loadRoutes('./modules/crm/routes/index.js', '/api/crm');
 
+  // Rutas de asignaciones de inventario a personal
+  await loadRoutes('./modules/asignaciones/routes/index.js', '/api/asignaciones');
+
   logger.info('✅ Todas las rutas han sido procesadas');
 };
 

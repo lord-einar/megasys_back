@@ -34,6 +34,7 @@ import CategoriaProblema from './CategoriaProblema.js';
 import EquipoServicio from './EquipoServicio.js';
 import Reclamo from './Reclamo.js';
 import Garantia from './Garantia.js';
+import AsignacionInventario from './AsignacionInventario.js';
 
 // =====================================================
 // DEFINICIÓN DE RELACIONES
@@ -706,6 +707,27 @@ Remito.addHook('afterUpdate', async (remito, options) => {
 });
 
 // =====================================================
+// RELACIONES ASIGNACION INVENTARIO (Inventario <-> Personal)
+// =====================================================
+Personal.hasMany(AsignacionInventario, {
+  foreignKey: 'personal_id',
+  as: 'asignacionesInventario'
+});
+AsignacionInventario.belongsTo(Personal, {
+  foreignKey: 'personal_id',
+  as: 'personal'
+});
+
+Inventario.hasMany(AsignacionInventario, {
+  foreignKey: 'inventario_id',
+  as: 'asignaciones'
+});
+AsignacionInventario.belongsTo(Inventario, {
+  foreignKey: 'inventario_id',
+  as: 'inventario'
+});
+
+// =====================================================
 // EXPORTAR TODOS LOS MODELOS
 // =====================================================
 
@@ -755,7 +777,10 @@ const models = {
   VisitaChecklistItem,
   VisitaImagen,
   SedeImagen,
-  CategoriaProblema
+  CategoriaProblema,
+
+  // Asignaciones de inventario a personal
+  AsignacionInventario
 };
 
 // Agregar métodos de asociación globales
@@ -805,5 +830,6 @@ export {
   VisitaChecklistItem,
   VisitaImagen,
   SedeImagen,
-  CategoriaProblema
+  CategoriaProblema,
+  AsignacionInventario
 };
