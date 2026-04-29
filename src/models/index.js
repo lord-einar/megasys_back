@@ -35,6 +35,10 @@ import EquipoServicio from './EquipoServicio.js';
 import Reclamo from './Reclamo.js';
 import Garantia from './Garantia.js';
 import AsignacionInventario from './AsignacionInventario.js';
+import CatalogoEquipo from './CatalogoEquipo.js';
+import SolicitudCompra from './SolicitudCompra.js';
+import SolicitudCompraAdjunto from './SolicitudCompraAdjunto.js';
+import SolicitudCompraHistorial from './SolicitudCompraHistorial.js';
 
 // =====================================================
 // DEFINICIÓN DE RELACIONES
@@ -728,6 +732,90 @@ AsignacionInventario.belongsTo(Inventario, {
 });
 
 // =====================================================
+// RELACIONES SOLICITUDES DE COMPRA DE EQUIPOS
+// =====================================================
+
+// Catálogo de equipos
+CatalogoEquipo.hasMany(SolicitudCompra, {
+  foreignKey: 'infra_catalogo_equipo_id',
+  as: 'solicitudes'
+});
+SolicitudCompra.belongsTo(CatalogoEquipo, {
+  foreignKey: 'infra_catalogo_equipo_id',
+  as: 'catalogoEquipo'
+});
+
+// Personal -> Solicitudes (varios roles en la misma solicitud)
+SolicitudCompra.belongsTo(Personal, {
+  foreignKey: 'beneficiario_personal_id',
+  as: 'beneficiario'
+});
+SolicitudCompra.belongsTo(Personal, {
+  foreignKey: 'solicitante_personal_id',
+  as: 'solicitante'
+});
+SolicitudCompra.belongsTo(Personal, {
+  foreignKey: 'infra_aprobador_id',
+  as: 'infraAprobador'
+});
+SolicitudCompra.belongsTo(Personal, {
+  foreignKey: 'rrhh_aprobador_id',
+  as: 'rrhhAprobador'
+});
+SolicitudCompra.belongsTo(Personal, {
+  foreignKey: 'compras_responsable_id',
+  as: 'comprasResponsable'
+});
+SolicitudCompra.belongsTo(Personal, {
+  foreignKey: 'rechazo_por_id',
+  as: 'rechazadoPor'
+});
+SolicitudCompra.belongsTo(Personal, {
+  foreignKey: 'cancelado_por_id',
+  as: 'canceladoPor'
+});
+
+// Inventario -> Solicitud (equipo a reponer y equipo creado al cierre)
+SolicitudCompra.belongsTo(Inventario, {
+  foreignKey: 'inventario_actual_id',
+  as: 'inventarioActual'
+});
+SolicitudCompra.belongsTo(Inventario, {
+  foreignKey: 'inventario_creado_id',
+  as: 'inventarioCreado'
+});
+
+// Adjuntos
+SolicitudCompra.hasMany(SolicitudCompraAdjunto, {
+  foreignKey: 'solicitud_id',
+  as: 'adjuntos',
+  onDelete: 'CASCADE'
+});
+SolicitudCompraAdjunto.belongsTo(SolicitudCompra, {
+  foreignKey: 'solicitud_id',
+  as: 'solicitud'
+});
+SolicitudCompraAdjunto.belongsTo(Personal, {
+  foreignKey: 'subido_por_id',
+  as: 'subidoPor'
+});
+
+// Historial / timeline
+SolicitudCompra.hasMany(SolicitudCompraHistorial, {
+  foreignKey: 'solicitud_id',
+  as: 'historial',
+  onDelete: 'CASCADE'
+});
+SolicitudCompraHistorial.belongsTo(SolicitudCompra, {
+  foreignKey: 'solicitud_id',
+  as: 'solicitud'
+});
+SolicitudCompraHistorial.belongsTo(Personal, {
+  foreignKey: 'actor_personal_id',
+  as: 'actor'
+});
+
+// =====================================================
 // EXPORTAR TODOS LOS MODELOS
 // =====================================================
 
@@ -780,7 +868,13 @@ const models = {
   CategoriaProblema,
 
   // Asignaciones de inventario a personal
-  AsignacionInventario
+  AsignacionInventario,
+
+  // Solicitudes de compra de equipos
+  CatalogoEquipo,
+  SolicitudCompra,
+  SolicitudCompraAdjunto,
+  SolicitudCompraHistorial
 };
 
 // Agregar métodos de asociación globales
@@ -831,5 +925,9 @@ export {
   VisitaImagen,
   SedeImagen,
   CategoriaProblema,
-  AsignacionInventario
+  AsignacionInventario,
+  CatalogoEquipo,
+  SolicitudCompra,
+  SolicitudCompraAdjunto,
+  SolicitudCompraHistorial
 };
