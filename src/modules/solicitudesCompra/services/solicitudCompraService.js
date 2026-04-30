@@ -14,8 +14,14 @@ import {
 } from '../../../models/index.js';
 import logger from '../../../shared/utils/logger.js';
 
-// Estados terminales — no se pueden editar.
+// Estados terminales — no se pueden editar ni transicionar.
 const ESTADOS_TERMINALES = ['comprada', 'rechazada', 'cancelada'];
+
+// Mapeo tipo_equipo -> nombre del TipoArticulo en inventario
+const TIPO_EQUIPO_TO_TIPO_ARTICULO = {
+  celular: 'Celular',
+  notebook: 'Notebook'
+};
 
 // Campos del solicitante: si cambia alguno tras una aprobación, la solicitud
 // vuelve a 'pendiente_infra' y se limpian las aprobaciones previas.
@@ -355,6 +361,303 @@ class SolicitudCompraService {
         diff
       }, { transaction });
 
+      return solicitud;
+    });
+  }
+
+  /**
+   * Aprobación de Infraestructura. Solo desde estado 'pendiente_infra'.
+   * Requiere indicar el modelo del catálogo a comprar.
+   * Se permite auto-aprobación (el creador puede aprobar su propia solicitud).
+   */
+  async aprobarInfra(id, { catalogo_equipo_id, observacion }, contexto) {
+    if (!catalogo_equipo_id) throw new Error('Debe indicar el equipo del catálogo a comprar');
+
+    return sequelize.transaction(async (transaction) => {
+      const solicitud = await SolicitudCompra.findByPk(id, { transaction });
+      if (!solicitud) throw new Error('Solicitud no encontrada');
+      if (solicitud.estado !== 'pendiente_infra') {
+        throw new Error(`No se puede aprobar como Infraestructura desde el estado ${solicitud.estado}`);
+      }
+
+      // Validar catálogo: existe, activo y mismo tipo de equipo
+      const catalogo = await CatalogoEquipo.findByPk(catalogo_equipo_id, { transaction });
+      if (!catalogo) throw new Error('Equipo del catálogo no encontrado');
+      if (!catalogo.activo) throw new Error('El equipo del catálogo está inactivo');
+      if (catalogo.tipo !== solicitud.tipo_equipo) {
+        throw new Error(`El equipo del catálogo es ${catalogo.tipo} pero la solicitud es de ${solicitud.tipo_equipo}`);
+      }
+
+      const actor = await this.resolverPersonal(contexto.email);
+
+      solicitud.estado = 'aprobada_infra';
+      solicitud.infra_aprobador_id = actor.id;
+      solicitud.infra_fecha = new Date();
+      solicitud.infra_observacion = observacion || null;
+      solicitud.infra_catalogo_equipo_id = catalogo.id;
+      await solicitud.save({ transaction });
+
+      await SolicitudCompraHistorial.create({
+        solicitud_id: solicitud.id,
+        accion: 'aprobada_infra',
+        actor_personal_id: actor.id,
+        actor_grupo: 'infraestructura',
+        comentario: observacion || null,
+        diff: { catalogo_equipo: { marca: catalogo.marca, modelo: catalogo.modelo } }
+      }, { transaction });
+
+      logger.info('Solicitud aprobada por Infraestructura', {
+        id: solicitud.id, numero: solicitud.numero, aprobador: actor.email
+      });
+      return solicitud;
+    });
+  }
+
+  /**
+   * Aprobación de RRHH. Solo desde 'aprobada_infra'.
+   */
+  async aprobarRrhh(id, { observacion }, contexto) {
+    return sequelize.transaction(async (transaction) => {
+      const solicitud = await SolicitudCompra.findByPk(id, { transaction });
+      if (!solicitud) throw new Error('Solicitud no encontrada');
+      if (solicitud.estado !== 'aprobada_infra') {
+        throw new Error(`No se puede aprobar como RRHH desde el estado ${solicitud.estado}`);
+      }
+
+      const actor = await this.resolverPersonal(contexto.email);
+
+      solicitud.estado = 'aprobada_rrhh';
+      solicitud.rrhh_aprobador_id = actor.id;
+      solicitud.rrhh_fecha = new Date();
+      solicitud.rrhh_observacion = observacion || null;
+      await solicitud.save({ transaction });
+
+      await SolicitudCompraHistorial.create({
+        solicitud_id: solicitud.id,
+        accion: 'aprobada_rrhh',
+        actor_personal_id: actor.id,
+        actor_grupo: 'rrhh',
+        comentario: observacion || null
+      }, { transaction });
+
+      logger.info('Solicitud aprobada por RRHH', {
+        id: solicitud.id, numero: solicitud.numero, aprobador: actor.email
+      });
+      return solicitud;
+    });
+  }
+
+  /**
+   * Registrar la compra (cierre del flujo). Solo desde 'aprobada_rrhh'.
+   * Crea Inventario nuevo + AsignacionInventario al beneficiario en una transacción.
+   * Si la solicitud es de reposición, da de baja el equipo anterior y cierra
+   * su asignación activa.
+   */
+  async registrarCompra(id, payload, contexto) {
+    const {
+      numero_oc,
+      marca,
+      modelo,
+      numero_serie,
+      sede_id,
+      fecha_adquisicion,
+      valor_adquisicion,
+      observacion
+    } = payload;
+
+    if (!numero_oc) throw new Error('numero_oc es requerido');
+    if (!marca || !modelo) throw new Error('marca y modelo son requeridos');
+    if (!sede_id) throw new Error('sede_id es requerido');
+    if (!fecha_adquisicion) throw new Error('fecha_adquisicion es requerida');
+
+    return sequelize.transaction(async (transaction) => {
+      const solicitud = await SolicitudCompra.findByPk(id, { transaction });
+      if (!solicitud) throw new Error('Solicitud no encontrada');
+      if (solicitud.estado !== 'aprobada_rrhh') {
+        throw new Error(`No se puede registrar compra desde el estado ${solicitud.estado}`);
+      }
+
+      // Resolver TipoArticulo según tipo_equipo
+      const nombreTipo = TIPO_EQUIPO_TO_TIPO_ARTICULO[solicitud.tipo_equipo];
+      const tipoArticulo = await TipoArticulo.findOne({
+        where: { nombre: nombreTipo }, transaction
+      });
+      if (!tipoArticulo) {
+        throw new Error(`No se encuentra el tipo de artículo "${nombreTipo}" en el sistema`);
+      }
+
+      const actor = await this.resolverPersonal(contexto.email);
+      const hoy = new Date().toISOString().slice(0, 10);
+
+      // Si es reposición: dar de baja el equipo anterior y cerrar su asignación
+      if (solicitud.esReposicion() && solicitud.inventario_actual_id) {
+        const previo = await Inventario.findByPk(solicitud.inventario_actual_id, { transaction });
+        if (previo) {
+          previo.estado = 'dado_de_baja';
+          previo.activo = false;
+          await previo.save({ transaction });
+
+          const asignacionPrevia = await AsignacionInventario.findOne({
+            where: {
+              inventario_id: previo.id,
+              personal_id: solicitud.beneficiario_personal_id,
+              activo: true
+            },
+            transaction
+          });
+          if (asignacionPrevia) {
+            asignacionPrevia.activo = false;
+            asignacionPrevia.fecha_devolucion = hoy;
+            await asignacionPrevia.save({ transaction });
+          }
+        }
+      }
+
+      // Crear nuevo inventario
+      const beneficiario = await Personal.findByPk(solicitud.beneficiario_personal_id, { transaction });
+      const sedeDestino = sede_id || beneficiario?.sede_id;
+      if (!sedeDestino) {
+        throw new Error('No se pudo determinar la sede destino del nuevo equipo');
+      }
+
+      const nuevoInventario = await Inventario.create({
+        tipo_articulo_id: tipoArticulo.id,
+        marca,
+        modelo,
+        numero_serie: numero_serie || null,
+        sede_id: sedeDestino,
+        estado: 'en_uso',
+        activo: true,
+        fecha_adquisicion,
+        valor_adquisicion: valor_adquisicion || null,
+        observaciones: observacion || `Compra SC-${String(solicitud.numero).padStart(4, '0')} (OC ${numero_oc})`
+      }, { transaction });
+
+      // Asignar el equipo nuevo al beneficiario
+      await AsignacionInventario.create({
+        inventario_id: nuevoInventario.id,
+        personal_id: solicitud.beneficiario_personal_id,
+        fecha_asignacion: hoy,
+        motivo: `Solicitud SC-${String(solicitud.numero).padStart(4, '0')} (OC ${numero_oc})`,
+        activo: true
+      }, { transaction });
+
+      // Cerrar la solicitud
+      solicitud.estado = 'comprada';
+      solicitud.compras_responsable_id = actor.id;
+      solicitud.compras_fecha = new Date();
+      solicitud.compras_numero_oc = numero_oc;
+      solicitud.compras_observacion = observacion || null;
+      solicitud.inventario_creado_id = nuevoInventario.id;
+      await solicitud.save({ transaction });
+
+      await SolicitudCompraHistorial.create({
+        solicitud_id: solicitud.id,
+        accion: 'comprada',
+        actor_personal_id: actor.id,
+        actor_grupo: 'compras',
+        comentario: observacion || null,
+        diff: {
+          numero_oc,
+          inventario_creado_id: nuevoInventario.id,
+          marca, modelo, numero_serie: numero_serie || null
+        }
+      }, { transaction });
+
+      logger.info('Compra registrada', {
+        id: solicitud.id, numero: solicitud.numero,
+        oc: numero_oc, inventario: nuevoInventario.id, responsable: actor.email
+      });
+
+      return solicitud;
+    });
+  }
+
+  /**
+   * Rechazar solicitud. Solo grupos Infra (en pendiente_infra) y RRHH (en aprobada_infra).
+   * El motivo es obligatorio.
+   */
+  async rechazar(id, { motivo }, contexto) {
+    if (!motivo || !motivo.trim()) {
+      throw new Error('El motivo de rechazo es obligatorio');
+    }
+
+    return sequelize.transaction(async (transaction) => {
+      const solicitud = await SolicitudCompra.findByPk(id, { transaction });
+      if (!solicitud) throw new Error('Solicitud no encontrada');
+
+      const grupoActor = this.determinarSolicitanteGrupo(contexto.roleAnalysis);
+
+      // Quién puede rechazar en cada estado
+      if (solicitud.estado === 'pendiente_infra' && grupoActor !== 'infraestructura') {
+        throw new Error('Solo Infraestructura puede rechazar en este estado');
+      }
+      if (solicitud.estado === 'aprobada_infra' && grupoActor !== 'rrhh') {
+        throw new Error('Solo RRHH puede rechazar en este estado');
+      }
+      if (!['pendiente_infra', 'aprobada_infra'].includes(solicitud.estado)) {
+        throw new Error(`No se puede rechazar desde el estado ${solicitud.estado}`);
+      }
+
+      const actor = await this.resolverPersonal(contexto.email);
+
+      solicitud.estado = 'rechazada';
+      solicitud.rechazo_motivo = motivo.trim();
+      solicitud.rechazo_por_id = actor.id;
+      solicitud.rechazo_fecha = new Date();
+      await solicitud.save({ transaction });
+
+      await SolicitudCompraHistorial.create({
+        solicitud_id: solicitud.id,
+        accion: 'rechazada',
+        actor_personal_id: actor.id,
+        actor_grupo: grupoActor,
+        comentario: motivo.trim()
+      }, { transaction });
+
+      logger.info('Solicitud rechazada', {
+        id: solicitud.id, numero: solicitud.numero, por: actor.email, grupo: grupoActor
+      });
+      return solicitud;
+    });
+  }
+
+  /**
+   * Cancelar solicitud. Disponible para Infra/RRHH/Compras desde cualquier estado
+   * no terminal. Motivo obligatorio.
+   */
+  async cancelar(id, { motivo }, contexto) {
+    if (!motivo || !motivo.trim()) {
+      throw new Error('El motivo de cancelación es obligatorio');
+    }
+
+    return sequelize.transaction(async (transaction) => {
+      const solicitud = await SolicitudCompra.findByPk(id, { transaction });
+      if (!solicitud) throw new Error('Solicitud no encontrada');
+      if (ESTADOS_TERMINALES.includes(solicitud.estado)) {
+        throw new Error(`No se puede cancelar una solicitud en estado ${solicitud.estado}`);
+      }
+
+      const actor = await this.resolverPersonal(contexto.email);
+      const grupoActor = this.determinarSolicitanteGrupo(contexto.roleAnalysis);
+
+      solicitud.estado = 'cancelada';
+      solicitud.cancelacion_motivo = motivo.trim();
+      solicitud.cancelado_por_id = actor.id;
+      solicitud.cancelado_fecha = new Date();
+      await solicitud.save({ transaction });
+
+      await SolicitudCompraHistorial.create({
+        solicitud_id: solicitud.id,
+        accion: 'cancelada',
+        actor_personal_id: actor.id,
+        actor_grupo: grupoActor,
+        comentario: motivo.trim()
+      }, { transaction });
+
+      logger.info('Solicitud cancelada', {
+        id: solicitud.id, numero: solicitud.numero, por: actor.email, grupo: grupoActor
+      });
       return solicitud;
     });
   }

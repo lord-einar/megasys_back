@@ -68,6 +68,81 @@ class SolicitudCompraController {
       return error(res, err.message, 400);
     }
   };
+
+  aprobarInfra = async (req, res) => {
+    try {
+      const solicitud = await solicitudCompraService.aprobarInfra(
+        req.params.id,
+        req.body,
+        buildContexto(req)
+      );
+      const completa = await solicitudCompraService.obtener(solicitud.id);
+      return success(res, completa, 'Solicitud aprobada por Infraestructura');
+    } catch (err) {
+      logger.error('Error aprobando como Infraestructura:', err);
+      return error(res, err.message, 400);
+    }
+  };
+
+  aprobarRrhh = async (req, res) => {
+    try {
+      const solicitud = await solicitudCompraService.aprobarRrhh(
+        req.params.id,
+        req.body,
+        buildContexto(req)
+      );
+      const completa = await solicitudCompraService.obtener(solicitud.id);
+      return success(res, completa, 'Solicitud aprobada por RRHH');
+    } catch (err) {
+      logger.error('Error aprobando como RRHH:', err);
+      return error(res, err.message, 400);
+    }
+  };
+
+  registrarCompra = async (req, res) => {
+    try {
+      const solicitud = await solicitudCompraService.registrarCompra(
+        req.params.id,
+        req.body,
+        buildContexto(req)
+      );
+      const completa = await solicitudCompraService.obtener(solicitud.id);
+      return success(res, completa, 'Compra registrada correctamente');
+    } catch (err) {
+      logger.error('Error registrando compra:', err);
+      return error(res, err.message, 400);
+    }
+  };
+
+  rechazar = async (req, res) => {
+    try {
+      const solicitud = await solicitudCompraService.rechazar(
+        req.params.id,
+        req.body,
+        buildContexto(req)
+      );
+      const completa = await solicitudCompraService.obtener(solicitud.id);
+      return success(res, completa, 'Solicitud rechazada');
+    } catch (err) {
+      logger.error('Error rechazando solicitud:', err);
+      return error(res, err.message, 400);
+    }
+  };
+
+  cancelar = async (req, res) => {
+    try {
+      const solicitud = await solicitudCompraService.cancelar(
+        req.params.id,
+        req.body,
+        buildContexto(req)
+      );
+      const completa = await solicitudCompraService.obtener(solicitud.id);
+      return success(res, completa, 'Solicitud cancelada');
+    } catch (err) {
+      logger.error('Error cancelando solicitud:', err);
+      return error(res, err.message, 400);
+    }
+  };
 }
 
 export default new SolicitudCompraController();
