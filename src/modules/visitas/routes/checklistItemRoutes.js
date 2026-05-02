@@ -2,7 +2,7 @@
 import express from 'express';
 import checklistItemController from '../controllers/checklistItemController.js';
 import { authenticate } from '../../auth/middleware/authMiddleware.js';
-import { requireRole } from '../../auth/middleware/roleMiddleware.js';
+import { requireRole, requireLegacyAccess } from '../../auth/middleware/roleMiddleware.js';
 import { body, param } from 'express-validator';
 import validate from '../../../shared/middleware/validation.js';
 
@@ -42,6 +42,7 @@ const validarReordenar = [
 
 // Todas las rutas requieren autenticación
 router.use(authenticate);
+router.use(requireLegacyAccess);
 
 /**
  * GET /api/visitas/checklist-items

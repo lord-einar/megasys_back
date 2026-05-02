@@ -4,6 +4,8 @@ import authController from '../controllers/authController.js';
 import { authenticate } from '../middleware/authMiddleware.js';
 
 // Rutas de autenticación
+router.get('/dev-users', authController.devUsers);
+router.post('/dev-login', authController.devLogin);
 router.get('/login', authController.login);
 router.get('/callback', authController.callback);
 router.post('/logout', authController.logout);

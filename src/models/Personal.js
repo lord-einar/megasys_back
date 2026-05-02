@@ -85,7 +85,7 @@ const Personal = sequelize.define('Personal', {
     }
   },
   privilegio_app: {
-    type: DataTypes.ENUM('super_admin', 'helpdesk', 'support', 'user'),
+    type: DataTypes.ENUM('super_admin', 'helpdesk', 'support', 'rrhh', 'compras', 'user'),
     allowNull: true,
     defaultValue: 'user',
     comment: 'Privilegios de aplicación basados en grupos Azure AD'

@@ -1,7 +1,7 @@
 // src/modules/sedes/routes/index.js - COMPLETO
 import express from 'express';
 import { authenticate } from '../../auth/middleware/authMiddleware.js';
-import { requirePermission } from '../../auth/middleware/roleMiddleware.js';
+import { requirePermission, requireLegacyAccess } from '../../auth/middleware/roleMiddleware.js';
 import validate from '../../../shared/middleware/validation.js';
 import { body, param, query } from 'express-validator';
 import sedeController from '../controllers/SedeController.js';
@@ -12,6 +12,7 @@ const router = express.Router();
 
 // Todas las rutas requieren autenticación
 router.use(authenticate);
+router.use(requireLegacyAccess);
 
 // Validaciones comunes
 const validarId = [

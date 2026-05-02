@@ -3,6 +3,23 @@ import solicitudCompraService from '../services/solicitudCompraService.js';
 import roleService from '../../auth/services/roleService.js';
 import { success, error, paginated } from '../../../shared/utils/response.js';
 import logger from '../../../shared/utils/logger.js';
+import multer from 'multer';
+import path from 'path';
+import { randomUUID } from 'node:crypto';
+import { SolicitudCompraAdjunto, SolicitudCompraHistorial } from '../../../models/index.js';
+import storageService from '../../../shared/services/storageService.js';
+
+const MAX_ADJUNTO_MB = 8;
+const ALLOWED_MIME = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
+
+export const uploadAdjuntoMiddleware = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_ADJUNTO_MB * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_MIME.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Solo se permiten imágenes JPG/PNG/WEBP o PDF'));
+  }
+}).single('archivo');
 
 const buildContexto = (req) => ({
   email: req.user?.email,
@@ -10,6 +27,36 @@ const buildContexto = (req) => ({
 });
 
 class SolicitudCompraController {
+  lookupPersonal = async (req, res) => {
+    try {
+      const items = await solicitudCompraService.lookupPersonal(req.query);
+      return success(res, items);
+    } catch (err) {
+      logger.error('Error en lookup de personal para solicitudes de compra:', err);
+      return error(res, err.message || 'Error al obtener personal', 500);
+    }
+  };
+
+  lookupSedes = async (req, res) => {
+    try {
+      const items = await solicitudCompraService.lookupSedes(req.query);
+      return success(res, items);
+    } catch (err) {
+      logger.error('Error en lookup de sedes para solicitudes de compra:', err);
+      return error(res, err.message || 'Error al obtener sedes', 500);
+    }
+  };
+
+  lookupInventarioAsignado = async (req, res) => {
+    try {
+      const items = await solicitudCompraService.lookupInventarioAsignado(req.query);
+      return success(res, items);
+    } catch (err) {
+      logger.error('Error en lookup de inventario asignado para solicitudes de compra:', err);
+      return error(res, err.message || 'Error al obtener inventario asignado', 400);
+    }
+  };
+
   listar = async (req, res) => {
     try {
       const {
@@ -111,6 +158,83 @@ class SolicitudCompraController {
     } catch (err) {
       logger.error('Error registrando compra:', err);
       return error(res, err.message, 400);
+    }
+  };
+
+  actualizarEstadoCompra = async (req, res) => {
+    try {
+      const solicitud = await solicitudCompraService.actualizarEstadoCompra(
+        req.params.id,
+        req.body,
+        buildContexto(req)
+      );
+      const completa = await solicitudCompraService.obtener(solicitud.id);
+      return success(res, completa, 'Estado de compra actualizado');
+    } catch (err) {
+      logger.error('Error actualizando estado de compra:', err);
+      return error(res, err.message, 400);
+    }
+  };
+
+  finalizarSistemas = async (req, res) => {
+    try {
+      const solicitud = await solicitudCompraService.finalizarSistemas(
+        req.params.id,
+        req.body,
+        buildContexto(req)
+      );
+      const completa = await solicitudCompraService.obtener(solicitud.id);
+      return success(res, completa, 'Solicitud finalizada por Sistemas');
+    } catch (err) {
+      logger.error('Error finalizando solicitud por Sistemas:', err);
+      return error(res, err.message, 400);
+    }
+  };
+
+  subirAdjunto = async (req, res) => {
+    try {
+      const { id } = req.params;
+      const tipo = req.body?.tipo || 'otro';
+      if (!['denuncia', 'rotura', 'otro'].includes(tipo)) {
+        return error(res, 'Tipo de adjunto inválido', 400);
+      }
+      if (!req.file) {
+        return error(res, 'No se recibió ningún archivo', 400);
+      }
+
+      const solicitud = await solicitudCompraService.obtener(id);
+      if (!solicitud) return error(res, 'Solicitud no encontrada', 404);
+
+      const actor = await solicitudCompraService.resolverPersonal(req.user?.email);
+      const ext = path.extname(req.file.originalname).toLowerCase()
+        || (req.file.mimetype === 'application/pdf' ? '.pdf' : '.jpg');
+      const filename = `${randomUUID()}${ext}`;
+      const folder = `solicitudes-compra/${id}`;
+      const url = await storageService.uploadImage(req.file.buffer, filename, folder, req.file.mimetype);
+
+      const adjunto = await SolicitudCompraAdjunto.create({
+        solicitud_id: id,
+        tipo,
+        filename,
+        url,
+        nombre_original: req.file.originalname,
+        tamanio: req.file.size,
+        mime_type: req.file.mimetype,
+        subido_por_id: actor.id
+      });
+
+      await SolicitudCompraHistorial.create({
+        solicitud_id: id,
+        accion: 'adjunto_agregado',
+        actor_personal_id: actor.id,
+        actor_grupo: null,
+        comentario: `Adjunto ${tipo}: ${req.file.originalname}`
+      });
+
+      return success(res, adjunto, 'Adjunto cargado correctamente', 201);
+    } catch (err) {
+      logger.error('Error subiendo adjunto de solicitud:', err);
+      return error(res, err.message || 'Error al subir adjunto', 500);
     }
   };
 

@@ -2,12 +2,13 @@
 import { Router } from 'express';
 import crmController from '../controllers/crmController.js';
 import { authenticate } from '../../auth/middleware/authMiddleware.js';
-import { requirePermission } from '../../auth/middleware/roleMiddleware.js';
+import { requirePermission, requireLegacyAccess } from '../../auth/middleware/roleMiddleware.js';
 
 const router = Router();
 
 // Todas las rutas requieren autenticación y permiso de lectura en crm
 router.use(authenticate);
+router.use(requireLegacyAccess);
 router.use(requirePermission('crm', 'read'));
 
 // Resumen del dashboard

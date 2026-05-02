@@ -6,12 +6,11 @@ import logger from '../../../shared/utils/logger.js';
 import { GUID_TO_GROUP_MAP } from '../config/roles.js';
 import Personal from '../../../models/Personal.js';
 
-// GUIDs de grupos autorizados
-const AUTHORIZED_GROUP_GUIDS = [
-  'edc49d22-9ee8-4d90-a8b2-41cf64db1eed', // Infraestructura
-  '4c25f14c-c4ba-4bf9-b07b-5d03572a2661', // Soporte
-  '88c0f708-14a1-4081-bcc6-4b3ab33a7ca6'  // Mesa de ayuda
-];
+// GUIDs de grupos autorizados a ingresar a la plataforma.
+// Se deriva del mapeo central en config/roles.js — agregar un grupo nuevo
+// allá lo habilita automáticamente acá.
+const AUTHORIZED_GROUP_GUIDS = Object.keys(GUID_TO_GROUP_MAP);
+const AUTHORIZED_GROUP_NAMES = Object.values(GUID_TO_GROUP_MAP);
 
 class AuthService {
   /**
@@ -87,6 +86,7 @@ class AuthService {
         const error = new Error('No tienes permiso para acceder a esta aplicación. Por favor contacta a Infraestructura.');
         error.code = 'UNAUTHORIZED_GROUP';
         error.statusCode = 403;
+        error.authorizedGroups = AUTHORIZED_GROUP_NAMES;
         throw error;
       }
 
@@ -169,6 +169,24 @@ class AuthService {
       logger.error('Error generando JWT:', error);
       throw error;
     }
+  }
+
+  /**
+   * Crear token local para usuarios de desarrollo.
+   * Este método no valida credenciales externas y debe usarse solo detrás
+   * de endpoints protegidos por ambiente de desarrollo.
+   */
+  generateDevJWT(personal, groups = []) {
+    const userInfo = {
+      id: personal.id,
+      email: personal.email,
+      name: `${personal.nombre} ${personal.apellido}`,
+      groups,
+      tenantId: 'local-development',
+      privilegioApp: personal.privilegio_app || 'user'
+    };
+
+    return this.generateJWT(userInfo);
   }
 
   /**

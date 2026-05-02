@@ -1,7 +1,7 @@
 // src/modules/proveedores/routes/index.js
 import express from 'express';
 import { authenticate } from '../../auth/middleware/authMiddleware.js';
-import { requirePermission } from '../../auth/middleware/roleMiddleware.js';
+import { requirePermission, requireLegacyAccess } from '../../auth/middleware/roleMiddleware.js';
 import validate from '../../../shared/middleware/validation.js';
 import { body, param, query } from 'express-validator';
 
@@ -18,6 +18,7 @@ const router = express.Router();
 
 // Todas las rutas requieren autenticación
 router.use(authenticate);
+router.use(requireLegacyAccess);
 
 // Validaciones comunes
 const validarUUID = [param('id').isUUID().withMessage('ID debe ser un UUID válido')];

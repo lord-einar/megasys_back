@@ -1,7 +1,7 @@
 // src/modules/remitos/routes/index.js
 import express from 'express';
 import { authenticate } from '../../auth/middleware/authMiddleware.js';
-import { requireDatabaseRole, requireRole } from '../../auth/middleware/roleMiddleware.js';
+import { requireDatabaseRole, requireRole, requireLegacyAccess } from '../../auth/middleware/roleMiddleware.js';
 import { publicEndpointLimiter } from '../../../shared/middleware/rateLimiter.js';
 import remitoController from '../controllers/remitoController.js';
 
@@ -38,6 +38,7 @@ router.post(
 
 // Todas las rutas de remitos requieren autenticación
 router.use(authenticate);
+router.use(requireLegacyAccess);
 
 // =====================================================
 // RUTAS DE REMITOS

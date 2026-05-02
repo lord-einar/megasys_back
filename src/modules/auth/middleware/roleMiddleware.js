@@ -181,6 +181,13 @@ const requireDatabaseRole = (roleNames) => {
 };
 
 /**
+ * Grupos con acceso a los módulos legacy (sedes, personal, inventario, remitos,
+ * proveedores, visitas, crm, asignaciones, etc). RRHH y Compras solo tienen
+ * acceso al módulo de Solicitudes de Compra y al catálogo de equipos.
+ */
+const LEGACY_AREA_GROUPS = ['Infraestructura', 'Soporte', 'Mesa de ayuda'];
+
+/**
  * Middleware para verificar que el usuario pertenezca a alguno de los
  * grupos Azure indicados. Se usa en flujos donde la decisión depende
  * del área (ej: solicitudes de compra: Infraestructura / RRHH / Compras),
@@ -214,12 +221,20 @@ const requireGroup = (...groupNames) => {
   };
 };
 
+/**
+ * Atajo para los módulos legacy: solo Infraestructura / Soporte / Mesa de ayuda.
+ * Aplicar con router.use() después de authenticate para bloquear a RRHH/Compras.
+ */
+const requireLegacyAccess = requireGroup(...LEGACY_AREA_GROUPS);
+
 export {
   requirePermission,
   requireRole,
   enrichUserWithRole,
   requireDatabaseRole,
-  requireGroup
+  requireGroup,
+  requireLegacyAccess,
+  LEGACY_AREA_GROUPS
 };
 
 export default {
@@ -227,5 +242,7 @@ export default {
   requireRole,
   enrichUserWithRole,
   requireDatabaseRole,
-  requireGroup
+  requireGroup,
+  requireLegacyAccess,
+  LEGACY_AREA_GROUPS
 };

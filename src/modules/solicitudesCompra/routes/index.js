@@ -4,7 +4,7 @@ import { body, param, query } from 'express-validator';
 import { authenticate } from '../../auth/middleware/authMiddleware.js';
 import { requirePermission, requireGroup, enrichUserWithRole } from '../../auth/middleware/roleMiddleware.js';
 import validate from '../../../shared/middleware/validation.js';
-import solicitudCompraController from '../controllers/solicitudCompraController.js';
+import solicitudCompraController, { uploadAdjuntoMiddleware } from '../controllers/solicitudCompraController.js';
 import SolicitudCompra from '../../../models/SolicitudCompra.js';
 
 const router = express.Router();
@@ -50,6 +50,30 @@ const validarListar = [
   query('limit').optional().isInt({ min: 1, max: 100 })
 ];
 
+router.get('/lookups/personal',
+  requirePermission('solicitudes_compra', 'read'),
+  query('q').optional().isString(),
+  query('limit').optional().isInt({ min: 1, max: 200 }),
+  validate,
+  solicitudCompraController.lookupPersonal
+);
+
+router.get('/lookups/sedes',
+  requirePermission('solicitudes_compra', 'read'),
+  query('q').optional().isString(),
+  query('limit').optional().isInt({ min: 1, max: 300 }),
+  validate,
+  solicitudCompraController.lookupSedes
+);
+
+router.get('/lookups/inventario-asignado',
+  requirePermission('solicitudes_compra', 'read'),
+  query('personal_id').isUUID().withMessage('personal_id debe ser un UUID válido'),
+  query('tipo_equipo').optional().isIn(SolicitudCompra.TIPOS_EQUIPO),
+  validate,
+  solicitudCompraController.lookupInventarioAsignado
+);
+
 router.get('/',
   requirePermission('solicitudes_compra', 'read'),
   validarListar, validate,
@@ -88,14 +112,19 @@ const validarAprobarRrhh = [
 const validarRegistrarCompra = [
   body('numero_oc').trim().notEmpty().withMessage('numero_oc es requerido')
     .isLength({ max: 50 }).withMessage('numero_oc no puede exceder 50 caracteres'),
-  body('marca').trim().notEmpty().withMessage('marca es requerida')
-    .isLength({ max: 50 }).withMessage('marca no puede exceder 50 caracteres'),
-  body('modelo').trim().notEmpty().withMessage('modelo es requerido')
-    .isLength({ max: 100 }).withMessage('modelo no puede exceder 100 caracteres'),
-  body('numero_serie').optional({ nullable: true }).isString()
-    .isLength({ max: 100 }).withMessage('numero_serie no puede exceder 100 caracteres'),
-  body('sede_id').isUUID().withMessage('sede_id debe ser un UUID válido'),
-  body('fecha_adquisicion').isISO8601().withMessage('fecha_adquisicion debe ser una fecha válida'),
+  body('observacion').optional({ nullable: true }).isString()
+];
+
+const validarEstadoCompra = [
+  body('estado').isIn(['pedido', 'recibido', 'entregado_sistemas', 'entregado_destinatario'])
+    .withMessage('estado de compra inválido'),
+  body('observacion').optional({ nullable: true }).isString()
+];
+
+const validarFinalizarSistemas = [
+  body('imei').optional({ nullable: true }).isString().isLength({ max: 50 }),
+  body('numero_serie').optional({ nullable: true }).isString().isLength({ max: 100 }),
+  body('fecha_adquisicion').optional({ nullable: true }).isISO8601(),
   body('valor_adquisicion').optional({ nullable: true }).isFloat({ min: 0 }),
   body('observacion').optional({ nullable: true }).isString()
 ];
@@ -120,6 +149,25 @@ router.post('/:id/registrar-compra',
   requireGroup('Compras'),
   [...validarId, ...validarRegistrarCompra], validate,
   solicitudCompraController.registrarCompra
+);
+
+router.post('/:id/estado-compra',
+  requireGroup('Compras'),
+  [...validarId, ...validarEstadoCompra], validate,
+  solicitudCompraController.actualizarEstadoCompra
+);
+
+router.post('/:id/finalizar-sistemas',
+  requireGroup('Infraestructura'),
+  [...validarId, ...validarFinalizarSistemas], validate,
+  solicitudCompraController.finalizarSistemas
+);
+
+router.post('/:id/adjuntos',
+  requirePermission('solicitudes_compra', 'update'),
+  validarId, validate,
+  uploadAdjuntoMiddleware,
+  solicitudCompraController.subirAdjunto
 );
 
 router.post('/:id/rechazar',

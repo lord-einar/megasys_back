@@ -3,13 +3,44 @@ import authService from '../services/authService.js';
 import tokenCacheService from '../services/tokenCacheService.js';
 import authResponseFormatter from '../services/authResponseFormatter.js';
 import roleService from '../services/roleService.js';
+import devAuthService from '../services/devAuthService.js';
 import personalService from '../../personal/services/personalService.js';
+import { GUID_TO_GROUP_MAP } from '../config/roles.js';
 import { success, error } from '../../../shared/utils/response.js';
 import asyncHandler from '../../../shared/utils/asyncHandler.js';
 import logger from '../../../shared/utils/logger.js';
 import Personal from '../../../models/Personal.js';
 
 class AuthController {
+  devUsers = asyncHandler(async (req, res) => {
+    if (!devAuthService.isEnabled()) {
+      return error(res, 'Login de desarrollo deshabilitado', 403);
+    }
+
+    success(res, { users: devAuthService.getAvailableUsers() }, 'Usuarios de desarrollo disponibles');
+  });
+
+  devLogin = asyncHandler(async (req, res) => {
+    try {
+      const { user, email } = req.body || {};
+      const authData = await devAuthService.login(user || email);
+
+      logger.info('Login local de desarrollo:', {
+        email: authData.user.email,
+        role: authData.user.role,
+        ip: req.ip
+      });
+
+      success(res, authData, 'Login de desarrollo exitoso');
+    } catch (err) {
+      logger.warn('Error en login local de desarrollo:', {
+        message: err.message,
+        statusCode: err.statusCode
+      });
+      error(res, err.message, err.statusCode || 500);
+    }
+  });
+
   /**
    * Iniciar proceso de autenticación
    */
@@ -63,9 +94,10 @@ class AuthController {
           logger.warn('Intento de acceso denegado por grupo no autorizado:', {
             message: authError.message
           });
+          const gruposAutorizados = Object.values(GUID_TO_GROUP_MAP).join(', ');
           const html = authResponseFormatter.formatAuthErrorRedirect(
             'unauthorized_group',
-            'No tienes permiso para acceder a esta aplicación. Solo usuarios de los grupos Infraestructura, Soporte o Mesa de ayuda pueden ingresar. Por favor contacta a Infraestructura.'
+            `No tienes permiso para acceder a esta aplicación. Solo usuarios de los grupos ${gruposAutorizados} pueden ingresar. Por favor contacta a Infraestructura.`
           );
           return res.send(html);
         }
@@ -338,11 +370,7 @@ class AuthController {
         },
         groupAnalysis: analysis,
         rawGroups: req.user.groups,
-        guidMapping: {
-          'edc49d22-9ee8-4d90-a8b2-41cf64db1eed': 'Infraestructura',
-          '2a16d910-c440-41a3-a896-eb6287185fef': 'Soporte',
-          '88c0f708-14a1-4081-bcc6-4b3ab33a7ca6': 'Mesa de ayuda'
-        }
+        guidMapping: GUID_TO_GROUP_MAP
       }, 'Análisis de grupos del usuario');
     } catch (err) {
       logger.error('Error en debugGroups:', err);

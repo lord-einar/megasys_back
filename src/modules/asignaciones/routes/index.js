@@ -1,6 +1,7 @@
 // src/modules/asignaciones/routes/index.js
 import express from 'express';
 import { authenticate } from '../../auth/middleware/authMiddleware.js';
+import { requireLegacyAccess } from '../../auth/middleware/roleMiddleware.js';
 import { body, param, query } from 'express-validator';
 import validate from '../../../shared/middleware/validation.js';
 import asignacionInventarioController from '../controllers/asignacionInventarioController.js';
@@ -8,6 +9,7 @@ import asignacionInventarioController from '../controllers/asignacionInventarioC
 const router = express.Router();
 
 router.use(authenticate);
+router.use(requireLegacyAccess);
 
 const validarId = [
   param('id').isUUID().withMessage('ID debe ser un UUID válido')

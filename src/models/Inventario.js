@@ -74,15 +74,10 @@ const Inventario = sequelize.define('Inventario', {
   },
   sede_id: {
     type: DataTypes.UUID,
-    allowNull: false,
+    allowNull: true,
     references: {
       model: 'sedes',
       key: 'id'
-    },
-    validate: {
-      notNull: {
-        msg: 'La sede es requerida'
-      }
     }
   },
   estado: {

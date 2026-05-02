@@ -2,7 +2,7 @@
 import express from 'express';
 import categoriaProblemaController from '../controllers/categoriaProblemaController.js';
 import { authenticate } from '../../auth/middleware/authMiddleware.js';
-import { requireRole } from '../../auth/middleware/roleMiddleware.js';
+import { requireRole, requireLegacyAccess } from '../../auth/middleware/roleMiddleware.js';
 import { body, param, query } from 'express-validator';
 import validate from '../../../shared/middleware/validation.js';
 
@@ -60,6 +60,7 @@ const validarListar = [
 
 // Todas las rutas requieren autenticación
 router.use(authenticate);
+router.use(requireLegacyAccess);
 
 /**
  * GET /api/visitas/categorias-problemas

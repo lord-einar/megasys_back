@@ -14,6 +14,11 @@ const SolicitudCompraAdjunto = sequelize.define('SolicitudCompraAdjunto', {
     allowNull: false,
     references: { model: 'solicitudes_compra', key: 'id' }
   },
+  tipo: {
+    type: DataTypes.ENUM('denuncia', 'rotura', 'otro'),
+    allowNull: false,
+    defaultValue: 'otro'
+  },
   filename: {
     type: DataTypes.STRING(255),
     allowNull: false
@@ -43,7 +48,8 @@ const SolicitudCompraAdjunto = sequelize.define('SolicitudCompraAdjunto', {
   tableName: 'solicitudes_compra_adjuntos',
   underscored: true,
   indexes: [
-    { fields: ['solicitud_id'] }
+    { fields: ['solicitud_id'] },
+    { fields: ['tipo'] }
   ]
 });
 

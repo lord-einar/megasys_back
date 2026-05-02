@@ -10,13 +10,20 @@ const MOTIVOS = [
   'nuevo_puesto',
   'reposicion_robo',
   'reposicion_perdida',
-  'reposicion_rotura'
+  'reposicion_rotura',
+  'cambio_equipo',
+  'otro'
 ];
 
 const ESTADOS = [
   'pendiente_infra',
   'aprobada_infra',
-  'aprobada_rrhh',
+  'pendiente_pedido',
+  'pedido',
+  'recibido',
+  'entregado_sistemas',
+  'entregado_destinatario',
+  'finalizada',
   'comprada',
   'rechazada',
   'cancelada'
@@ -127,6 +134,30 @@ const SolicitudCompra = sequelize.define('SolicitudCompra', {
     allowNull: true
   },
   compras_observacion: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  compras_estado_fecha: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  compras_entrega_observacion: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  imei: {
+    type: DataTypes.STRING(50),
+    allowNull: true
+  },
+  numero_serie_final: {
+    type: DataTypes.STRING(100),
+    allowNull: true
+  },
+  sistemas_fecha: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  sistemas_observacion: {
     type: DataTypes.TEXT,
     allowNull: true
   },

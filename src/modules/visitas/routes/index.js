@@ -3,7 +3,7 @@ const router = express.Router();
 import visitaController from '../controllers/visitaController.js';
 import visitaImagenController, { uploadMiddleware } from '../controllers/visitaImagenController.js';
 import { authenticate } from '../../auth/middleware/authMiddleware.js';
-import { requireRole } from '../../auth/middleware/roleMiddleware.js';
+import { requireRole, requireLegacyAccess } from '../../auth/middleware/roleMiddleware.js';
 import { publicEndpointLimiter } from '../../../shared/middleware/rateLimiter.js';
 import { body, param, query } from 'express-validator';
 import validate from '../../../shared/middleware/validation.js';
@@ -76,6 +76,7 @@ router.post('/feedback/:token', publicEndpointLimiter, validarAgregarFeedback, v
 
 // Rutas Protegidas
 router.use(authenticate);
+router.use(requireLegacyAccess);
 
 // Calendario y Listas (lectura - super_admin, support, helpdesk)
 router.get('/calendario', requireRole('helpdesk'), visitaController.obtenerCalendario);

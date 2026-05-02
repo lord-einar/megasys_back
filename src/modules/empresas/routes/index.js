@@ -2,7 +2,7 @@
 import express from 'express';
 import empresaController from '../controllers/empresaController.js';
 import { authenticate } from '../../auth/middleware/authMiddleware.js';
-import { requirePermission } from '../../auth/middleware/roleMiddleware.js';
+import { requirePermission, requireLegacyAccess } from '../../auth/middleware/roleMiddleware.js';
 import validate from '../../../shared/middleware/validation.js';
 import { body, param } from 'express-validator';
 
@@ -20,7 +20,7 @@ router.get('/activas', empresaController.activas);
  * @desc    Obtener todas las empresas
  * @access  Private
  */
-router.get('/', authenticate, empresaController.todas);
+router.get('/', authenticate, requireLegacyAccess, empresaController.todas);
 
 /**
  * @route   GET /api/empresas/:id
@@ -30,6 +30,7 @@ router.get('/', authenticate, empresaController.todas);
 router.get(
   '/:id',
   authenticate,
+  requireLegacyAccess,
   [param('id').isUUID().withMessage('ID de empresa inválido')],
   validate,
   empresaController.obtenerPorId
