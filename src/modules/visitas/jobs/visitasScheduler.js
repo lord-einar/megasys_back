@@ -4,6 +4,27 @@ import { Visita, Sede, Personal, Rol } from '../../../models/index.js';
 import visitaEmailService from '../services/emailService.js';
 import logger from '../../../shared/utils/logger.js';
 
+const TIMEZONE = process.env.VISITAS_SCHEDULER_TZ || 'America/Argentina/Buenos_Aires';
+
+const getYmdInTimeZone = (date = new Date(), timeZone = TIMEZONE) => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).formatToParts(date);
+
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+};
+
+const addDaysToYmd = (ymd, days) => {
+    const [year, month, day] = ymd.split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+};
+
 class VisitasScheduler {
     constructor() {
         this.task = null;
@@ -49,19 +70,20 @@ class VisitasScheduler {
         this.task = cron.schedule('0 9 * * *', async () => {
             logger.info('⏰ Ejecutando job de recordatorios de visitas...');
             await this.enviarRecordatorios();
-        });
+        }, { timezone: TIMEZONE });
 
-        logger.info('✅ Scheduler de visitas programado (09:00 AM diariamente)');
+        logger.info(`✅ Scheduler de visitas programado (09:00 AM diariamente, ${TIMEZONE})`);
     }
 
     async enviarRecordatorios() {
         try {
-            // Calcular fecha de mañana
-            const manana = new Date();
-            manana.setDate(manana.getDate() + 1);
-            const fechaManana = manana.toISOString().split('T')[0];
+            const hoyLocal = getYmdInTimeZone();
+            const fechaManana = addDaysToYmd(hoyLocal, 1);
 
-            logger.info(`🔍 Buscando visitas programadas para mañana (${fechaManana})...`);
+            logger.info(`🔍 Buscando visitas programadas para mañana (${fechaManana})...`, {
+                timezone: TIMEZONE,
+                hoyLocal
+            });
 
             const visitas = await Visita.findAll({
                 where: {

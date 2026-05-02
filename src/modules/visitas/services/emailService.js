@@ -2,6 +2,23 @@ import emailService from '../../../shared/services/emailService.js';
 import logger from '../../../shared/utils/logger.js';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const VISITAS_TIMEZONE = process.env.VISITAS_SCHEDULER_TZ || 'America/Argentina/Buenos_Aires';
+
+const parseDateOnlyToNoonUtc = (value) => {
+  if (!value) return null;
+  const [year, month, day] = String(value).slice(0, 10).split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+};
+
+const formatDateOnly = (value, options = {}) => {
+  const date = parseDateOnlyToNoonUtc(value);
+  if (!date) return '';
+  return date.toLocaleDateString('es-AR', {
+    timeZone: VISITAS_TIMEZONE,
+    ...options
+  });
+};
 
 class VisitaEmailService {
 
@@ -10,7 +27,7 @@ class VisitaEmailService {
    */
   _generarHTMLRecordatorio(visita) {
     const linkSolicitudes = `${FRONTEND_URL}/visitas/solicitar?token=${visita.token_solicitudes}`;
-    const fecha = new Date(visita.fecha).toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const fecha = formatDateOnly(visita.fecha, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
     return `
       <!DOCTYPE html>
@@ -259,7 +276,7 @@ class VisitaEmailService {
   async enviarRecordatorio(visita, emailsDestino) {
     try {
       const html = this._generarHTMLRecordatorio(visita);
-      const asunto = `Recordatorio: Visita de Soporte mañana ${new Date(visita.fecha).toLocaleDateString('es-AR')}`;
+      const asunto = `Recordatorio: Visita de Soporte mañana ${formatDateOnly(visita.fecha)}`;
 
       // Enviar individualmente o en copia oculta
       // Para simplificar, usamos el servicio genérico que envía uno a uno si es un array?
