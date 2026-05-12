@@ -821,7 +821,7 @@ class SolicitudCompraService {
       throw new Error('El motivo de cancelación es obligatorio');
     }
 
-    return sequelize.transaction(async (transaction) => {
+    const solicitud = await sequelize.transaction(async (transaction) => {
       const solicitud = await SolicitudCompra.findByPk(id, { transaction });
       if (!solicitud) throw new Error('Solicitud no encontrada');
       if (ESTADOS_TERMINALES.includes(solicitud.estado)) {
@@ -850,6 +850,10 @@ class SolicitudCompraService {
       });
       return solicitud;
     });
+
+    const completa = await this.obtener(solicitud.id);
+    await solicitudCompraNotificationService.notificarCancelada(completa);
+    return solicitud;
   }
 }
 

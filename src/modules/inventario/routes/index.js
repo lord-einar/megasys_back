@@ -225,12 +225,12 @@ const validarPaginacion = [
     .withMessage('Búsqueda no puede exceder 100 caracteres'),
 
   query('sede_id')
-    .optional()
+    .optional({ checkFalsy: true })
     .isUUID()
     .withMessage('Sede ID debe ser un UUID válido'),
 
   query('tipo_articulo_id')
-    .optional()
+    .optional({ checkFalsy: true })
     .isUUID()
     .withMessage('Tipo artículo ID debe ser un UUID válido'),
   
@@ -253,12 +253,12 @@ const validarBusqueda = [
     .withMessage('Término de búsqueda debe tener entre 2 y 100 caracteres'),
 
   query('sede_id')
-    .optional()
+    .optional({ checkFalsy: true })
     .isUUID()
     .withMessage('Sede ID debe ser un UUID válido'),
 
   query('tipo_articulo_id')
-    .optional()
+    .optional({ checkFalsy: true })
     .isUUID()
     .withMessage('Tipo artículo ID debe ser un UUID válido'),
   

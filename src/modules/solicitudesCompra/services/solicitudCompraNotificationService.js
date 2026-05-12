@@ -139,6 +139,22 @@ class SolicitudCompraNotificationService {
       `La solicitud fue rechazada. Motivo: ${solicitud.rechazo_motivo || 'No informado'}.`
     );
   }
+
+  async notificarCancelada(solicitud) {
+    const [infra, rrhh, compras] = await Promise.all([
+      this.obtenerDestinatarios('infraestructura'),
+      this.obtenerDestinatarios('rrhh'),
+      this.obtenerDestinatarios('compras')
+    ]);
+    const destinatarios = [solicitud.solicitante?.email, ...infra, ...rrhh, ...compras];
+
+    return this.enviarEmails(
+      destinatarios,
+      solicitud,
+      `Solicitud cancelada ${solicitud.getCodigo()}`,
+      `La solicitud fue cancelada. Motivo: ${solicitud.cancelacion_motivo || 'No informado'}.`
+    );
+  }
 }
 
 export default new SolicitudCompraNotificationService();
