@@ -120,7 +120,7 @@ router.post('/seed-staging', async (req, res) => {
         const serie = `STG-${tipo.slice(0,3).toUpperCase().replace(' ','')}-${String(idx).padStart(4,'0')}`;
         const catId = cat === 'nb' ? rand(catNbIds) : cat === 'cel' ? rand(catCelIds) : null;
         try {
-          await sequelize.query(`INSERT INTO inventario(id,tipos_articulo_id,marca,modelo,numero_serie,sede_id,estado,activo,categoria_id,created_at,updated_at) VALUES(:id,:tipoId,:marca,:modelo,:serie,:sedeId,:estado,true,:catId,NOW(),NOW()) ON CONFLICT(numero_serie) DO NOTHING`,
+          await sequelize.query(`INSERT INTO inventario(id,tipo_articulo_id,marca,modelo,numero_serie,sede_id,estado,activo,categoria_id,created_at,updated_at) VALUES(:id,:tipoId,:marca,:modelo,:serie,:sedeId,:estado,true,:catId,NOW(),NOW()) ON CONFLICT(numero_serie) DO NOTHING`,
             { replacements: { id: randomUUID(), tipoId, marca, modelo, serie, sedeId: rand(sedeIds), estado: rand(estadosInv), catId } });
           okInv++;
         } catch (e) { info(`  inv skip: ${e.message.slice(0, 50)}`); }
@@ -154,8 +154,8 @@ router.post('/seed-staging', async (req, res) => {
 
     // 6. 10 solicitudes de compra
     const [catalogoDb] = await sequelize.query("SELECT id FROM catalogo_equipos LIMIT 10");
-    const motivosSC = ['nuevo_ingreso','nuevo_puesto','reposicion','cambio_equipo'];
-    const estadosSC = ['pendiente_infra','pendiente_rrhh','aprobada_rrhh','completada','rechazada'];
+    const motivosSC = ['nuevo_ingreso','nuevo_puesto','reposicion_robo','reposicion_perdida','reposicion_rotura','cambio_equipo','otro'];
+    const estadosSC = ['pendiente_infra','aprobada_infra','aprobada_rrhh','comprada','recibido','entregado_destinatario','rechazada'];
     let okSC = 0;
 
     for (let i = 0; i < 10; i++) {
