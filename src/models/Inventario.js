@@ -170,6 +170,11 @@ const Inventario = sequelize.define('Inventario', {
     type: DataTypes.BOOLEAN,
     allowNull: true,
     defaultValue: false
+  },
+  categoria_id: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    references: { model: 'categoria_equipos', key: 'id' }
   }
 }, {
   tableName: 'inventario',

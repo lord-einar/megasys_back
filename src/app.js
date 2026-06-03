@@ -182,6 +182,10 @@ const initializeRoutes = async () => {
   await loadRoutes('./modules/solicitudesCompra/routes/catalogoEquipoRoutes.js', '/api/catalogo-equipos');
   await loadRoutes('./modules/solicitudesCompra/routes/index.js', '/api/solicitudes-compra');
 
+  // Rutas de solicitudes de asignación de equipos (nuevo módulo)
+  await loadRoutes('./modules/solicitudesAsignacion/routes/categoriaEquipoRoutes.js', '/api/categoria-equipos');
+  await loadRoutes('./modules/solicitudesAsignacion/routes/index.js', '/api/solicitudes-asignacion');
+
   logger.info('✅ Todas las rutas han sido procesadas');
 };
 

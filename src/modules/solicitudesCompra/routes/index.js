@@ -5,7 +5,9 @@ import { authenticate } from '../../auth/middleware/authMiddleware.js';
 import { requirePermission, requireGroup, enrichUserWithRole } from '../../auth/middleware/roleMiddleware.js';
 import validate from '../../../shared/middleware/validation.js';
 import solicitudCompraController, { uploadAdjuntoMiddleware } from '../controllers/solicitudCompraController.js';
+import stockEquiposController from '../controllers/stockEquiposController.js';
 import SolicitudCompra from '../../../models/SolicitudCompra.js';
+import { VALID_STATES } from '../../../shared/constants/inventoryStates.js';
 
 const router = express.Router();
 
@@ -72,6 +74,34 @@ router.get('/lookups/inventario-asignado',
   query('tipo_equipo').optional().isIn(SolicitudCompra.TIPOS_EQUIPO),
   validate,
   solicitudCompraController.lookupInventarioAsignado
+);
+
+// === STOCK DE EQUIPOS (Notebooks y Celulares) ===
+// Visibilidad: cualquier usuario con permiso de lectura de solicitudes de compra
+// (super_admin, RRHH y Compras), más Infraestructura para soporte a equipo.
+router.get('/stock-equipos',
+  requirePermission('solicitudes_compra', 'read'),
+  [
+    query('tipo').optional().isIn(['notebook', 'celular']).withMessage('tipo debe ser notebook o celular'),
+    query('estado').optional().isIn(VALID_STATES).withMessage('estado inválido'),
+    query('q').optional().isString()
+  ],
+  validate,
+  stockEquiposController.listarStock
+);
+
+router.get('/historial-equipos/personal/:personalId',
+  requirePermission('solicitudes_compra', 'read'),
+  param('personalId').isUUID().withMessage('personalId debe ser un UUID válido'),
+  validate,
+  stockEquiposController.historialPorPersonal
+);
+
+router.get('/historial-equipos/sede/:sedeId',
+  requirePermission('solicitudes_compra', 'read'),
+  param('sedeId').isUUID().withMessage('sedeId debe ser un UUID válido'),
+  validate,
+  stockEquiposController.historialPorSede
 );
 
 router.get('/',

@@ -39,6 +39,10 @@ import CatalogoEquipo from './CatalogoEquipo.js';
 import SolicitudCompra from './SolicitudCompra.js';
 import SolicitudCompraAdjunto from './SolicitudCompraAdjunto.js';
 import SolicitudCompraHistorial from './SolicitudCompraHistorial.js';
+import CategoriaEquipo from './CategoriaEquipo.js';
+import SolicitudAsignacion from './SolicitudAsignacion.js';
+import SolicitudAsignacionHistorial from './SolicitudAsignacionHistorial.js';
+import SolicitudAsignacionAdjunto from './SolicitudAsignacionAdjunto.js';
 
 // =====================================================
 // DEFINICIÓN DE RELACIONES
@@ -816,6 +820,51 @@ SolicitudCompraHistorial.belongsTo(Personal, {
 });
 
 // =====================================================
+// RELACIONES MÓDULO SOLICITUDES DE ASIGNACIÓN
+// =====================================================
+
+// CategoriaEquipo <-> Inventario
+CategoriaEquipo.hasMany(Inventario, { foreignKey: 'categoria_id', as: 'equipos' });
+Inventario.belongsTo(CategoriaEquipo, { foreignKey: 'categoria_id', as: 'categoria' });
+
+// SolicitudAsignacion -> Personal (múltiples roles)
+SolicitudAsignacion.belongsTo(Personal, { foreignKey: 'beneficiario_personal_id', as: 'beneficiario' });
+SolicitudAsignacion.belongsTo(Personal, { foreignKey: 'solicitante_personal_id', as: 'solicitante' });
+SolicitudAsignacion.belongsTo(Personal, { foreignKey: 'infra_asignador_id', as: 'infraAsignador' });
+SolicitudAsignacion.belongsTo(Personal, { foreignKey: 'rrhh_aprobador_id', as: 'rrhhAprobador' });
+SolicitudAsignacion.belongsTo(Personal, { foreignKey: 'cierre_personal_id', as: 'cierrePor' });
+SolicitudAsignacion.belongsTo(Personal, { foreignKey: 'rechazo_por_id', as: 'rechazadoPor' });
+SolicitudAsignacion.belongsTo(Personal, { foreignKey: 'cancelado_por_id', as: 'canceladoPor' });
+
+// SolicitudAsignacion -> Inventario
+SolicitudAsignacion.belongsTo(Inventario, { foreignKey: 'inventario_anterior_id', as: 'inventarioAnterior' });
+SolicitudAsignacion.belongsTo(Inventario, { foreignKey: 'inventario_asignado_id', as: 'inventarioAsignado' });
+
+// SolicitudAsignacion -> CategoriaEquipo
+SolicitudAsignacion.belongsTo(CategoriaEquipo, { foreignKey: 'categoria_id', as: 'categoria' });
+
+// SolicitudAsignacion -> Remito
+SolicitudAsignacion.belongsTo(Remito, { foreignKey: 'remito_id', as: 'remito' });
+
+// Adjuntos
+SolicitudAsignacion.hasMany(SolicitudAsignacionAdjunto, {
+  foreignKey: 'solicitud_id',
+  as: 'adjuntos',
+  onDelete: 'CASCADE'
+});
+SolicitudAsignacionAdjunto.belongsTo(SolicitudAsignacion, { foreignKey: 'solicitud_id', as: 'solicitud' });
+SolicitudAsignacionAdjunto.belongsTo(Personal, { foreignKey: 'subido_por_id', as: 'subidoPor' });
+
+// Historial
+SolicitudAsignacion.hasMany(SolicitudAsignacionHistorial, {
+  foreignKey: 'solicitud_id',
+  as: 'historial',
+  onDelete: 'CASCADE'
+});
+SolicitudAsignacionHistorial.belongsTo(SolicitudAsignacion, { foreignKey: 'solicitud_id', as: 'solicitud' });
+SolicitudAsignacionHistorial.belongsTo(Personal, { foreignKey: 'actor_personal_id', as: 'actor' });
+
+// =====================================================
 // EXPORTAR TODOS LOS MODELOS
 // =====================================================
 
@@ -874,7 +923,13 @@ const models = {
   CatalogoEquipo,
   SolicitudCompra,
   SolicitudCompraAdjunto,
-  SolicitudCompraHistorial
+  SolicitudCompraHistorial,
+
+  // Solicitudes de asignación de equipos
+  CategoriaEquipo,
+  SolicitudAsignacion,
+  SolicitudAsignacionHistorial,
+  SolicitudAsignacionAdjunto
 };
 
 // Agregar métodos de asociación globales
@@ -929,5 +984,9 @@ export {
   CatalogoEquipo,
   SolicitudCompra,
   SolicitudCompraAdjunto,
-  SolicitudCompraHistorial
+  SolicitudCompraHistorial,
+  CategoriaEquipo,
+  SolicitudAsignacion,
+  SolicitudAsignacionHistorial,
+  SolicitudAsignacionAdjunto
 };
