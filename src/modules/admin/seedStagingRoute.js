@@ -1,6 +1,11 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { sequelize } from '../../shared/utils/database.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const router = express.Router();
 
@@ -18,8 +23,8 @@ router.post('/seed-staging', async (req, res) => {
   const info = (msg) => { console.log(msg); log.push(msg); };
 
   try {
-    const { default: seedData } = await import('../../../data/staging-seed-data.json', { assert: { type: 'json' } });
-    const { empresas, sedes, personal, tipos_all } = seedData;
+    const dataPath = path.resolve(__dirname, '../../../data/staging-seed-data.json');
+    const { empresas, sedes, personal, tipos_all } = JSON.parse(readFileSync(dataPath, 'utf8'));
 
     const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
     const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
