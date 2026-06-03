@@ -162,8 +162,8 @@ router.post('/seed-staging', async (req, res) => {
       const sol = rand(personalDb), ben = rand(personalDb);
       const catItem = catalogoDb.length ? rand(catalogoDb) : null;
       try {
-        await sequelize.query(`INSERT INTO solicitudes_compra(id,tipo_equipo,motivo,estado,solicitante_personal_id,beneficiario_personal_id,catalogo_equipo_id,observacion_solicitante,created_at,updated_at) VALUES(:id,:tipo,:motivo,:estado,:solId,:benId,:catId,:obs,NOW(),NOW()) ON CONFLICT DO NOTHING`,
-          { replacements: { id: randomUUID(), tipo: rand(['notebook','celular']), motivo: rand(motivosSC), estado: rand(estadosSC), solId: sol.id, benId: ben.id, catId: catItem?.id ?? null, obs: `Solicitud de prueba #${i+1}` } });
+        await sequelize.query(`INSERT INTO solicitudes_compra(id,tipo_equipo,motivo,estado,solicitante_personal_id,beneficiario_personal_id,observacion_solicitante,created_at,updated_at) VALUES(:id,:tipo,:motivo,:estado,:solId,:benId,:obs,NOW(),NOW()) ON CONFLICT DO NOTHING`,
+          { replacements: { id: randomUUID(), tipo: rand(['notebook','celular']), motivo: rand(motivosSC), estado: rand(estadosSC), solId: sol.id, benId: ben.id, obs: `Solicitud de prueba #${i+1}` } });
         okSC++;
       } catch (e) { info(`  sc skip: ${e.message.slice(0, 60)}`); }
     }
