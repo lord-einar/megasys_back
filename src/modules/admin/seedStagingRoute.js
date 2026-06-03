@@ -33,11 +33,13 @@ router.post('/seed-staging', async (req, res) => {
       let ok = 0;
       for (const row of rows) {
         const cols = Object.keys(row);
-        const vals = Object.values(row);
-        const ph = vals.map((_, i) => `$${i + 1}`).join(',');
+        const ph = cols.map(c => `:${c}`).join(',');
         const upd = cols.filter(c => c !== conflict).map(c => `${c}=EXCLUDED.${c}`).join(',');
         try {
-          await sequelize.query(`INSERT INTO ${table}(${cols.join(',')}) VALUES(${ph}) ON CONFLICT(${conflict}) DO UPDATE SET ${upd}`, { bind: vals });
+          await sequelize.query(
+            `INSERT INTO ${table}(${cols.join(',')}) VALUES(${ph}) ON CONFLICT(${conflict}) DO UPDATE SET ${upd}`,
+            { replacements: row }
+          );
           ok++;
         } catch (e) { info(`  skip ${table}: ${e.message.slice(0, 60)}`); }
       }
@@ -46,14 +48,19 @@ router.post('/seed-staging', async (req, res) => {
 
     // 1. Datos maestros
     await upsert('empresas', empresas.map(e => ({ id: e.id, nombre_empresa: e.nombre_empresa, cuit: e.cuit, rason_social: e.rason_social, email: e.email, telefono: e.telefono, direccion: e.direccion, activo: true, created_at: new Date(), updated_at: new Date() })));
-    await upsert('sedes', sedes.map(s => ({ id: s.id, nombre_sede: s.nombre_sede, direccion: s.direccion, localidad: s.localidad, provincia: s.provincia, activo: true, created_at: new Date(), updated_at: new Date() })));
+    await upsert('sedes', sedes.map(s => ({ id: s.id, nombre_sede: s.nombre_sede, direccion: s.direccion, localidad: s.localidad, provincia: s.provincia, empresa_id: s.empresa_id, activo: true, created_at: new Date(), updated_at: new Date() })));
     await upsert('personal', personal.map(p => ({ id: p.id, nombre: p.nombre, apellido: p.apellido, email: p.email, telefono: p.telefono ?? null, sede_id: p.sede_id ?? null, privilegio_app: p.privilegio_app ?? 'user', activo: true, fecha_ingreso: p.fecha_ingreso ?? new Date().toISOString().slice(0, 10), created_at: new Date(), updated_at: new Date() })));
 
     // 2. Tipos articulo
     for (const t of tipos_all) {
       try {
-        await sequelize.query(`INSERT INTO tipo_articulo(id,nombre,descripcion,activo,created_at,updated_at) VALUES($1,$2,$3,$4,NOW(),NOW()) ON CONFLICT(nombre) DO UPDATE SET descripcion=EXCLUDED.descripcion,activo=EXCLUDED.activo`, { bind: [t.id, t.nombre, t.descripcion ?? null, t.activo ?? true] });
-      } catch (e) { info(`  tipo skip: ${e.message.slice(0, 50)}`); }
+        await sequelize.query(
+          `INSERT INTO tipo_articulo(id,nombre,descripcion,activo,created_at,updated_at)
+           VALUES(:id,:nombre,:desc,:activo,NOW(),NOW())
+           ON CONFLICT(nombre) DO UPDATE SET descripcion=EXCLUDED.descripcion,activo=EXCLUDED.activo`,
+          { replacements: { id: t.id, nombre: t.nombre, desc: t.descripcion ?? null, activo: t.activo ?? true } }
+        );
+      } catch (e) { info(`  tipo skip: ${e.message.slice(0, 60)}`); }
     }
     info(`✅ tipo_articulo: ${tipos_all.length} procesados`);
 
@@ -71,7 +78,7 @@ router.post('/seed-staging', async (req, res) => {
       { id: randomUUID(), nombre: 'Celular operativo', descripcion: 'Smartphones estándar', tipo: 'celular', activo: true },
     ];
     for (const c of categorias) {
-      try { await sequelize.query(`INSERT INTO categoria_equipos(id,nombre,descripcion,tipo,activo,created_at,updated_at) VALUES($1,$2,$3,$4,$5,NOW(),NOW()) ON CONFLICT DO NOTHING`, { bind: [c.id, c.nombre, c.descripcion, c.tipo, c.activo] }); } catch (e) {}
+      try { await sequelize.query(`INSERT INTO categoria_equipos(id,nombre,descripcion,tipo,activo,created_at,updated_at) VALUES(:id,:nombre,:desc,:tipo,:activo,NOW(),NOW()) ON CONFLICT DO NOTHING`, { replacements: { id: c.id, nombre: c.nombre, desc: c.descripcion, tipo: c.tipo, activo: c.activo } }); } catch (e) {}
     }
     info(`✅ categoria_equipos: ${categorias.length}`);
 
@@ -113,8 +120,8 @@ router.post('/seed-staging', async (req, res) => {
         const serie = `STG-${tipo.slice(0,3).toUpperCase().replace(' ','')}-${String(idx).padStart(4,'0')}`;
         const catId = cat === 'nb' ? rand(catNbIds) : cat === 'cel' ? rand(catCelIds) : null;
         try {
-          await sequelize.query(`INSERT INTO inventario(id,tipo_articulo_id,marca,modelo,numero_serie,sede_id,estado,activo,categoria_id,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,true,$8,NOW(),NOW()) ON CONFLICT(numero_serie) DO NOTHING`,
-            { bind: [randomUUID(), tipoId, marca, modelo, serie, rand(sedeIds), rand(estadosInv), catId] });
+          await sequelize.query(`INSERT INTO inventario(id,tipo_articulo_id,marca,modelo,numero_serie,sede_id,estado,activo,categoria_id,created_at,updated_at) VALUES(:id,:tipoId,:marca,:modelo,:serie,:sedeId,:estado,true,:catId,NOW(),NOW()) ON CONFLICT(numero_serie) DO NOTHING`,
+            { replacements: { id: randomUUID(), tipoId, marca, modelo, serie, sedeId: rand(sedeIds), estado: rand(estadosInv), catId } });
           okInv++;
         } catch (e) { info(`  inv skip: ${e.message.slice(0, 50)}`); }
       }
@@ -134,11 +141,11 @@ router.post('/seed-staging', async (req, res) => {
       const num = `REM-2026-${String(seqNum++).padStart(3,'0')}`;
       const fecha = new Date(Date.now() - randInt(0, 30) * 86400000);
       try {
-        await sequelize.query(`INSERT INTO remitos(id,numero_remito,fecha,sede_origen_id,sede_destino_id,solicitante_id,estado,observaciones,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,NOW(),NOW())`,
-          { bind: [remitoId, num, fecha, sol.sede_id, rand(sedeIds), sol.id, rand(estadosRem), `Remito de prueba #${i+1}`] });
+        await sequelize.query(`INSERT INTO remitos(id,numero_remito,fecha,sede_origen_id,sede_destino_id,solicitante_id,estado,observaciones,created_at,updated_at) VALUES(:id,:num,:fecha,:origenId,:destinoId,:solId,:estado,:obs,NOW(),NOW())`,
+          { replacements: { id: remitoId, num, fecha, origenId: sol.sede_id, destinoId: rand(sedeIds), solId: sol.id, estado: rand(estadosRem), obs: `Remito de prueba #${i+1}` } });
         for (let d = 0; d < randInt(1, 3); d++) {
-          try { await sequelize.query(`INSERT INTO remito_detalles(id,remito_id,inventario_id,cantidad,es_prestamo,created_at,updated_at) VALUES($1,$2,$3,1,false,NOW(),NOW())`,
-            { bind: [randomUUID(), remitoId, rand(invDb).id] }); } catch (_) {}
+          try { await sequelize.query(`INSERT INTO remito_detalles(id,remito_id,inventario_id,cantidad,es_prestamo,created_at,updated_at) VALUES(:id,:remitoId,:invId,1,false,NOW(),NOW())`,
+            { replacements: { id: randomUUID(), remitoId, invId: rand(invDb).id } }); } catch (_) {}
         }
         okRem++;
       } catch (e) { info(`  remito skip: ${e.message.slice(0, 60)}`); }
@@ -155,8 +162,8 @@ router.post('/seed-staging', async (req, res) => {
       const sol = rand(personalDb), ben = rand(personalDb);
       const catItem = catalogoDb.length ? rand(catalogoDb) : null;
       try {
-        await sequelize.query(`INSERT INTO solicitudes_compra(id,tipo_equipo,motivo,estado,solicitante_personal_id,beneficiario_personal_id,catalogo_equipo_id,observacion_solicitante,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,NOW(),NOW()) ON CONFLICT DO NOTHING`,
-          { bind: [randomUUID(), rand(['notebook','celular']), rand(motivosSC), rand(estadosSC), sol.id, ben.id, catItem?.id ?? null, `Solicitud de prueba #${i+1}`] });
+        await sequelize.query(`INSERT INTO solicitudes_compra(id,tipo_equipo,motivo,estado,solicitante_personal_id,beneficiario_personal_id,catalogo_equipo_id,observacion_solicitante,created_at,updated_at) VALUES(:id,:tipo,:motivo,:estado,:solId,:benId,:catId,:obs,NOW(),NOW()) ON CONFLICT DO NOTHING`,
+          { replacements: { id: randomUUID(), tipo: rand(['notebook','celular']), motivo: rand(motivosSC), estado: rand(estadosSC), solId: sol.id, benId: ben.id, catId: catItem?.id ?? null, obs: `Solicitud de prueba #${i+1}` } });
         okSC++;
       } catch (e) { info(`  sc skip: ${e.message.slice(0, 60)}`); }
     }
