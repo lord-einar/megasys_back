@@ -186,6 +186,11 @@ const initializeRoutes = async () => {
   await loadRoutes('./modules/solicitudesAsignacion/routes/categoriaEquipoRoutes.js', '/api/categoria-equipos');
   await loadRoutes('./modules/solicitudesAsignacion/routes/index.js', '/api/solicitudes-asignacion');
 
+  // Seed de staging (solo disponible en entorno staging)
+  if (process.env.NODE_ENV !== 'production') {
+    await loadRoutes('./modules/admin/seedStagingRoute.js', '/api/admin');
+  }
+
   logger.info('✅ Todas las rutas han sido procesadas');
 };
 
