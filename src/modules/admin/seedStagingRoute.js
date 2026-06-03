@@ -55,17 +55,17 @@ router.post('/seed-staging', async (req, res) => {
     for (const t of tipos_all) {
       try {
         await sequelize.query(
-          `INSERT INTO tipo_articulo(id,nombre,descripcion,activo,created_at,updated_at)
+          `INSERT INTO tipos_articulo(id,nombre,descripcion,activo,created_at,updated_at)
            VALUES(:id,:nombre,:desc,:activo,NOW(),NOW())
            ON CONFLICT(nombre) DO UPDATE SET descripcion=EXCLUDED.descripcion,activo=EXCLUDED.activo`,
           { replacements: { id: t.id, nombre: t.nombre, desc: t.descripcion ?? null, activo: t.activo ?? true } }
         );
       } catch (e) { info(`  tipo skip: ${e.message.slice(0, 60)}`); }
     }
-    info(`✅ tipo_articulo: ${tipos_all.length} procesados`);
+    info(`✅ tipos_articulo: ${tipos_all.length} procesados`);
 
     // Mapa nombre→id en staging
-    const [tiposStaging] = await sequelize.query('SELECT id, nombre FROM tipo_articulo');
+    const [tiposStaging] = await sequelize.query('SELECT id, nombre FROM tipos_articulo');
     const tipoMap = Object.fromEntries(tiposStaging.map(t => [t.nombre, t.id]));
     info(`ℹ️ tipos: ${Object.keys(tipoMap).join(', ')}`);
 
@@ -120,7 +120,7 @@ router.post('/seed-staging', async (req, res) => {
         const serie = `STG-${tipo.slice(0,3).toUpperCase().replace(' ','')}-${String(idx).padStart(4,'0')}`;
         const catId = cat === 'nb' ? rand(catNbIds) : cat === 'cel' ? rand(catCelIds) : null;
         try {
-          await sequelize.query(`INSERT INTO inventario(id,tipo_articulo_id,marca,modelo,numero_serie,sede_id,estado,activo,categoria_id,created_at,updated_at) VALUES(:id,:tipoId,:marca,:modelo,:serie,:sedeId,:estado,true,:catId,NOW(),NOW()) ON CONFLICT(numero_serie) DO NOTHING`,
+          await sequelize.query(`INSERT INTO inventario(id,tipos_articulo_id,marca,modelo,numero_serie,sede_id,estado,activo,categoria_id,created_at,updated_at) VALUES(:id,:tipoId,:marca,:modelo,:serie,:sedeId,:estado,true,:catId,NOW(),NOW()) ON CONFLICT(numero_serie) DO NOTHING`,
             { replacements: { id: randomUUID(), tipoId, marca, modelo, serie, sedeId: rand(sedeIds), estado: rand(estadosInv), catId } });
           okInv++;
         } catch (e) { info(`  inv skip: ${e.message.slice(0, 50)}`); }
