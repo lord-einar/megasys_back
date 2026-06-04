@@ -174,9 +174,9 @@ router.post('/seed-staging', async (req, res) => {
     await sequelize.query(`
       SELECT SETVAL('remito_numero_seq',
         COALESCE((
-          SELECT MAX(CAST(REGEXP_REPLACE(numero_remito, '[^0-9]', '', 'g') AS INTEGER))
+          SELECT MAX(CAST(SPLIT_PART(numero_remito, '-', 3) AS INTEGER))
           FROM remitos
-          WHERE numero_remito ~ '^REM-'
+          WHERE numero_remito ~ '^REM-\\d+-\\d+$'
         ), 1)
       )
     `);
