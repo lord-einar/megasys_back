@@ -101,6 +101,16 @@ router.post(
 router.get('/:id', remitoController.obtener.bind(remitoController));
 
 /**
+ * PUT /remitos/:id
+ * Actualizar campos básicos del remito (super_admin, mientras no esté completado/cancelado)
+ */
+router.put(
+  '/:id',
+  requireRole('super_admin'),
+  remitoController.actualizar.bind(remitoController)
+);
+
+/**
  * PATCH /remitos/:id/estado
  * Cambiar estado del remito
  * Requiere: Rol "Infraestructura" O ser el técnico asignado al remito

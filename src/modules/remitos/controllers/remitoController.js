@@ -114,6 +114,17 @@ class RemitoController {
     }
   }
 
+  async actualizar(req, res) {
+    try {
+      const { id } = req.params;
+      const remito = await remitoService.actualizar(id, req.body);
+      return success(res, remito, 'Remito actualizado correctamente');
+    } catch (err) {
+      logger.error('Error actualizando remito:', err);
+      return error(res, err.message || 'Error al actualizar remito', err.statusCode || 500);
+    }
+  }
+
   /**
    * PATCH /remitos/:id/estado
    * Cambiar estado del remito

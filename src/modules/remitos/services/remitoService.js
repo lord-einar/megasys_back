@@ -611,6 +611,28 @@ class RemitoService {
   /**
    * Obtener remito con todos los detalles
    */
+  async actualizar(remitoId, datos) {
+    const remito = await Remito.findByPk(remitoId);
+    if (!remito) throw Object.assign(new Error('Remito no encontrado'), { statusCode: 404 });
+
+    const ESTADOS_BLOQUEADOS = ['completado', 'cancelado'];
+    if (ESTADOS_BLOQUEADOS.includes(remito.estado)) {
+      throw Object.assign(
+        new Error(`No se puede modificar un remito en estado "${remito.estado}"`),
+        { statusCode: 400 }
+      );
+    }
+
+    const CAMPOS_PERMITIDOS = ['solicitante_id', 'tecnico_asignado_id', 'sede_origen_id', 'sede_destino_id', 'fecha', 'observaciones'];
+    const update = {};
+    for (const campo of CAMPOS_PERMITIDOS) {
+      if (datos[campo] !== undefined) update[campo] = datos[campo] ?? null;
+    }
+
+    await remito.update(update);
+    return this.obtener(remitoId);
+  }
+
   async obtener(remitoId) {
     const remito = await Remito.findByPk(remitoId, {
       include: [
