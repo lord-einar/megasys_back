@@ -170,6 +170,18 @@ router.post('/seed-staging', async (req, res) => {
     }
     info(`✅ solicitudes_compra: ${okSC}/10`);
 
+    // Ajustar secuencia de remitos al máximo existente
+    await sequelize.query(`
+      SELECT SETVAL('remito_numero_seq',
+        COALESCE((
+          SELECT MAX(CAST(REGEXP_REPLACE(numero_remito, '[^0-9]', '', 'g') AS INTEGER))
+          FROM remitos
+          WHERE numero_remito ~ '^REM-'
+        ), 1)
+      )
+    `);
+    info('✅ secuencia remito_numero_seq sincronizada');
+
     // Deduplicar categorías (mantener solo la primera de cada nombre)
     await sequelize.query(`
       DELETE FROM categoria_equipos
