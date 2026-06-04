@@ -78,7 +78,7 @@ router.post('/seed-staging', async (req, res) => {
       { id: randomUUID(), nombre: 'Celular operativo', descripcion: 'Smartphones estándar', tipo: 'celular', activo: true },
     ];
     for (const c of categorias) {
-      try { await sequelize.query(`INSERT INTO categoria_equipos(id,nombre,descripcion,tipo,activo,created_at,updated_at) VALUES(:id,:nombre,:desc,:tipo,:activo,NOW(),NOW()) ON CONFLICT DO NOTHING`, { replacements: { id: c.id, nombre: c.nombre, desc: c.descripcion, tipo: c.tipo, activo: c.activo } }); } catch (e) {}
+      try { await sequelize.query(`INSERT INTO categoria_equipos(id,nombre,descripcion,tipo,activo,created_at,updated_at) VALUES(:id,:nombre,:desc,:tipo,true,NOW(),NOW()) ON CONFLICT(nombre) DO UPDATE SET activo=true,tipo=EXCLUDED.tipo`, { replacements: { id: c.id, nombre: c.nombre, desc: c.descripcion, tipo: c.tipo } }); } catch (e) {}
     }
     info(`✅ categoria_equipos: ${categorias.length}`);
 
