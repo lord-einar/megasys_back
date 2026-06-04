@@ -98,9 +98,15 @@ router.post('/:id/aprobar-rrhh',
   solicitudAsignacionController.aprobarRrhh
 );
 
+router.get('/lookups/soporte',
+  requirePermission('solicitudes_asignacion', 'read'),
+  validate,
+  solicitudAsignacionController.lookupSoporte
+);
+
 router.post('/:id/generar-remito',
   requireGroup('Infraestructura'),
-  validarId, validate,
+  [...validarId, body('tecnico_id').optional({ nullable: true }).isUUID()], validate,
   solicitudAsignacionController.generarRemito
 );
 

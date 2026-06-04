@@ -112,10 +112,21 @@ class SolicitudAsignacionController {
     }
   };
 
+  lookupSoporte = async (req, res) => {
+    try {
+      const items = await solicitudAsignacionService.lookupSoporte();
+      return success(res, items);
+    } catch (err) {
+      logger.error('Error en lookup de soporte:', err);
+      return error(res, err.message || 'Error al obtener soporte', 500);
+    }
+  };
+
   generarRemito = async (req, res) => {
     try {
       const solicitud = await solicitudAsignacionService.generarRemito(
         req.params.id,
+        { tecnico_id: req.body?.tecnico_id || null },
         buildContexto(req)
       );
       const completa = await solicitudAsignacionService.obtener(solicitud.id);

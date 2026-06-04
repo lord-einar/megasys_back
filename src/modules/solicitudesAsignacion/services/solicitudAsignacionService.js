@@ -178,12 +178,14 @@ class SolicitudAsignacionService {
 
     if (categoria_id) where.categoria_id = categoria_id;
 
-    // Solo equipos de depósito: sin historial de asignaciones previas (nuevos de stock)
-    where.id = {
-      [Op.notIn]: sequelize.literal(
-        `(SELECT DISTINCT inventario_id FROM asignaciones_inventario)`
-      )
-    };
+    // Solo equipos de depósito: sede cuyo nombre contenga "deposito"
+    const sedesDeposito = await Sede.findAll({
+      where: { nombre_sede: { [Op.iLike]: '%dep%' } },
+      attributes: ['id']
+    });
+    if (sedesDeposito.length) {
+      where.sede_id = { [Op.in]: sedesDeposito.map(s => s.id) };
+    }
 
     return Inventario.findAll({
       where,
@@ -440,7 +442,15 @@ class SolicitudAsignacionService {
     return solicitud;
   }
 
-  async generarRemito(id, contexto) {
+  async lookupSoporte() {
+    return Personal.findAll({
+      where: { privilegio_app: 'support', activo: true },
+      attributes: ['id', 'nombre', 'apellido', 'email'],
+      order: [['apellido', 'ASC'], ['nombre', 'ASC']]
+    });
+  }
+
+  async generarRemito(id, { tecnico_id } = {}, contexto) {
     return sequelize.transaction(async (t) => {
       const s = await SolicitudAsignacion.findByPk(id, {
         include: [
@@ -478,7 +488,7 @@ class SolicitudAsignacionService {
         sede_origen_id: s.inventarioAsignado.sede_id,
         sede_destino_id: s.beneficiario.sede_id,
         solicitante_id: s.beneficiario_personal_id,
-        tecnico_asignado_id: actor.id,
+        tecnico_asignado_id: tecnico_id || null,
         observaciones: `Solicitud ${s.getCodigo()} — ${s.tipo_equipo} — ${(s.motivo || '').replaceAll('_', ' ')}`
       }, { transaction: t });
 
