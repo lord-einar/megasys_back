@@ -611,6 +611,35 @@ class RemitoService {
   /**
    * Obtener remito con todos los detalles
    */
+  async agregarDetalle(remitoId, { inventario_id, es_prestamo = false }) {
+    const remito = await Remito.findByPk(remitoId);
+    if (!remito) throw Object.assign(new Error('Remito no encontrado'), { statusCode: 404 });
+    if (remito.estado !== 'preparado') throw Object.assign(new Error('Solo se pueden agregar artículos a remitos en estado preparado'), { statusCode: 400 });
+
+    const inv = await Inventario.findByPk(inventario_id);
+    if (!inv) throw Object.assign(new Error('Artículo no encontrado'), { statusCode: 404 });
+    if (!inv.activo) throw Object.assign(new Error('El artículo no está activo'), { statusCode: 400 });
+    if (inv.estado !== 'disponible') throw Object.assign(new Error(`El artículo no está disponible (estado: ${inv.estado})`), { statusCode: 400 });
+
+    const yaExiste = await RemitoDetalle.findOne({ where: { remito_id: remitoId, inventario_id } });
+    if (yaExiste) throw Object.assign(new Error('El artículo ya está en este remito'), { statusCode: 400 });
+
+    await RemitoDetalle.create({ remito_id: remitoId, inventario_id, es_prestamo });
+    return this.obtener(remitoId);
+  }
+
+  async quitarDetalle(remitoId, detalleId) {
+    const remito = await Remito.findByPk(remitoId);
+    if (!remito) throw Object.assign(new Error('Remito no encontrado'), { statusCode: 404 });
+    if (remito.estado !== 'preparado') throw Object.assign(new Error('Solo se pueden quitar artículos de remitos en estado preparado'), { statusCode: 400 });
+
+    const detalle = await RemitoDetalle.findOne({ where: { id: detalleId, remito_id: remitoId } });
+    if (!detalle) throw Object.assign(new Error('Detalle no encontrado'), { statusCode: 404 });
+
+    await detalle.destroy();
+    return this.obtener(remitoId);
+  }
+
   async actualizar(remitoId, datos) {
     const remito = await Remito.findByPk(remitoId);
     if (!remito) throw Object.assign(new Error('Remito no encontrado'), { statusCode: 404 });

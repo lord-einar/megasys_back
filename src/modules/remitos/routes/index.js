@@ -111,6 +111,26 @@ router.put(
 );
 
 /**
+ * POST /remitos/:id/detalles
+ * Agregar artículo al remito (solo en estado preparado)
+ */
+router.post(
+  '/:id/detalles',
+  requireRole('super_admin'),
+  remitoController.agregarDetalle.bind(remitoController)
+);
+
+/**
+ * DELETE /remitos/:id/detalles/:detalleId
+ * Quitar artículo del remito (solo en estado preparado)
+ */
+router.delete(
+  '/:id/detalles/:detalleId',
+  requireRole('super_admin'),
+  remitoController.quitarDetalle.bind(remitoController)
+);
+
+/**
  * PATCH /remitos/:id/estado
  * Cambiar estado del remito
  * Requiere: Rol "Infraestructura" O ser el técnico asignado al remito

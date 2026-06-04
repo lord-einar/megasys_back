@@ -125,6 +125,26 @@ class RemitoController {
     }
   }
 
+  async agregarDetalle(req, res) {
+    try {
+      const remito = await remitoService.agregarDetalle(req.params.id, req.body);
+      return success(res, remito, 'Artículo agregado correctamente');
+    } catch (err) {
+      logger.error('Error agregando detalle:', err);
+      return error(res, err.message || 'Error al agregar artículo', err.statusCode || 500);
+    }
+  }
+
+  async quitarDetalle(req, res) {
+    try {
+      const remito = await remitoService.quitarDetalle(req.params.id, req.params.detalleId);
+      return success(res, remito, 'Artículo quitado correctamente');
+    } catch (err) {
+      logger.error('Error quitando detalle:', err);
+      return error(res, err.message || 'Error al quitar artículo', err.statusCode || 500);
+    }
+  }
+
   /**
    * PATCH /remitos/:id/estado
    * Cambiar estado del remito
