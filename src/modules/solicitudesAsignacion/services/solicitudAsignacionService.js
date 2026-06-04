@@ -178,6 +178,13 @@ class SolicitudAsignacionService {
 
     if (categoria_id) where.categoria_id = categoria_id;
 
+    // Solo equipos de depósito: sin historial de asignaciones previas (nuevos de stock)
+    where.id = {
+      [Op.notIn]: sequelize.literal(
+        `(SELECT DISTINCT inventario_id FROM asignaciones_inventario)`
+      )
+    };
+
     return Inventario.findAll({
       where,
       include: [
@@ -470,7 +477,8 @@ class SolicitudAsignacionService {
         fecha: new Date(),
         sede_origen_id: s.inventarioAsignado.sede_id,
         sede_destino_id: s.beneficiario.sede_id,
-        solicitante_id: actor.id,
+        solicitante_id: s.beneficiario_personal_id,
+        tecnico_asignado_id: actor.id,
         observaciones: `Solicitud ${s.getCodigo()} — ${s.tipo_equipo} — ${(s.motivo || '').replaceAll('_', ' ')}`
       }, { transaction: t });
 
