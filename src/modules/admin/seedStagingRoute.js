@@ -170,6 +170,15 @@ router.post('/seed-staging', async (req, res) => {
     }
     info(`✅ solicitudes_compra: ${okSC}/10`);
 
+    // Deduplicar categorías (mantener solo la primera de cada nombre)
+    await sequelize.query(`
+      DELETE FROM categoria_equipos
+      WHERE id NOT IN (
+        SELECT DISTINCT ON (nombre) id FROM categoria_equipos ORDER BY nombre, created_at ASC
+      )
+    `);
+    info('✅ categorias deduplicadas');
+
     // Conteos finales
     const [[counts]] = await sequelize.query(`
       SELECT
