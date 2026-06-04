@@ -365,7 +365,7 @@ class SolicitudAsignacionService {
         inventario_id,
         personal_id: s.beneficiario_personal_id,
         fecha_asignacion: hoy,
-        motivo: `Solicitud ${s.getCodigo()}`,
+        motivo: `Solicitud ${s.getCodigo()} [${s.id}]`,
         activo: true
       }, { transaction: t });
 
