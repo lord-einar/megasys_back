@@ -60,6 +60,21 @@ const initializeServer = async () => {
       } catch (cronError) {
         logger.error('Error iniciando cron job Entra ID:', cronError);
       }
+
+      // Cron job: verificación diaria de stock por categoría (8:00 AM)
+      try {
+        const cron = await import('node-cron');
+        const stockAlertDiario = await import('./modules/solicitudesAsignacion/services/stockAlertDiarioService.js');
+
+        cron.schedule('0 8 * * *', async () => {
+          logger.info('⏰ Ejecutando cron job: verificación de stock por categoría');
+          await stockAlertDiario.default.ejecutar();
+        }, { timezone: 'America/Argentina/Buenos_Aires' });
+
+        logger.info('⏰ Cron job de stock diario configurado (08:00 AM Argentina)');
+      } catch (cronError) {
+        logger.error('Error iniciando cron job de stock diario:', cronError);
+      }
     });
 
     // Manejo de errores del servidor

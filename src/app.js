@@ -185,6 +185,7 @@ const initializeRoutes = async () => {
   // Rutas de solicitudes de asignación de equipos (nuevo módulo)
   await loadRoutes('./modules/solicitudesAsignacion/routes/categoriaEquipoRoutes.js', '/api/categoria-equipos');
   await loadRoutes('./modules/solicitudesAsignacion/routes/index.js', '/api/solicitudes-asignacion');
+  await loadRoutes('./modules/solicitudesAsignacion/routes/stockAlertRoutes.js', '/api/stock-alerts');
 
   // Seed de staging (solo disponible en entorno staging)
   if (process.env.NODE_ENV !== 'production') {
