@@ -175,6 +175,13 @@ const Inventario = sequelize.define('Inventario', {
     type: DataTypes.UUID,
     allowNull: true,
     references: { model: 'categoria_equipos', key: 'id' }
+  },
+  imei: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    unique: {
+      msg: 'Este IMEI ya está registrado en el sistema'
+    }
   }
 }, {
   tableName: 'inventario',

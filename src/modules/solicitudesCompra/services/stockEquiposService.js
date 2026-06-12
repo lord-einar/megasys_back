@@ -50,6 +50,7 @@ const inventarioToCard = (inv) => {
     marca: inv.marca,
     modelo: inv.modelo,
     numero_serie: inv.numero_serie,
+    imei: inv.imei,
     service_tag: inv.service_tag,
     estado: inv.estado,
     activo: inv.activo,
@@ -234,6 +235,7 @@ class StockEquiposService {
           marca: inv.marca,
           modelo: inv.modelo,
           numero_serie: inv.numero_serie,
+          imei: inv.imei,
           estado: inv.estado,
           sede: inv.sedePrincipal ? {
             id: inv.sedePrincipal.id,
@@ -341,6 +343,7 @@ class StockEquiposService {
         marca: inv.marca,
         modelo: inv.modelo,
         numero_serie: inv.numero_serie,
+        imei: inv.imei,
         estado: inv.estado,
         titular_tipo: asignacionActiva ? 'persona' : 'sede',
         titular_personal: asignacionActiva?.personal ? {

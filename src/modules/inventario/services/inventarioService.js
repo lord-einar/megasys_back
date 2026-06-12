@@ -24,6 +24,20 @@ class InventarioService {
     }
   }
 
+  async validarImeiUnico(imei, inventarioIdExcluir = null) {
+    if (!imei) return;
+
+    const whereClause = { imei: imei.trim() };
+    if (inventarioIdExcluir) {
+      whereClause.id = { [Op.ne]: inventarioIdExcluir };
+    }
+
+    const itemExistente = await Inventario.findOne({ where: whereClause });
+    if (itemExistente) {
+      throw new Error(`Ya existe un equipo con el IMEI \"${imei}\" en el sistema.`);
+    }
+  }
+
   /**
    * Listar inventario con paginación y filtros
    */
@@ -246,6 +260,7 @@ class InventarioService {
       marca,
       modelo,
       numero_serie,
+      imei,
       service_tag,
       sede_id,
       estado = 'disponible',
@@ -260,13 +275,15 @@ class InventarioService {
       tipo_conector,
       puertos_ethernet,
       puertos_sfp,
-      poe
+      poe,
+      categoria_id
     } = datosNuevo;
 
     // Validaciones previas (fuera de la transacción)
     await CommonValidators.validarTipoArticuloActivo(tipo_articulo_id);
     await CommonValidators.validarSedeActiva(sede_id);
     await this.validarNumeroSerieUnico(numero_serie);
+    await this.validarImeiUnico(imei);
 
     // Guardar datos para auditoría
     const datosAuditoria = {
@@ -299,22 +316,24 @@ class InventarioService {
           tipo_articulo_id,
           marca: marca.trim(),
           modelo: modelo.trim(),
-          numero_serie: numero_serie?.trim(),
-          service_tag: service_tag?.trim(),
-          sede_id,
+          numero_serie: numero_serie?.trim() || null,
+          imei: imei?.trim() || null,
+          service_tag: service_tag?.trim() || null,
+          sede_id: sede_id || null,
           estado,
           fecha_adquisicion,
           valor_adquisicion,
-          observaciones: observaciones?.trim(),
-          procesador: procesador?.trim(),
-          memoria: memoria?.trim(),
-          disco: disco?.trim(),
-          sistema_operativo: sistema_operativo?.trim(),
-          pulgadas: pulgadas?.trim(),
-          tipo_conector: tipo_conector?.trim(),
-          puertos_ethernet,
-          puertos_sfp,
-          poe,
+          observaciones: observaciones?.trim() || null,
+          procesador: procesador?.trim() || null,
+          memoria: memoria?.trim() || null,
+          disco: disco?.trim() || null,
+          sistema_operativo: sistema_operativo?.trim() || null,
+          pulgadas: pulgadas?.trim() || null,
+          tipo_conector: tipo_conector?.trim() || null,
+          puertos_ethernet: puertos_ethernet || null,
+          puertos_sfp: puertos_sfp || null,
+          poe: poe || false,
+          categoria_id: categoria_id || null,
           activo: true
         }, { transaction });
 
@@ -403,6 +422,10 @@ class InventarioService {
 
     if (datosActualizacion.numero_serie && datosActualizacion.numero_serie !== item.numero_serie) {
       await this.validarNumeroSerieUnico(datosActualizacion.numero_serie, inventarioId);
+    }
+
+    if (datosActualizacion.imei && datosActualizacion.imei !== item.imei) {
+      await this.validarImeiUnico(datosActualizacion.imei, inventarioId);
     }
 
     let sedeAnterior = null;
