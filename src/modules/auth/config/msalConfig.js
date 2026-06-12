@@ -1,5 +1,36 @@
-// src/modules/auth/config/msalConfig.js
-import { ConfidentialClientApplication } from '@azure/msal-node';
+import { ConfidentialClientApplication, LogLevel } from '@azure/msal-node';
+import axios from 'axios';
+import logger from '../../../shared/utils/logger.js';
+
+// Custom HTTP client using axios to avoid Railway network issues with MSAL's built-in HttpClient
+const axiosNetworkClient = {
+  sendGetRequestAsync: async (url, options) => {
+    try {
+      const response = await axios.get(url, {
+        headers: options?.headers || {},
+        timeout: 15000,
+        validateStatus: () => true,
+      });
+      return { headers: response.headers, body: response.data, status: response.status };
+    } catch (err) {
+      logger.error('MSAL GET request failed:', { url: url.split('?')[0], error: err.message, code: err.code });
+      throw err;
+    }
+  },
+  sendPostRequestAsync: async (url, options) => {
+    try {
+      const response = await axios.post(url, options?.body, {
+        headers: options?.headers || {},
+        timeout: 15000,
+        validateStatus: () => true,
+      });
+      return { headers: response.headers, body: response.data, status: response.status };
+    } catch (err) {
+      logger.error('MSAL POST request failed:', { url: url.split('?')[0], error: err.message, code: err.code });
+      throw err;
+    }
+  },
+};
 
 const msalConfig = {
   auth: {
@@ -8,14 +39,15 @@ const msalConfig = {
     authority: `https://login.microsoftonline.com/${process.env.AZURE_TENANT_ID}`,
   },
   system: {
+    networkClient: axiosNetworkClient,
     loggerOptions: {
-      loggerCallback: (level, message) => {
-        if (process.env.NODE_ENV === 'development') {
-          // console.log(message);
+      loggerCallback: (level, message, containsPii) => {
+        if (!containsPii && (level === LogLevel.Error || level === LogLevel.Warning)) {
+          logger.warn(`MSAL [${level}]: ${message}`);
         }
       },
       piiLoggingEnabled: false,
-      logLevel: 'Info',
+      logLevel: LogLevel.Warning,
     },
   },
 };
