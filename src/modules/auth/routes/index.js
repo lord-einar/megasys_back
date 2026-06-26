@@ -17,5 +17,6 @@ router.get('/status', authenticate, authController.status);
 router.get('/permissions', authenticate, authController.getPermissions);
 router.get('/photo/:userId', authenticate, authController.getPhoto);
 router.get('/photo-base64', authenticate, authController.getPhotoBase64);
+router.get('/debug-groups', authenticate, authController.debugGroups);
 
 export default router;
