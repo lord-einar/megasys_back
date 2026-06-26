@@ -79,11 +79,16 @@ class SolicitudAsignacionNotificationService {
   }
 
   async notificarCreada(solicitud) {
-    return this.enviar(
-      'infraestructura',
+    const [infra, rrhh] = await Promise.all([
+      this.obtenerDestinatarios('infraestructura'),
+      this.obtenerDestinatarios('rrhh')
+    ]);
+    const destinatarios = [...new Set([...infra, ...rrhh])];
+    return this.enviarEmails(
+      destinatarios,
       solicitud,
       `Nueva solicitud de asignación ${solicitud.getCodigo()}`,
-      'Se cargó una nueva solicitud de asignación pendiente de revisión técnica por Infraestructura.'
+      'Se cargó una nueva solicitud de asignación. Infraestructura debe revisar el equipo disponible y RRHH debe aprobarla.'
     );
   }
 
