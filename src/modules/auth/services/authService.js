@@ -4,6 +4,7 @@ import axios from 'axios';
 import { msalInstance } from '../config/msalConfig.js';
 import logger from '../../../shared/utils/logger.js';
 import { GUID_TO_GROUP_MAP } from '../config/roles.js';
+import roleService from './roleService.js';
 import Personal from '../../../models/Personal.js';
 
 // GUIDs de grupos autorizados a ingresar a la plataforma.
@@ -118,6 +119,17 @@ class AuthService {
           userInfo.azureId = userInfo.id;
           // Usar el ID de la tabla Personal
           userInfo.id = personalRecord.id;
+
+          // Sincronizar privilegio_app con el rol derivado de los grupos Azure
+          const derivedRole = roleService.getUserRole(userGroups);
+          if (derivedRole && derivedRole !== 'user' && personalRecord.privilegio_app !== derivedRole) {
+            await personalRecord.update({ privilegio_app: derivedRole });
+            logger.info('privilegio_app sincronizado con grupo Azure', {
+              email: userInfo.email,
+              anterior: personalRecord.privilegio_app,
+              nuevo: derivedRole
+            });
+          }
 
           logger.info('Usuario mapeado a ID de Personal:', {
             email: userInfo.email,
