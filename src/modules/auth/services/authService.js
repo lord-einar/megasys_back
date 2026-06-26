@@ -120,16 +120,18 @@ class AuthService {
           // Usar el ID de la tabla Personal
           userInfo.id = personalRecord.id;
 
-          // Sincronizar privilegio_app con el rol derivado de los grupos Azure
+          // Sincronizar privilegio_app y registrar último acceso
           const derivedRole = roleService.getUserRole(userGroups);
+          const updates = { ultimo_acceso: new Date() };
           if (derivedRole && derivedRole !== 'user' && personalRecord.privilegio_app !== derivedRole) {
-            await personalRecord.update({ privilegio_app: derivedRole });
+            updates.privilegio_app = derivedRole;
             logger.info('privilegio_app sincronizado con grupo Azure', {
               email: userInfo.email,
               anterior: personalRecord.privilegio_app,
               nuevo: derivedRole
             });
           }
+          await personalRecord.update(updates);
 
           logger.info('Usuario mapeado a ID de Personal:', {
             email: userInfo.email,

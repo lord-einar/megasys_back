@@ -118,6 +118,11 @@ const Personal = sequelize.define('Personal', {
         msg: 'El color debe estar en formato hexadecimal (ej. #007bff)'
       }
     }
+  },
+  ultimo_acceso: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null
   }
 }, {
   tableName: 'personal',
