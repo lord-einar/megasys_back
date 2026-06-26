@@ -170,7 +170,7 @@ router.post('/:id/aprobar-infra',
 );
 
 router.post('/:id/aprobar-rrhh',
-  requireGroup('RRHH'),
+  requireGroup('RRHH Acceso PortalIT'),
   [...validarId, ...validarAprobarRrhh], validate,
   solicitudCompraController.aprobarRrhh
 );
@@ -201,13 +201,13 @@ router.post('/:id/adjuntos',
 );
 
 router.post('/:id/rechazar',
-  requireGroup('Infraestructura', 'RRHH'),
+  requireGroup('Infraestructura', 'RRHH Acceso PortalIT'),
   [...validarId, ...validarMotivo], validate,
   solicitudCompraController.rechazar
 );
 
 router.post('/:id/cancelar',
-  requireGroup('Infraestructura', 'RRHH', 'Compras'),
+  requireGroup('Infraestructura', 'RRHH Acceso PortalIT', 'Compras'),
   [...validarId, ...validarMotivo], validate,
   solicitudCompraController.cancelar
 );

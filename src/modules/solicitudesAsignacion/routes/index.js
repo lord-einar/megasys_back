@@ -93,7 +93,7 @@ router.post('/:id/asignar-equipo',
 );
 
 router.post('/:id/aprobar-rrhh',
-  requireGroup('RRHH'),
+  requireGroup('RRHH Acceso PortalIT'),
   [...validarId, body('observacion').optional({ nullable: true }).isString()], validate,
   solicitudAsignacionController.aprobarRrhh
 );
@@ -111,7 +111,7 @@ router.post('/:id/generar-remito',
 );
 
 router.post('/:id/finalizar',
-  requireGroup('Infraestructura', 'RRHH'),
+  requireGroup('Infraestructura', 'RRHH Acceso PortalIT'),
   [...validarId, body('observacion').optional({ nullable: true }).isString()], validate,
   solicitudAsignacionController.finalizar
 );
@@ -124,19 +124,19 @@ router.post('/:id/adjuntos',
 );
 
 router.post('/:id/rechazar',
-  requireGroup('Infraestructura', 'RRHH'),
+  requireGroup('Infraestructura', 'RRHH Acceso PortalIT'),
   [...validarId, body('motivo').trim().notEmpty().withMessage('El motivo es obligatorio')], validate,
   solicitudAsignacionController.rechazar
 );
 
 router.post('/:id/cancelar',
-  requireGroup('Infraestructura', 'RRHH', 'Compras'),
+  requireGroup('Infraestructura', 'RRHH Acceso PortalIT', 'Compras'),
   [...validarId, body('motivo').trim().notEmpty().withMessage('El motivo es obligatorio')], validate,
   solicitudAsignacionController.cancelar
 );
 
 router.post('/:id/reenviar-aviso',
-  requireGroup('Infraestructura', 'RRHH'),
+  requireGroup('Infraestructura', 'RRHH Acceso PortalIT'),
   validarId, validate,
   solicitudAsignacionController.reenviarAviso
 );
