@@ -5,6 +5,7 @@ import {
   SolicitudAsignacionAdjunto,
   CategoriaEquipo,
   Personal,
+  Rol,
   Inventario,
   AsignacionInventario,
   TipoArticulo,
@@ -447,7 +448,13 @@ class SolicitudAsignacionService {
 
   async lookupSoporte() {
     return Personal.findAll({
-      where: { privilegio_app: 'support', activo: true },
+      where: { activo: true },
+      include: [{
+        model: Rol,
+        as: 'rol',
+        where: { nombre: 'Tecnico sede' },
+        attributes: []
+      }],
       attributes: ['id', 'nombre', 'apellido', 'email'],
       order: [['apellido', 'ASC'], ['nombre', 'ASC']]
     });
