@@ -2,7 +2,7 @@
 import express from 'express';
 import { body, param, query } from 'express-validator';
 import { authenticate } from '../../auth/middleware/authMiddleware.js';
-import { requirePermission, requireGroup, enrichUserWithRole } from '../../auth/middleware/roleMiddleware.js';
+import { requirePermission, enrichUserWithRole } from '../../auth/middleware/roleMiddleware.js';
 import validate from '../../../shared/middleware/validation.js';
 import solicitudCompraController, { uploadAdjuntoMiddleware } from '../controllers/solicitudCompraController.js';
 import stockEquiposController from '../controllers/stockEquiposController.js';
@@ -164,31 +164,31 @@ const validarMotivo = [
 ];
 
 router.post('/:id/aprobar-infra',
-  requireGroup('Infraestructura'),
+  requirePermission('solicitudes_compra', 'aprobar_infra'),
   [...validarId, ...validarAprobarInfra], validate,
   solicitudCompraController.aprobarInfra
 );
 
 router.post('/:id/aprobar-rrhh',
-  requireGroup('RRHH Acceso PortalIT'),
+  requirePermission('solicitudes_compra', 'aprobar_rrhh'),
   [...validarId, ...validarAprobarRrhh], validate,
   solicitudCompraController.aprobarRrhh
 );
 
 router.post('/:id/registrar-compra',
-  requireGroup('Compras'),
+  requirePermission('solicitudes_compra', 'registrar_compra'),
   [...validarId, ...validarRegistrarCompra], validate,
   solicitudCompraController.registrarCompra
 );
 
 router.post('/:id/estado-compra',
-  requireGroup('Compras'),
+  requirePermission('solicitudes_compra', 'estado_compra'),
   [...validarId, ...validarEstadoCompra], validate,
   solicitudCompraController.actualizarEstadoCompra
 );
 
 router.post('/:id/finalizar-sistemas',
-  requireGroup('Infraestructura'),
+  requirePermission('solicitudes_compra', 'finalizar_sistemas'),
   [...validarId, ...validarFinalizarSistemas], validate,
   solicitudCompraController.finalizarSistemas
 );
@@ -201,13 +201,13 @@ router.post('/:id/adjuntos',
 );
 
 router.post('/:id/rechazar',
-  requireGroup('Infraestructura', 'RRHH Acceso PortalIT'),
+  requirePermission('solicitudes_compra', 'rechazar'),
   [...validarId, ...validarMotivo], validate,
   solicitudCompraController.rechazar
 );
 
 router.post('/:id/cancelar',
-  requireGroup('Infraestructura', 'RRHH Acceso PortalIT', 'Compras'),
+  requirePermission('solicitudes_compra', 'cancelar'),
   [...validarId, ...validarMotivo], validate,
   solicitudCompraController.cancelar
 );

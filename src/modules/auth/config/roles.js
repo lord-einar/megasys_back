@@ -94,7 +94,9 @@ const PERMISSIONS = {
     aprobar_rrhh: ['rrhh'],
     registrar_compra: ['compras'],
     rechazar: ['super_admin', 'rrhh'],
-    dashboard: ['super_admin', 'rrhh', 'compras']
+    dashboard: ['super_admin', 'rrhh', 'compras'],
+    estado_compra: ['super_admin', 'compras'],
+    finalizar_sistemas: ['super_admin']
   },
 
   // Catálogo de equipos aprobados (marca/modelo de celulares y notebooks)
@@ -112,7 +114,12 @@ const PERMISSIONS = {
     update: ['super_admin', 'rrhh'],
     cancelar: ['super_admin', 'rrhh', 'compras'],
     rechazar: ['super_admin', 'rrhh'],
-    dashboard: ['super_admin', 'rrhh', 'compras']
+    dashboard: ['super_admin', 'rrhh', 'compras'],
+    asignar_equipo: ['super_admin'],
+    aprobar_rrhh: ['super_admin', 'rrhh'],
+    generar_remito: ['super_admin'],
+    finalizar: ['super_admin', 'rrhh'],
+    reenviar_aviso: ['super_admin', 'rrhh']
   }
 };
 

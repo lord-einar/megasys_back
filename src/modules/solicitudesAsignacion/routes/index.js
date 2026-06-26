@@ -1,7 +1,7 @@
 import express from 'express';
 import { body, param, query } from 'express-validator';
 import { authenticate } from '../../auth/middleware/authMiddleware.js';
-import { requirePermission, requireGroup, enrichUserWithRole } from '../../auth/middleware/roleMiddleware.js';
+import { requirePermission, enrichUserWithRole } from '../../auth/middleware/roleMiddleware.js';
 import validate from '../../../shared/middleware/validation.js';
 import solicitudAsignacionController, { uploadAdjuntoMiddleware } from '../controllers/solicitudAsignacionController.js';
 import SolicitudAsignacion from '../../../models/SolicitudAsignacion.js';
@@ -87,13 +87,13 @@ router.post('/',
 // === WORKFLOW ===
 
 router.post('/:id/asignar-equipo',
-  requireGroup('Infraestructura'),
+  requirePermission('solicitudes_asignacion', 'asignar_equipo'),
   [...validarId, ...validarAsignar], validate,
   solicitudAsignacionController.asignarEquipo
 );
 
 router.post('/:id/aprobar-rrhh',
-  requireGroup('RRHH Acceso PortalIT'),
+  requirePermission('solicitudes_asignacion', 'aprobar_rrhh'),
   [...validarId, body('observacion').optional({ nullable: true }).isString()], validate,
   solicitudAsignacionController.aprobarRrhh
 );
@@ -105,13 +105,13 @@ router.get('/lookups/soporte',
 );
 
 router.post('/:id/generar-remito',
-  requireGroup('Infraestructura'),
+  requirePermission('solicitudes_asignacion', 'generar_remito'),
   [...validarId, body('tecnico_id').optional({ nullable: true }).isUUID()], validate,
   solicitudAsignacionController.generarRemito
 );
 
 router.post('/:id/finalizar',
-  requireGroup('Infraestructura', 'RRHH Acceso PortalIT'),
+  requirePermission('solicitudes_asignacion', 'finalizar'),
   [...validarId, body('observacion').optional({ nullable: true }).isString()], validate,
   solicitudAsignacionController.finalizar
 );
@@ -124,19 +124,19 @@ router.post('/:id/adjuntos',
 );
 
 router.post('/:id/rechazar',
-  requireGroup('Infraestructura', 'RRHH Acceso PortalIT'),
+  requirePermission('solicitudes_asignacion', 'rechazar'),
   [...validarId, body('motivo').trim().notEmpty().withMessage('El motivo es obligatorio')], validate,
   solicitudAsignacionController.rechazar
 );
 
 router.post('/:id/cancelar',
-  requireGroup('Infraestructura', 'RRHH Acceso PortalIT', 'Compras'),
+  requirePermission('solicitudes_asignacion', 'cancelar'),
   [...validarId, body('motivo').trim().notEmpty().withMessage('El motivo es obligatorio')], validate,
   solicitudAsignacionController.cancelar
 );
 
 router.post('/:id/reenviar-aviso',
-  requireGroup('Infraestructura', 'RRHH Acceso PortalIT'),
+  requirePermission('solicitudes_asignacion', 'reenviar_aviso'),
   validarId, validate,
   solicitudAsignacionController.reenviarAviso
 );
