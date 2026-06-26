@@ -92,6 +92,16 @@ class SolicitudAsignacionNotificationService {
     );
   }
 
+  async notificarEquipoAsignadoPorInfra(solicitud) {
+    const destinatarios = await this.obtenerDestinatarios('rrhh');
+    return this.enviarEmails(
+      destinatarios,
+      solicitud,
+      `Solicitud lista para aprobación RRHH — ${solicitud.getCodigo()}`,
+      'Infraestructura asignó el equipo. La solicitud está pendiente de tu aprobación para completar la asignación.'
+    );
+  }
+
   async notificarAprobadaRrhh(solicitud) {
     const [compras, infra] = await Promise.all([
       this.obtenerDestinatarios('compras'),

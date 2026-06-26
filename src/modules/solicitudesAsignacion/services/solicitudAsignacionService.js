@@ -407,6 +407,9 @@ class SolicitudAsignacionService {
       ).catch(() => {});
     }
 
+    const completa = await this.getById(solicitud.id);
+    solicitudAsignacionNotificationService.notificarEquipoAsignadoPorInfra(completa).catch(() => {});
+
     return solicitud;
   }
 
