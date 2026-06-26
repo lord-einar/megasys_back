@@ -135,4 +135,10 @@ router.post('/:id/cancelar',
   solicitudAsignacionController.cancelar
 );
 
+router.post('/:id/reenviar-aviso',
+  requireGroup('Infraestructura', 'RRHH'),
+  validarId, validate,
+  solicitudAsignacionController.reenviarAviso
+);
+
 export default router;

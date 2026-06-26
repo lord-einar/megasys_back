@@ -126,6 +126,24 @@ class SolicitudAsignacionNotificationService {
     );
   }
 
+  async reenviarAviso(solicitud) {
+    const ESTADOS_TERMINALES = ['finalizada', 'rechazada', 'cancelada'];
+    if (ESTADOS_TERMINALES.includes(solicitud.estado)) {
+      throw new Error('No se puede reenviar aviso en una solicitud finalizada, rechazada o cancelada');
+    }
+
+    if (solicitud.estado === 'pendiente_infra') {
+      return this.notificarCreada(solicitud);
+    }
+    if (solicitud.estado === 'pendiente_rrhh') {
+      return this.notificarEquipoAsignadoPorInfra(solicitud);
+    }
+    if (solicitud.estado === 'aprobada') {
+      return this.notificarAprobadaRrhh(solicitud);
+    }
+    throw new Error(`Estado desconocido: ${solicitud.estado}`);
+  }
+
   async notificarCancelada(solicitud) {
     const [infra, rrhh, compras] = await Promise.all([
       this.obtenerDestinatarios('infraestructura'),

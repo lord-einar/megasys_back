@@ -182,6 +182,16 @@ class SolicitudAsignacionController {
     }
   };
 
+  reenviarAviso = async (req, res) => {
+    try {
+      const resultado = await solicitudAsignacionService.reenviarAviso(req.params.id);
+      return success(res, resultado, 'Aviso reenviado correctamente');
+    } catch (err) {
+      logger.error('Error reenviando aviso:', err);
+      return error(res, err.message, 400);
+    }
+  };
+
   subirAdjunto = async (req, res) => {
     try {
       const { id } = req.params;

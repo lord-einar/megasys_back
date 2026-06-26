@@ -407,7 +407,7 @@ class SolicitudAsignacionService {
       ).catch(() => {});
     }
 
-    const completa = await this.getById(solicitud.id);
+    const completa = await this.obtener(solicitud.id);
     solicitudAsignacionNotificationService.notificarEquipoAsignadoPorInfra(completa).catch(() => {});
 
     return solicitud;
@@ -636,6 +636,12 @@ class SolicitudAsignacionService {
     const completa = await this.obtener(solicitud.id);
     solicitudAsignacionNotificationService.notificarCancelada(completa).catch(() => {});
     return solicitud;
+  }
+
+  async reenviarAviso(id) {
+    const solicitud = await this.obtener(id);
+    if (!solicitud) throw new Error('Solicitud no encontrada');
+    return solicitudAsignacionNotificationService.reenviarAviso(solicitud);
   }
 }
 
