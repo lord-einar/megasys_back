@@ -8,7 +8,7 @@ const GUID_TO_GROUP_MAP = {
   'edc49d22-9ee8-4d90-a8b2-41cf64db1eed': 'Infraestructura',
   '4c25f14c-c4ba-4bf9-b07b-5d03572a2661': 'Soporte',
   '88c0f708-14a1-4081-bcc6-4b3ab33a7ca6': 'Mesa de ayuda',
-  '55feb1c9-997c-4545-b383-ca9b55967500': 'RRHH',
+  '55feb1c9-997c-4545-b383-ca9b55967500': 'Administracion de personal',
   'fec8b151-9369-475c-b47d-e786d5c4c812': 'Compras'
 };
 
@@ -17,7 +17,7 @@ const GROUP_TO_ROLE_MAP = {
   'Infraestructura': 'super_admin',    // Prioridad 1 - MÁS ALTO
   'Mesa de ayuda': 'helpdesk',         // Prioridad 2
   'Soporte': 'support',                // Prioridad 3
-  'RRHH': 'rrhh',                      // Área funcional (paralela)
+  'Administracion de personal': 'rrhh', // Área funcional (paralela)
   'Compras': 'compras'                 // Área funcional (paralela)
 };
 
@@ -142,7 +142,7 @@ const ROLES = {
   rrhh: {
     name: 'Recursos Humanos',
     description: 'Aprobación de solicitudes de compra desde RRHH',
-    azureGroup: 'RRHH',
+    azureGroup: 'Administracion de personal',
     azureGuid: '55feb1c9-997c-4545-b383-ca9b55967500',
     level: 3
   },

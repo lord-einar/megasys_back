@@ -145,7 +145,7 @@ class RoleService {
       hasInfraestructura: this.hasGroup(azureGroups, 'Infraestructura'),
       hasMesaAyuda: this.hasGroup(azureGroups, 'Mesa de ayuda'),
       hasSoporte: this.hasGroup(azureGroups, 'Soporte'),
-      hasRRHH: this.hasGroup(azureGroups, 'RRHH'),
+      hasRRHH: this.hasGroup(azureGroups, 'Administracion de personal'),
       hasCompras: this.hasGroup(azureGroups, 'Compras')
     };
 
