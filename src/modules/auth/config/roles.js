@@ -8,7 +8,7 @@ const GUID_TO_GROUP_MAP = {
   'edc49d22-9ee8-4d90-a8b2-41cf64db1eed': 'Infraestructura',
   '4c25f14c-c4ba-4bf9-b07b-5d03572a2661': 'Soporte',
   '88c0f708-14a1-4081-bcc6-4b3ab33a7ca6': 'Mesa de ayuda',
-  '55feb1c9-997c-4545-b383-ca9b55967500': 'RRHH Acceso PortalIT',
+  'd4f0f145-e112-497d-a0aa-8184ac34e2a7': 'RRHH Acceso PortalIT',
   'fec8b151-9369-475c-b47d-e786d5c4c812': 'Compras'
 };
 
@@ -143,7 +143,7 @@ const ROLES = {
     name: 'Recursos Humanos',
     description: 'Aprobación de solicitudes de compra desde RRHH',
     azureGroup: 'RRHH Acceso PortalIT',
-    azureGuid: '55feb1c9-997c-4545-b383-ca9b55967500',
+    azureGuid: 'd4f0f145-e112-497d-a0aa-8184ac34e2a7',
     level: 3
   },
   compras: {
