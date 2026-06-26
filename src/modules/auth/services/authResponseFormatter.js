@@ -84,51 +84,50 @@ class AuthResponseFormatter {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <meta http-equiv="refresh" content="0; url=${redirectUrl}">
           <style>
+            *, *::before, *::after { box-sizing: border-box; }
             body {
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
               display: flex;
+              flex-direction: column;
               justify-content: center;
               align-items: center;
               min-height: 100vh;
               margin: 0;
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              background-color: #020617;
+              background-image: linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+                                linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px);
+              background-size: 56px 56px;
+              color: #94a3b8;
             }
-            .container {
-              text-align: center;
-              background: white;
-              padding: 2rem;
-              border-radius: 8px;
-              box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-              max-width: 400px;
+            .spinner {
+              width: 32px;
+              height: 32px;
+              border: 2px solid rgba(255,255,255,0.15);
+              border-top-color: rgba(255,255,255,0.8);
+              border-radius: 50%;
+              animation: spin 0.8s linear infinite;
+              margin-bottom: 16px;
             }
-            h1 {
-              color: #333;
-              margin: 0 0 1rem 0;
-              font-size: 1.5rem;
-            }
+            @keyframes spin { to { transform: rotate(360deg); } }
             p {
-              color: #666;
-              margin: 0.5rem 0;
-              line-height: 1.6;
+              font-size: 13px;
+              font-weight: 500;
+              margin: 0;
+              color: #475569;
             }
             a {
-              color: #667eea;
+              color: #6366f1;
               text-decoration: none;
-              font-weight: 500;
-              margin-top: 1rem;
+              font-size: 12px;
+              margin-top: 12px;
               display: inline-block;
-            }
-            a:hover {
-              text-decoration: underline;
             }
           </style>
         </head>
         <body>
-          <div class="container">
-            <h1>${title}</h1>
-            <p>${message}</p>
-            <p>Si no se redirige automáticamente, <a href="${redirectUrl}">haz clic aquí</a>.</p>
-          </div>
+          <div class="spinner"></div>
+          <p>${message}</p>
+          <a href="${redirectUrl}">Continuar manualmente</a>
         </body>
       </html>
     `;
