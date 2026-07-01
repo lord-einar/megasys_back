@@ -110,8 +110,8 @@ const PERMISSIONS = {
   // Solicitudes de asignación de equipos del stock
   solicitudes_asignacion: {
     read: ['super_admin', 'rrhh', 'compras'],
-    create: ['super_admin', 'rrhh'],
-    update: ['super_admin', 'rrhh'],
+    create: ['super_admin', 'rrhh', 'compras'],
+    update: ['super_admin', 'rrhh', 'compras'],
     cancelar: ['super_admin', 'rrhh', 'compras'],
     rechazar: ['super_admin', 'rrhh'],
     dashboard: ['super_admin', 'rrhh', 'compras'],
@@ -119,7 +119,7 @@ const PERMISSIONS = {
     aprobar_rrhh: ['super_admin', 'rrhh'],
     generar_remito: ['super_admin'],
     finalizar: ['super_admin', 'rrhh'],
-    reenviar_aviso: ['super_admin', 'rrhh']
+    reenviar_aviso: ['super_admin', 'rrhh', 'compras']
   }
 };
 
