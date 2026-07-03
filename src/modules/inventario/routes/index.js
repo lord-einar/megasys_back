@@ -9,9 +9,12 @@ import { VALID_STATES } from '../../../shared/constants/inventoryStates.js';
 
 const router = express.Router();
 
-// Todas las rutas requieren autenticación
+// Todas las rutas requieren autenticación.
+// requireLegacyAccess se aplica por ruta (no como router.use global) porque
+// la creación de items de inventario (celulares) también está permitida a
+// Compras, que no pertenece a los grupos "legacy" (Infraestructura/Soporte/
+// Mesa de ayuda) usados por el resto del módulo.
 router.use(authenticate);
-router.use(requireLegacyAccess);
 
 // Validaciones comunes
 const validarId = [
@@ -284,6 +287,7 @@ const validarBusqueda = [
  * @access  Private (Read permission - Todos)
  */
 router.get('/',
+  requireLegacyAccess,
   validarPaginacion,
   validate,
   inventarioController.listar
@@ -295,6 +299,7 @@ router.get('/',
  * @access  Private (Read permission - Todos)
  */
 router.get('/buscar',
+  requireLegacyAccess,
   validarBusqueda,
   validate,
   inventarioController.buscar
@@ -306,6 +311,7 @@ router.get('/buscar',
  * @access  Private (Read permission - Todos)
  */
 router.get('/estadisticas',
+  requireLegacyAccess,
   [
     query('sede_id')
       .optional()
@@ -322,6 +328,7 @@ router.get('/estadisticas',
  * @access  Private (Read permission - Todos)
  */
 router.get('/:id',
+  requireLegacyAccess,
   validarId,
   validate,
   inventarioController.obtener
@@ -330,7 +337,7 @@ router.get('/:id',
 /**
  * @route   POST /api/inventario
  * @desc    Crear nuevo item de inventario
- * @access  Private (Create permission - Infraestructura y Soporte)
+ * @access  Private (Create permission - Infraestructura, Soporte y Compras)
  */
 router.post('/',
   authenticate,
@@ -347,6 +354,7 @@ router.post('/',
  */
 router.put('/:id',
   authenticate,
+  requireLegacyAccess,
   requirePermission('inventario', 'update'),
   validarId,
   validarInventarioUpdate,
@@ -361,6 +369,7 @@ router.put('/:id',
  */
 router.delete('/:id',
   authenticate,
+  requireLegacyAccess,
   requirePermission('inventario', 'delete'),
   validarId,
   validate,
@@ -374,6 +383,7 @@ router.delete('/:id',
  */
 router.patch('/:id/estado',
   authenticate,
+  requireLegacyAccess,
   validarId,
   validarCambioEstado2025,
   validate,
@@ -386,6 +396,7 @@ router.patch('/:id/estado',
  * @access  Private (Read permission - Todos)
  */
 router.get('/:id/garantias',
+  requireLegacyAccess,
   validarId,
   validate,
   inventarioController.obtenerGarantias
@@ -398,6 +409,7 @@ router.get('/:id/garantias',
  */
 router.post('/:id/garantias/refrescar',
   authenticate,
+  requireLegacyAccess,
   requirePermission('inventario', 'update'),
   validarId,
   validate,
@@ -410,6 +422,7 @@ router.post('/:id/garantias/refrescar',
  * @access  Private (Read permission - Todos)
  */
 router.get('/:id/historial',
+  requireLegacyAccess,
   validarId,
   [
     query('limite')

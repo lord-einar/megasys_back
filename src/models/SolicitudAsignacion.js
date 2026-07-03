@@ -26,7 +26,7 @@ const ESTADOS = [
 
 const ESTADOS_TERMINALES = ['finalizada', 'rechazada', 'cancelada'];
 
-const SOLICITANTE_GRUPOS = ['infraestructura', 'rrhh'];
+const SOLICITANTE_GRUPOS = ['infraestructura', 'rrhh', 'compras'];
 
 const MOTIVOS_REPOSICION = ['reposicion_robo', 'reposicion_perdida', 'reposicion_rotura'];
 

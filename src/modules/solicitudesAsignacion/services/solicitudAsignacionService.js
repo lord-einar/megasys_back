@@ -93,7 +93,8 @@ class SolicitudAsignacionService {
   determinarSolicitanteGrupo(roleAnalysis) {
     if (roleAnalysis?.hasInfraestructura) return 'infraestructura';
     if (roleAnalysis?.hasRRHH) return 'rrhh';
-    throw new Error('Solo Infraestructura y RRHH pueden crear solicitudes de asignación');
+    if (roleAnalysis?.hasCompras) return 'compras';
+    throw new Error('Solo Infraestructura, RRHH o Compras pueden crear solicitudes de asignación');
   }
 
   async listar(filtros = {}, paginacion = {}) {
