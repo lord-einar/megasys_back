@@ -57,7 +57,7 @@ router.get('/lookups/personal',
 router.get('/lookups/inventario-disponible',
   requirePermission('solicitudes_asignacion', 'read'),
   [
-    query('tipo_equipo').optional().isIn(['notebook', 'celular']).withMessage('tipo_equipo debe ser notebook o celular'),
+    query('tipo_equipo').optional().isIn(SolicitudAsignacion.TIPOS_EQUIPO).withMessage('tipo_equipo inválido'),
     query('categoria_id').optional().isUUID()
   ],
   validate,
@@ -84,12 +84,40 @@ router.post('/',
   solicitudAsignacionController.crear
 );
 
+const validarEditar = [
+  body('tipo_equipo').optional().isIn(SolicitudAsignacion.TIPOS_EQUIPO).withMessage('tipo_equipo inválido'),
+  body('motivo').optional().isIn(SolicitudAsignacion.MOTIVOS).withMessage('motivo inválido'),
+  body('observacion_solicitante').optional().isString(),
+  body('beneficiario_personal_id').optional().isUUID().withMessage('beneficiario_personal_id debe ser un UUID válido'),
+  body('inventario_anterior_id').optional({ nullable: true }).isUUID(),
+  body('denuncia_presentada').optional({ nullable: true }).isBoolean(),
+  body('comentario_edicion').optional({ nullable: true }).isString()
+];
+
+router.put('/:id',
+  requirePermission('solicitudes_asignacion', 'update'),
+  [...validarId, ...validarEditar], validate,
+  solicitudAsignacionController.editar
+);
+
 // === WORKFLOW ===
+
+router.post('/:id/solicitar-compra',
+  requirePermission('solicitudes_asignacion', 'asignar_equipo'),
+  [...validarId, body('observacion').optional({ nullable: true }).isString()], validate,
+  solicitudAsignacionController.solicitarCompra
+);
 
 router.post('/:id/asignar-equipo',
   requirePermission('solicitudes_asignacion', 'asignar_equipo'),
   [...validarId, ...validarAsignar], validate,
   solicitudAsignacionController.asignarEquipo
+);
+
+router.post('/:id/aprobar-infra',
+  requirePermission('solicitudes_asignacion', 'asignar_equipo'),
+  [...validarId, body('observacion').optional({ nullable: true }).isString()], validate,
+  solicitudAsignacionController.aprobarInfra
 );
 
 router.post('/:id/aprobar-rrhh',

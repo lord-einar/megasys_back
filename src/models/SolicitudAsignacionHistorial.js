@@ -5,7 +5,9 @@ import { randomUUID as uuidv4 } from 'node:crypto';
 const ACCIONES = [
   'creada',
   'editada',
+  'solicitud_compra',
   'equipo_asignado',
+  'aprobada_infra',
   'aprobada_rrhh',
   'rechazada',
   'cancelada',

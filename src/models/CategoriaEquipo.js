@@ -2,7 +2,7 @@ import { DataTypes } from 'sequelize';
 import { sequelize } from '../shared/utils/database.js';
 import { randomUUID as uuidv4 } from 'node:crypto';
 
-const TIPOS = ['notebook', 'celular', 'ambos'];
+const TIPOS = ['notebook', 'celular', 'pc', 'ambos'];
 
 const CategoriaEquipo = sequelize.define('CategoriaEquipo', {
   id: {
@@ -27,7 +27,7 @@ const CategoriaEquipo = sequelize.define('CategoriaEquipo', {
     allowNull: false,
     defaultValue: 'ambos',
     validate: {
-      isIn: { args: [TIPOS], msg: 'El tipo debe ser notebook, celular o ambos' }
+      isIn: { args: [TIPOS], msg: 'El tipo debe ser notebook, celular, pc o ambos' }
     }
   },
   activo: {

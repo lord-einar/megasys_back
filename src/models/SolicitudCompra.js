@@ -3,7 +3,7 @@ import { DataTypes } from 'sequelize';
 import { sequelize } from '../shared/utils/database.js';
 import { randomUUID as uuidv4 } from 'node:crypto';
 
-const TIPOS_EQUIPO = ['celular', 'notebook'];
+const TIPOS_EQUIPO = ['celular', 'notebook', 'pc_escritorio'];
 
 const MOTIVOS = [
   'nuevo_ingreso',

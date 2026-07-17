@@ -15,20 +15,20 @@ const validarId = [param('id').isUUID().withMessage('ID debe ser un UUID válido
 const validarCrear = [
   body('nombre').trim().isLength({ min: 1, max: 80 }).withMessage('nombre es requerido (1-80 caracteres)'),
   body('descripcion').optional({ nullable: true }).isString(),
-  body('tipo').isIn(['notebook', 'celular', 'ambos']).withMessage('tipo debe ser notebook, celular o ambos')
+  body('tipo').isIn(['notebook', 'celular', 'pc', 'ambos']).withMessage('tipo debe ser notebook, celular, pc o ambos')
 ];
 
 const validarActualizar = [
   body('nombre').optional().trim().isLength({ min: 1, max: 80 }),
   body('descripcion').optional({ nullable: true }).isString(),
-  body('tipo').optional().isIn(['notebook', 'celular', 'ambos']),
+  body('tipo').optional().isIn(['notebook', 'celular', 'pc', 'ambos']),
   body('activo').optional().isBoolean()
 ];
 
 router.get('/',
   requirePermission('solicitudes_asignacion', 'read'),
   [
-    query('tipo').optional().isIn(['notebook', 'celular', 'ambos']),
+    query('tipo').optional().isIn(['notebook', 'celular', 'pc', 'ambos']),
     query('activo').optional().isBoolean()
   ],
   validate,

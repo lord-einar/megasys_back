@@ -2,7 +2,7 @@ import { DataTypes } from 'sequelize';
 import { sequelize } from '../shared/utils/database.js';
 import { randomUUID as uuidv4 } from 'node:crypto';
 
-const TIPOS_EQUIPO = ['celular', 'notebook'];
+const TIPOS_EQUIPO = ['celular', 'notebook', 'pc_escritorio'];
 
 const MOTIVOS = [
   'nuevo_ingreso',
@@ -73,6 +73,13 @@ const SolicitudAsignacion = sequelize.define('SolicitudAsignacion', {
     type: DataTypes.ENUM(...ESTADOS),
     allowNull: false,
     defaultValue: 'pendiente_infra'
+  },
+  // Bandera paralela: la solicitud sigue su flujo de aprobación aunque no haya
+  // stock; queda marcado que hay que comprar el equipo antes de poder entregarlo.
+  compra_pendiente: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
   },
   // Equipo anterior (reposiciones)
   inventario_anterior_id: {

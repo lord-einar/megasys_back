@@ -15,16 +15,13 @@ import {
 } from '../../../models/index.js';
 import logger from '../../../shared/utils/logger.js';
 import solicitudCompraNotificationService from './solicitudCompraNotificationService.js';
+import { TIPO_EQUIPO_TO_TIPO_ARTICULO, tipoArticuloCoincide } from '../../../shared/constants/tipoEquipo.js';
 
 // Estados terminales — no se pueden editar ni transicionar.
 const ESTADOS_TERMINALES = ['finalizada', 'comprada', 'rechazada', 'cancelada'];
 const ESTADOS_COMPRA = ['pedido', 'recibido', 'entregado_sistemas', 'entregado_destinatario'];
 
-// Mapeo tipo_equipo -> nombre del TipoArticulo en inventario
-const TIPO_EQUIPO_TO_TIPO_ARTICULO = {
-  celular: 'Celular',
-  notebook: 'Notebook'
-};
+// Mapeo tipo_equipo -> nombre del TipoArticulo en inventario (ver shared/constants/tipoEquipo.js)
 
 // Campos del solicitante: si cambia alguno tras una aprobación, la solicitud
 // vuelve a 'pendiente_infra' y se limpian las aprobaciones previas.
@@ -209,9 +206,7 @@ class SolicitudCompraService {
   async lookupInventarioAsignado({ personal_id, tipo_equipo }) {
     if (!personal_id) throw new Error('personal_id es requerido');
 
-    const tipoArticulo = tipo_equipo === 'celular'
-      ? 'Celular'
-      : (tipo_equipo === 'notebook' ? 'Notebook' : null);
+    const tipoArticulo = TIPO_EQUIPO_TO_TIPO_ARTICULO[tipo_equipo] || null;
 
     const includeInventario = {
       model: Inventario,
@@ -308,10 +303,7 @@ class SolicitudCompraService {
       const inv = await Inventario.findByPk(inventario_actual_id, {
         include: [{ model: TipoArticulo, as: 'tipoArticulo' }]
       });
-      const nombreTipo = (inv?.tipoArticulo?.nombre || '').toLowerCase();
-      const matchCelular = tipo_equipo === 'celular' && nombreTipo.includes('cel');
-      const matchNotebook = tipo_equipo === 'notebook' && nombreTipo.includes('notebook');
-      if (!matchCelular && !matchNotebook) {
+      if (!tipoArticuloCoincide(tipo_equipo, inv?.tipoArticulo?.nombre)) {
         throw new Error('El tipo del equipo actual no coincide con el tipo de equipo solicitado');
       }
     } else {

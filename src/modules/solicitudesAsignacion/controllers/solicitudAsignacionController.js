@@ -82,6 +82,51 @@ class SolicitudAsignacionController {
     }
   };
 
+  editar = async (req, res) => {
+    try {
+      const solicitud = await solicitudAsignacionService.editar(
+        req.params.id,
+        req.body,
+        buildContexto(req)
+      );
+      const completa = await solicitudAsignacionService.obtener(solicitud.id);
+      return success(res, completa, 'Solicitud actualizada correctamente');
+    } catch (err) {
+      logger.error('Error editando solicitud:', err);
+      return error(res, err.message, 400);
+    }
+  };
+
+  solicitarCompra = async (req, res) => {
+    try {
+      const solicitud = await solicitudAsignacionService.solicitarCompra(
+        req.params.id,
+        req.body,
+        buildContexto(req)
+      );
+      const completa = await solicitudAsignacionService.obtener(solicitud.id);
+      return success(res, completa, 'Solicitud marcada como pendiente de compra');
+    } catch (err) {
+      logger.error('Error solicitando compra:', err);
+      return error(res, err.message, 400);
+    }
+  };
+
+  aprobarInfra = async (req, res) => {
+    try {
+      const solicitud = await solicitudAsignacionService.aprobarInfra(
+        req.params.id,
+        req.body,
+        buildContexto(req)
+      );
+      const completa = await solicitudAsignacionService.obtener(solicitud.id);
+      return success(res, completa, 'Solicitud aprobada por Infraestructura');
+    } catch (err) {
+      logger.error('Error aprobando por Infra:', err);
+      return error(res, err.message, 400);
+    }
+  };
+
   asignarEquipo = async (req, res) => {
     try {
       const solicitud = await solicitudAsignacionService.asignarEquipo(

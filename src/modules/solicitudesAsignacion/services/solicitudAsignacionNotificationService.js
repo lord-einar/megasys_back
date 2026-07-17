@@ -102,6 +102,19 @@ class SolicitudAsignacionNotificationService {
     );
   }
 
+  async notificarAprobadaInfra(solicitud) {
+    const destinatarios = await this.obtenerDestinatarios('rrhh');
+    const mensaje = solicitud.compra_pendiente && !solicitud.inventario_asignado_id
+      ? 'Infraestructura aprobó la solicitud. El equipo tiene la compra pendiente (sin stock al momento). La solicitud está pendiente de tu aprobación de RRHH; el equipo se asignará cuando entre el stock.'
+      : 'Infraestructura aprobó la solicitud y asignó el equipo. La solicitud está pendiente de tu aprobación de RRHH.';
+    return this.enviarEmails(
+      destinatarios,
+      solicitud,
+      `Solicitud lista para aprobación RRHH — ${solicitud.getCodigo()}`,
+      mensaje
+    );
+  }
+
   async notificarAprobadaRrhh(solicitud) {
     const [compras, infra] = await Promise.all([
       this.obtenerDestinatarios('compras'),
@@ -142,6 +155,36 @@ class SolicitudAsignacionNotificationService {
       return this.notificarAprobadaRrhh(solicitud);
     }
     throw new Error(`Estado desconocido: ${solicitud.estado}`);
+  }
+
+  async notificarEditada(solicitud) {
+    const [infra, rrhh, compras] = await Promise.all([
+      this.obtenerDestinatarios('infraestructura'),
+      this.obtenerDestinatarios('rrhh'),
+      this.obtenerDestinatarios('compras')
+    ]);
+    const destinatarios = [...new Set([...infra, ...rrhh, ...compras])];
+    return this.enviarEmails(
+      destinatarios,
+      solicitud,
+      `Solicitud de asignación editada — ${solicitud.getCodigo()}`,
+      'Alguien editó una solicitud de asignación. Revisá los cambios en el detalle de la solicitud.'
+    );
+  }
+
+  async notificarSolicitudCompra(solicitud) {
+    const [infra, rrhh, compras] = await Promise.all([
+      this.obtenerDestinatarios('infraestructura'),
+      this.obtenerDestinatarios('rrhh'),
+      this.obtenerDestinatarios('compras')
+    ]);
+    const destinatarios = [...new Set([...infra, ...rrhh, ...compras])];
+    return this.enviarEmails(
+      destinatarios,
+      solicitud,
+      `Solicitud con compra pendiente — ${solicitud.getCodigo()}`,
+      'No hay stock disponible del equipo requerido. Compras debe gestionar la compra. La solicitud continúa su curso: RRHH puede aprobar la entrega igualmente y, cuando entre el stock, Infraestructura asignará el equipo editando la solicitud.'
+    );
   }
 
   async notificarCancelada(solicitud) {

@@ -11,7 +11,8 @@ import {
 
 const TIPOS_ARTICULO = {
   notebook: 'Notebook',
-  celular: 'Celular'
+  celular: 'Celular',
+  pc_escritorio: 'PC'
 };
 
 const TIPOS_PERMITIDOS = Object.values(TIPOS_ARTICULO);

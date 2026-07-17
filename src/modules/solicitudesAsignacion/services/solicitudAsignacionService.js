@@ -17,6 +17,7 @@ import {
 import logger from '../../../shared/utils/logger.js';
 import stockAlertService from './stockAlertService.js';
 import solicitudAsignacionNotificationService from './solicitudAsignacionNotificationService.js';
+import { TIPO_EQUIPO_TO_TIPO_ARTICULO, tipoArticuloCoincide, etiquetaTipoEquipo } from '../../../shared/constants/tipoEquipo.js';
 
 const ESTADOS_TERMINALES = ['finalizada', 'rechazada', 'cancelada'];
 const MOTIVOS_REPOSICION = ['reposicion_robo', 'reposicion_perdida', 'reposicion_rotura'];
@@ -169,13 +170,17 @@ class SolicitudAsignacionService {
     const where = { estado: 'disponible', activo: true };
 
     if (tipo_equipo) {
-      const nombreBuscar = tipo_equipo === 'notebook' ? 'Notebook' : 'Celular';
+      const nombreBuscar = TIPO_EQUIPO_TO_TIPO_ARTICULO[tipo_equipo] || 'Celular';
       const tiposArticulo = await TipoArticulo.findAll({
         where: { nombre: { [Op.iLike]: `%${nombreBuscar}%` } },
-        attributes: ['id']
+        attributes: ['id', 'nombre']
       });
-      if (!tiposArticulo.length) return [];
-      where.tipo_articulo_id = { [Op.in]: tiposArticulo.map(t => t.id) };
+      // Filtro estricto por coincidencia de tipo (evita que "PC" matchee parcialmente otros nombres).
+      const idsValidos = tiposArticulo
+        .filter(t => tipoArticuloCoincide(tipo_equipo, t.nombre))
+        .map(t => t.id);
+      if (!idsValidos.length) return [];
+      where.tipo_articulo_id = { [Op.in]: idsValidos };
     }
 
     if (categoria_id) where.categoria_id = categoria_id;
@@ -234,10 +239,7 @@ class SolicitudAsignacionService {
       const inv = await Inventario.findByPk(inventario_anterior_id, {
         include: [{ model: TipoArticulo, as: 'tipoArticulo' }]
       });
-      const nombreTipo = (inv?.tipoArticulo?.nombre || '').toLowerCase();
-      const matchCelular = tipo_equipo === 'celular' && nombreTipo.includes('cel');
-      const matchNotebook = tipo_equipo === 'notebook' && nombreTipo.includes('notebook');
-      if (!matchCelular && !matchNotebook) {
+      if (!tipoArticuloCoincide(tipo_equipo, inv?.tipoArticulo?.nombre)) {
         throw new Error('El tipo del equipo actual no coincide con el tipo de equipo solicitado');
       }
     } else {
@@ -277,6 +279,183 @@ class SolicitudAsignacionService {
 
     const completa = await this.obtener(solicitud.id);
     solicitudAsignacionNotificationService.notificarCreada(completa).catch(() => {});
+    return solicitud;
+  }
+
+  /**
+   * Edita los datos de una solicitud ya creada. Solo permitido en estados no
+   * terminales. Registra la edición en el historial y avisa por mail a
+   * Compras, RRHH e Infraestructura.
+   */
+  async editar(id, payload, contexto) {
+    const CAMPOS_EDITABLES = [
+      'tipo_equipo',
+      'motivo',
+      'observacion_solicitante',
+      'beneficiario_personal_id',
+      'denuncia_presentada',
+      'inventario_anterior_id'
+    ];
+
+    const solicitud = await sequelize.transaction(async (t) => {
+      const s = await SolicitudAsignacion.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
+      if (!s) throw new Error('Solicitud no encontrada');
+      if (ESTADOS_TERMINALES.includes(s.estado)) {
+        throw new Error(`No se puede editar una solicitud en estado ${s.estado}`);
+      }
+
+      // No permitir cambiar el tipo de equipo si ya hay un equipo asignado
+      // (quedaría inconsistente con el inventario en uso).
+      if (
+        payload.tipo_equipo &&
+        payload.tipo_equipo !== s.tipo_equipo &&
+        s.inventario_asignado_id
+      ) {
+        throw new Error('No se puede cambiar el tipo de equipo mientras haya un equipo asignado. Liberá el equipo primero.');
+      }
+
+      // Validar beneficiario si cambia
+      if (payload.beneficiario_personal_id && payload.beneficiario_personal_id !== s.beneficiario_personal_id) {
+        const beneficiario = await Personal.findByPk(payload.beneficiario_personal_id, { transaction: t });
+        if (!beneficiario || !beneficiario.activo) {
+          throw new Error('El beneficiario no existe o no está activo');
+        }
+      }
+
+      const tipoFinal = payload.tipo_equipo || s.tipo_equipo;
+      const motivoFinal = payload.motivo || s.motivo;
+      const esReposicion = MOTIVOS_REPOSICION.includes(motivoFinal);
+
+      // Construir diff de campos que efectivamente cambian
+      const diff = {};
+      for (const campo of CAMPOS_EDITABLES) {
+        if (!(campo in payload)) continue;
+        let nuevoValor = payload[campo];
+
+        if (campo === 'inventario_anterior_id') {
+          nuevoValor = esReposicion ? (nuevoValor || null) : null;
+        }
+        if (campo === 'denuncia_presentada') {
+          nuevoValor = motivoFinal === 'reposicion_robo' ? !!nuevoValor : null;
+        }
+
+        const valorActual = s.getDataValue(campo);
+        if (String(valorActual ?? '') !== String(nuevoValor ?? '')) {
+          diff[campo] = { antes: valorActual ?? null, despues: nuevoValor ?? null };
+          s.set(campo, nuevoValor);
+        }
+      }
+
+      if (Object.keys(diff).length === 0) {
+        throw new Error('No hay cambios para guardar');
+      }
+
+      const actor = await this.resolverPersonal(contexto.email);
+      const grupoActor = contexto.roleAnalysis?.hasInfraestructura ? 'infraestructura'
+        : contexto.roleAnalysis?.hasRRHH ? 'rrhh'
+        : contexto.roleAnalysis?.hasCompras ? 'compras'
+        : 'desconocido';
+
+      await s.save({ transaction: t });
+
+      await SolicitudAsignacionHistorial.create({
+        solicitud_id: s.id,
+        accion: 'editada',
+        actor_personal_id: actor.id,
+        actor_grupo: grupoActor,
+        comentario: payload.comentario_edicion || null,
+        diff
+      }, { transaction: t });
+
+      logger.info('Solicitud de asignación editada', { id: s.id, numero: s.numero, campos: Object.keys(diff) });
+      return s;
+    });
+
+    const completa = await this.obtener(solicitud.id);
+    solicitudAsignacionNotificationService.notificarEditada(completa).catch(() => {});
+    return solicitud;
+  }
+
+  /**
+   * Marca la solicitud como "compra pendiente" cuando no hay stock del equipo
+   * requerido. No frena el workflow: la solicitud avanza a la aprobación de RRHH
+   * igual (la aprobación decide si corresponde entregar un equipo). Cuando entra
+   * el stock comprado, Infra asigna el equipo editando la solicitud.
+   * Avisa a Compras, RRHH e Infraestructura.
+   */
+  async solicitarCompra(id, { observacion } = {}, contexto) {
+    const solicitud = await sequelize.transaction(async (t) => {
+      const s = await SolicitudAsignacion.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
+      if (!s) throw new Error('Solicitud no encontrada');
+      if (s.estado !== 'pendiente_infra') {
+        throw new Error(`Solo se puede solicitar compra desde la revisión de Infraestructura (estado actual: ${s.estado})`);
+      }
+      if (s.inventario_asignado_id) {
+        throw new Error('La solicitud ya tiene un equipo asignado');
+      }
+
+      const actor = await this.resolverPersonal(contexto.email);
+      // Solo marca la bandera. NO aprueba ni avanza el estado: la aprobación de
+      // Infra es un paso explícito aparte (aprobarInfra).
+      s.compra_pendiente = true;
+      if (observacion) s.infra_observacion = observacion;
+      await s.save({ transaction: t });
+
+      await SolicitudAsignacionHistorial.create({
+        solicitud_id: s.id,
+        accion: 'solicitud_compra',
+        actor_personal_id: actor.id,
+        actor_grupo: 'infraestructura',
+        comentario: observacion || 'Se solicita compra por falta de stock del equipo requerido.'
+      }, { transaction: t });
+
+      logger.info('Solicitud marcada como compra pendiente', { id: s.id, numero: s.numero });
+      return s;
+    });
+
+    const completa = await this.obtener(solicitud.id);
+    solicitudAsignacionNotificationService.notificarSolicitudCompra(completa).catch(() => {});
+    return solicitud;
+  }
+
+  /**
+   * Aprobación explícita de Infraestructura. Requiere que se haya asignado un
+   * equipo o que se haya marcado "compra pendiente". Avanza a la aprobación de RRHH.
+   */
+  async aprobarInfra(id, { observacion } = {}, contexto) {
+    const solicitud = await sequelize.transaction(async (t) => {
+      const s = await SolicitudAsignacion.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
+      if (!s) throw new Error('Solicitud no encontrada');
+      if (s.estado !== 'pendiente_infra') {
+        throw new Error(`No se puede aprobar por Infraestructura desde el estado ${s.estado}`);
+      }
+      if (!s.inventario_asignado_id && !s.compra_pendiente) {
+        throw new Error('Para aprobar debés asignar un equipo o marcar "Solicitar compra" si no hay stock');
+      }
+
+      const actor = await this.resolverPersonal(contexto.email);
+      if (!s.infra_asignador_id) s.infra_asignador_id = actor.id;
+      if (!s.infra_fecha) s.infra_fecha = new Date();
+      if (observacion) s.infra_observacion = observacion;
+      s.estado = 'pendiente_rrhh';
+      await s.save({ transaction: t });
+
+      await SolicitudAsignacionHistorial.create({
+        solicitud_id: s.id,
+        accion: 'aprobada_infra',
+        actor_personal_id: actor.id,
+        actor_grupo: 'infraestructura',
+        comentario: observacion || (s.compra_pendiente && !s.inventario_asignado_id
+          ? 'Aprobada con compra pendiente (sin stock al momento)'
+          : null)
+      }, { transaction: t });
+
+      logger.info('Solicitud aprobada por Infra', { id: s.id, numero: s.numero, compra_pendiente: s.compra_pendiente });
+      return s;
+    });
+
+    const completa = await this.obtener(solicitud.id);
+    solicitudAsignacionNotificationService.notificarAprobadaInfra(completa).catch(() => {});
     return solicitud;
   }
 
@@ -321,7 +500,13 @@ class SolicitudAsignacionService {
     const solicitud = await sequelize.transaction(async (t) => {
       const s = await SolicitudAsignacion.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
       if (!s) throw new Error('Solicitud no encontrada');
-      if (s.estado !== 'pendiente_infra') {
+      if (s.inventario_asignado_id) {
+        throw new Error('La solicitud ya tiene un equipo asignado');
+      }
+      // Se puede asignar en cualquier paso previo a la entrega. Esto cubre el caso
+      // "compra pendiente": la solicitud pudo avanzar / aprobarse sin stock y el
+      // equipo se asigna cuando entra el stock comprado.
+      if (!['pendiente_infra', 'pendiente_rrhh', 'aprobada'].includes(s.estado)) {
         throw new Error(`No se puede asignar equipo desde el estado ${s.estado}`);
       }
 
@@ -333,11 +518,8 @@ class SolicitudAsignacionService {
       if (!inventario.activo) throw new Error('El equipo no está activo');
       if (inventario.estado !== 'disponible') throw new Error(`El equipo no está disponible (estado: ${inventario.estado})`);
 
-      const nombreTipo = (inventario.tipoArticulo?.nombre || '').toLowerCase();
-      const matchCelular = s.tipo_equipo === 'celular' && nombreTipo.includes('cel');
-      const matchNotebook = s.tipo_equipo === 'notebook' && nombreTipo.includes('notebook');
-      if (!matchCelular && !matchNotebook) {
-        throw new Error(`El equipo seleccionado es ${inventario.tipoArticulo?.nombre} pero la solicitud es de ${s.tipo_equipo}`);
+      if (!tipoArticuloCoincide(s.tipo_equipo, inventario.tipoArticulo?.nombre)) {
+        throw new Error(`El equipo seleccionado es ${inventario.tipoArticulo?.nombre} pero la solicitud es de ${etiquetaTipoEquipo(s.tipo_equipo)}`);
       }
 
       // Gestionar equipo anterior si es reposición
@@ -379,7 +561,10 @@ class SolicitudAsignacionService {
       s.infra_fecha = new Date();
       s.infra_observacion = observacion || null;
       s.equipo_anterior_accion = equipo_anterior_accion || null;
-      s.estado = 'pendiente_rrhh';
+      // Ya hay equipo asignado: se resuelve la compra pendiente (si la había).
+      // Asignar el equipo NO aprueba ni avanza el workflow; eso lo hace la
+      // aprobación explícita de Infra (aprobarInfra).
+      s.compra_pendiente = false;
       await s.save({ transaction: t });
 
       await SolicitudAsignacionHistorial.create({
@@ -410,7 +595,11 @@ class SolicitudAsignacionService {
     }
 
     const completa = await this.obtener(solicitud.id);
-    solicitudAsignacionNotificationService.notificarEquipoAsignadoPorInfra(completa).catch(() => {});
+    // Si el equipo se asignó sobre una solicitud ya aprobada por RRHH (caso de
+    // compra pendiente resuelta), queda lista para generar el remito.
+    if (solicitud.estado === 'aprobada') {
+      solicitudAsignacionNotificationService.notificarAprobadaRrhh(completa).catch(() => {});
+    }
 
     return solicitud;
   }

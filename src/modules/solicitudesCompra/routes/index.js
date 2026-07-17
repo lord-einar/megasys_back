@@ -82,7 +82,7 @@ router.get('/lookups/inventario-asignado',
 router.get('/stock-equipos',
   requirePermission('solicitudes_compra', 'read'),
   [
-    query('tipo').optional().isIn(['notebook', 'celular']).withMessage('tipo debe ser notebook o celular'),
+    query('tipo').optional().isIn(SolicitudCompra.TIPOS_EQUIPO).withMessage('tipo inválido'),
     query('estado').optional().isIn(VALID_STATES).withMessage('estado inválido'),
     query('q').optional().isString()
   ],
