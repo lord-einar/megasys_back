@@ -131,7 +131,7 @@ class RemitoService {
 
       // Verificar si alguno está en estado activo
       const remitoActivo = detallesExistentes.find(detalle => {
-        return detalle.remito && ['preparado', 'en_transito'].includes(detalle.remito.estado);
+        return detalle.remito && ['borrador', 'preparado', 'en_transito'].includes(detalle.remito.estado);
       });
 
       if (remitoActivo) {
@@ -154,7 +154,7 @@ class RemitoService {
   /**
    * Validar que un artículo NO esté en otro remito activo
    * Un artículo no puede estar en 2 remitos activos simultáneamente
-   * Estados activos: preparado, en_transito, entregado
+   * Estados activos: borrador, preparado, en_transito, entregado
    */
   async validarArticuloNoEnTransito(inventarioId) {
     try {
@@ -168,7 +168,7 @@ class RemitoService {
           as: 'remito',
           where: {
             estado: {
-              [Op.in]: ['preparado', 'en_transito', 'entregado']
+              [Op.in]: ['borrador', 'preparado', 'en_transito', 'entregado']
             }
           }
         }]
@@ -232,7 +232,7 @@ class RemitoService {
         model: Remito,
         as: 'remito',
         where: {
-          estado: { [Op.in]: ['preparado', 'en_transito'] }
+          estado: { [Op.in]: ['borrador', 'preparado', 'en_transito'] }
         },
         attributes: ['id', 'numero_remito', 'estado'],
         required: true
@@ -727,7 +727,7 @@ class RemitoService {
   async cambiarEstado(remitoId, nuevoEstado, usuarioId, options = {}) {
     const { transaction: externalTransaction, userRoles = [], usuarioEmail = null, userAgent = null, ipAddress = null, privilegioApp = null } = options;
 
-    const estadosValidos = ['preparado', 'en_transito', 'entregado', 'completado', 'devuelto_parcial', 'devuelto', 'cancelado'];
+    const estadosValidos = ['borrador', 'preparado', 'en_transito', 'entregado', 'completado', 'devuelto_parcial', 'devuelto', 'cancelado'];
     if (!estadosValidos.includes(nuevoEstado)) {
       throw new Error(`Estado "${nuevoEstado}" no es válido`);
     }
@@ -751,6 +751,7 @@ class RemitoService {
 
     // Validaciones de transiciones de estado
     const transicionesValidas = {
+      'borrador': ['preparado', 'cancelado'],
       'preparado': ['en_transito', 'cancelado'],
       'en_transito': ['entregado', 'cancelado'],
       'entregado': ['completado', 'devuelto_parcial', 'devuelto', 'cancelado'],
@@ -1572,6 +1573,14 @@ class RemitoService {
             fechaConfirmacion,
             resultadoPDFConfirmado.buffer
           );
+          if (remitoCompleto.generado_desde_solicitud_asignacion) {
+            await emailService.enviarConfirmacionRecepcionACompras(
+              remitoCompleto,
+              resultadoPDFConfirmado.url,
+              fechaConfirmacion,
+              resultadoPDFConfirmado.buffer
+            );
+          }
           logger.info('Email de confirmación enviado');
         } catch (emailError) {
           logger.error('Error enviando email de confirmación:', {
