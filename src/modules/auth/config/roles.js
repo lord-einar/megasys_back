@@ -116,6 +116,7 @@ const PERMISSIONS = {
     rechazar: ['super_admin', 'rrhh'],
     dashboard: ['super_admin', 'rrhh', 'compras'],
     asignar_equipo: ['super_admin', 'compras'],
+    aprobar_infra: ['super_admin'],
     aprobar_rrhh: ['super_admin', 'rrhh'],
     generar_remito: ['super_admin'],
     finalizar: ['super_admin', 'rrhh'],

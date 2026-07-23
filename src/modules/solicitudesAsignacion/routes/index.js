@@ -103,7 +103,7 @@ router.put('/:id',
 // === WORKFLOW ===
 
 router.post('/:id/solicitar-compra',
-  requirePermission('solicitudes_asignacion', 'asignar_equipo'),
+  requirePermission('solicitudes_asignacion', 'aprobar_infra'),
   [...validarId, body('observacion').optional({ nullable: true }).isString()], validate,
   solicitudAsignacionController.solicitarCompra
 );
@@ -115,7 +115,7 @@ router.post('/:id/asignar-equipo',
 );
 
 router.post('/:id/aprobar-infra',
-  requirePermission('solicitudes_asignacion', 'asignar_equipo'),
+  requirePermission('solicitudes_asignacion', 'aprobar_infra'),
   [...validarId, body('observacion').optional({ nullable: true }).isString()], validate,
   solicitudAsignacionController.aprobarInfra
 );
