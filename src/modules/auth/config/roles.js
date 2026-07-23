@@ -47,9 +47,9 @@ const PERMISSIONS = {
 
   // Permisos para Inventario
   inventario: {
-    read: ['super_admin', 'helpdesk', 'support'],
+    read: ['super_admin', 'helpdesk', 'support', 'compras'],
     create: ['super_admin', 'support', 'compras'],
-    update: ['super_admin', 'support'],
+    update: ['super_admin', 'support', 'compras'],
     delete: ['super_admin', 'support']
   },
 
