@@ -185,14 +185,9 @@ class SolicitudAsignacionService {
 
     if (categoria_id) where.categoria_id = categoria_id;
 
-    // Solo equipos de depósito: sede cuyo nombre contenga "deposito"
-    const sedesDeposito = await Sede.findAll({
-      where: { nombre_sede: { [Op.iLike]: '%dep%' } },
-      attributes: ['id']
-    });
-    if (sedesDeposito.length) {
-      where.sede_id = { [Op.in]: sedesDeposito.map(s => s.id) };
-    }
+    // Se ofrece cualquier equipo disponible del tipo/categoría, sin importar la
+    // sede (consistente con lo que muestra "Stock disponible"). La sede del equipo
+    // se usa luego como origen del remito.
 
     return Inventario.findAll({
       where,

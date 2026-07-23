@@ -6,6 +6,7 @@ import {
   Sede,
   Personal,
   AsignacionInventario,
+  CategoriaEquipo,
   SolicitudCompra
 } from '../../../models/index.js';
 
@@ -19,6 +20,7 @@ const TIPOS_PERMITIDOS = Object.values(TIPOS_ARTICULO);
 
 const inventarioInclude = () => ([
   { model: TipoArticulo, as: 'tipoArticulo', attributes: ['id', 'nombre'] },
+  { model: CategoriaEquipo, as: 'categoria', attributes: ['id', 'nombre', 'tipo'] },
   { model: Sede, as: 'sedePrincipal', attributes: ['id', 'nombre_sede', 'localidad', 'provincia'] },
   {
     model: AsignacionInventario,
@@ -55,6 +57,11 @@ const inventarioToCard = (inv) => {
     service_tag: inv.service_tag,
     estado: inv.estado,
     activo: inv.activo,
+    categoria: inv.categoria ? {
+      id: inv.categoria.id,
+      nombre: inv.categoria.nombre,
+      tipo: inv.categoria.tipo
+    } : null,
     fecha_adquisicion: inv.fecha_adquisicion,
     observaciones: inv.observaciones,
     sede: sede ? {
