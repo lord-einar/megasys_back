@@ -81,6 +81,11 @@ const SolicitudAsignacion = sequelize.define('SolicitudAsignacion', {
     allowNull: false,
     defaultValue: false
   },
+  equipo_asignado_por_compras: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
+  },
   // Equipo anterior (reposiciones)
   inventario_anterior_id: {
     type: DataTypes.UUID,
