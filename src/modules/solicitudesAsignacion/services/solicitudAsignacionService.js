@@ -298,6 +298,9 @@ class SolicitudAsignacionService {
       if (ESTADOS_TERMINALES.includes(s.estado)) {
         throw new Error(`No se puede editar una solicitud en estado ${s.estado}`);
       }
+      if (s.inventario_asignado_id) {
+        throw new Error('No se puede editar una solicitud que ya tiene equipo asignado');
+      }
 
       // No permitir cambiar el tipo de equipo si ya hay un equipo asignado
       // (quedaría inconsistente con el inventario en uso).
@@ -498,6 +501,14 @@ class SolicitudAsignacionService {
       if (s.inventario_asignado_id) {
         throw new Error('La solicitud ya tiene un equipo asignado');
       }
+
+      const actorEsCompras = !!contexto.roleAnalysis?.hasCompras && !contexto.roleAnalysis?.hasInfraestructura;
+      if (actorEsCompras) {
+        if (s.estado !== 'aprobada' || !s.compra_pendiente) {
+          throw new Error('Compras solo puede asignar equipo en solicitudes aprobadas con compra pendiente');
+        }
+      }
+
       // Se puede asignar en cualquier paso previo a la entrega. Esto cubre el caso
       // "compra pendiente": la solicitud pudo avanzar / aprobarse sin stock y el
       // equipo se asigna cuando entra el stock comprado.
@@ -549,6 +560,7 @@ class SolicitudAsignacionService {
       }, { transaction: t });
 
       const actor = await this.resolverPersonal(contexto.email);
+      const actorGrupo = actorEsCompras ? 'compras' : 'infraestructura';
 
       s.inventario_asignado_id = inventario_id;
       s.categoria_id = categoria_id || null;
@@ -560,22 +572,73 @@ class SolicitudAsignacionService {
       // Asignar el equipo NO aprueba ni avanza el workflow; eso lo hace la
       // aprobación explícita de Infra (aprobarInfra).
       s.compra_pendiente = false;
+
+      if (actorEsCompras) {
+        if (!inventario.sede_id) {
+          throw new Error('El equipo asignado no tiene sede definida. Actualizá la sede del equipo en inventario antes de generar el borrador de remito.');
+        }
+        const beneficiario = await Personal.findByPk(s.beneficiario_personal_id, { transaction: t });
+        if (!beneficiario?.sede_id) {
+          throw new Error('El beneficiario no tiene sede principal asignada.');
+        }
+
+        const [seqRow] = await sequelize.query(
+          "SELECT NEXTVAL('remito_numero_seq') AS numero",
+          { type: Sequelize.QueryTypes.SELECT, transaction: t }
+        );
+        const year = new Date().getFullYear();
+        const numero_remito = `REM-${year}-${String(seqRow.numero).padStart(3, '0')}`;
+
+        const remito = await Remito.create({
+          numero_remito,
+          fecha: new Date(),
+          sede_origen_id: inventario.sede_id,
+          sede_destino_id: beneficiario.sede_id,
+          solicitante_id: s.beneficiario_personal_id,
+          tecnico_asignado_id: null,
+          estado: 'borrador',
+          generado_desde_solicitud_asignacion: true,
+          observaciones: `Borrador generado por Compras desde solicitud ${s.getCodigo()} - ${s.tipo_equipo} - ${(s.motivo || '').replaceAll('_', ' ')}`
+        }, { transaction: t });
+
+        await RemitoDetalle.create({
+          remito_id: remito.id,
+          inventario_id: s.inventario_asignado_id,
+          es_prestamo: false
+        }, { transaction: t });
+
+        s.remito_id = remito.id;
+        s.estado = 'remito_generado';
+      }
+
       await s.save({ transaction: t });
 
       await SolicitudAsignacionHistorial.create({
         solicitud_id: s.id,
         accion: 'equipo_asignado',
         actor_personal_id: actor.id,
-        actor_grupo: 'infraestructura',
+        actor_grupo: actorGrupo,
         comentario: observacion || null,
         diff: {
           inventario_id,
           marca: inventario.marca,
           modelo: inventario.modelo,
           categoria_id: categoria_id || null,
-          equipo_anterior_accion: equipo_anterior_accion || null
+          equipo_anterior_accion: equipo_anterior_accion || null,
+          remito_borrador_id: s.remito_id || null
         }
       }, { transaction: t });
+
+      if (actorEsCompras && s.remito_id) {
+        await SolicitudAsignacionHistorial.create({
+          solicitud_id: s.id,
+          accion: 'remito_generado',
+          actor_personal_id: actor.id,
+          actor_grupo: 'compras',
+          comentario: 'Borrador de remito generado automáticamente para completar por Infraestructura',
+          diff: { remito_id: s.remito_id, estado_remito: 'borrador' }
+        }, { transaction: t });
+      }
 
       invParaAlert = inventario;
       return s;
@@ -684,6 +747,7 @@ class SolicitudAsignacionService {
         sede_destino_id: s.beneficiario.sede_id,
         solicitante_id: s.beneficiario_personal_id,
         tecnico_asignado_id: tecnico_id || null,
+        generado_desde_solicitud_asignacion: true,
         observaciones: `Solicitud ${s.getCodigo()} — ${s.tipo_equipo} — ${(s.motivo || '').replaceAll('_', ' ')}`
       }, { transaction: t });
 
@@ -759,7 +823,7 @@ class SolicitudAsignacionService {
         throw new Error(`No se puede rechazar desde el estado ${s.estado}`);
       }
 
-      if (s.estado === 'pendiente_rrhh') {
+      if (s.inventario_asignado_id) {
         await this.liberarEquipo(s, t);
       }
 
@@ -796,8 +860,11 @@ class SolicitudAsignacionService {
       if (ESTADOS_TERMINALES.includes(s.estado)) {
         throw new Error(`No se puede cancelar una solicitud en estado ${s.estado}`);
       }
+      if (s.remito_id) {
+        throw new Error('No se puede cancelar una solicitud que ya generó remito. Gestioná el remito desde el módulo Remitos.');
+      }
 
-      if (s.inventario_asignado_id && s.estado !== 'pendiente_infra') {
+      if (s.inventario_asignado_id) {
         await this.liberarEquipo(s, t);
       }
 

@@ -661,7 +661,9 @@ VisitaProblemaResuelto.belongsTo(CategoriaProblema, {
 RemitoDetalle.addHook('afterCreate', async (remitoDetalle, options) => {
   try {
     // Obtener el remito completo
-    const remito = await Remito.findByPk(remitoDetalle.remito_id);
+    const remito = await Remito.findByPk(remitoDetalle.remito_id, {
+      transaction: options.transaction
+    });
 
     if (remito) {
       // Crear registro en historial
@@ -693,7 +695,8 @@ Remito.addHook('afterUpdate', async (remito, options) => {
       // Obtener todos los detalles del remito
       const detalles = await RemitoDetalle.findAll({
         where: { remito_id: remito.id },
-        include: ['inventarioDetalle']
+        include: ['inventarioDetalle'],
+        transaction: options.transaction
       });
 
       // Actualizar la sede de cada item de inventario (siempre, independientemente de si es préstamo)

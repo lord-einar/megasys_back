@@ -87,15 +87,20 @@ const Remito = sequelize.define('Remito', {
     }
   },
   estado: {
-    type: DataTypes.ENUM('preparado', 'en_transito', 'entregado', 'completado', 'devuelto_parcial', 'devuelto', 'cancelado'),
+    type: DataTypes.ENUM('borrador', 'preparado', 'en_transito', 'entregado', 'completado', 'devuelto_parcial', 'devuelto', 'cancelado'),
     allowNull: false,
     defaultValue: 'preparado',
     validate: {
       isIn: {
-        args: [['preparado', 'en_transito', 'entregado', 'completado', 'devuelto_parcial', 'devuelto', 'cancelado']],
-        msg: 'El estado debe ser: preparado, en_transito, entregado, completado, devuelto_parcial, devuelto o cancelado'
+        args: [['borrador', 'preparado', 'en_transito', 'entregado', 'completado', 'devuelto_parcial', 'devuelto', 'cancelado']],
+        msg: 'El estado debe ser: borrador, preparado, en_transito, entregado, completado, devuelto_parcial, devuelto o cancelado'
       }
     }
+  },
+  generado_desde_solicitud_asignacion: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
   },
   observaciones: {
     type: DataTypes.TEXT,
@@ -181,7 +186,7 @@ const Remito = sequelize.define('Remito', {
 
 // Métodos de instancia
 Remito.prototype.puedeEditarse = function () {
-  return this.estado === 'preparado';
+  return ['borrador', 'preparado'].includes(this.estado);
 };
 
 Remito.prototype.puedeEnviarse = function () {
@@ -197,7 +202,7 @@ Remito.prototype.puedeDevolverse = function () {
 };
 
 Remito.prototype.puedeCancelarse = function () {
-  return ['preparado', 'en_transito', 'entregado'].includes(this.estado);
+  return ['borrador', 'preparado', 'en_transito', 'entregado'].includes(this.estado);
 };
 
 Remito.prototype.estaCancelado = function () {
@@ -214,6 +219,7 @@ Remito.prototype.getDescripcion = function () {
 
 // Métodos estáticos para obtener estados válidos
 Remito.ESTADOS = {
+  BORRADOR: 'borrador',
   PREPARADO: 'preparado',
   EN_TRANSITO: 'en_transito',
   ENTREGADO: 'entregado',
@@ -223,6 +229,7 @@ Remito.ESTADOS = {
 };
 
 Remito.TRANSICIONES_VALIDAS = {
+  'borrador': ['preparado', 'cancelado'],
   'preparado': ['en_transito', 'cancelado'],
   'en_transito': ['entregado', 'cancelado'],
   'entregado': ['completado', 'devuelto', 'cancelado'],

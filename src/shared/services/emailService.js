@@ -32,6 +32,7 @@ const SMTP_CONFIG = {
 
 const EMAIL_FROM = process.env.SMTP_FROM || 'remitos@megatlon.com.ar';
 const EMAIL_INFRAESTRUCTURA = process.env.EMAIL_INFRAESTRUCTURA || 'infraestructura@megatlon.com.ar';
+const EMAIL_COMPRAS = process.env.EMAIL_COMPRAS || 'compras@megatlon.com.ar';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 // Activar Graph API en producción o si se fuerza explícitamente
 const USE_GRAPH_API = process.env.USE_GRAPH_API === 'true' || process.env.NODE_ENV === 'production';
@@ -618,6 +619,47 @@ class EmailService {
         error: error.message,
         remito: remito.numero_remito,
         email: emailSolicitante
+      });
+      throw error;
+    }
+  }
+
+  async enviarConfirmacionRecepcionACompras(remito, rutaPDF, fechaConfirmacion, pdfBuffer = null) {
+    try {
+      logger.info('📧 INICIANDO ENVÍO DE CONFIRMACIÓN A COMPRAS', {
+        remito: remito.numero_remito,
+        email: EMAIL_COMPRAS
+      });
+
+      const html = this.generarHTMLConfirmacion(remito, EMAIL_COMPRAS, fechaConfirmacion);
+
+      const attachment = {
+        filename: `Remito_${remito.numero_remito}_Confirmado.pdf`,
+      };
+
+      if (pdfBuffer) {
+        attachment.content = pdfBuffer;
+      } else {
+        attachment.path = rutaPDF;
+      }
+
+      const info = await this.enviarEmail(
+        EMAIL_COMPRAS,
+        `Remito confirmado por destinatario - ${remito.numero_remito}`,
+        html,
+        [attachment]
+      );
+
+      return {
+        success: true,
+        messageId: info.messageId,
+        email: EMAIL_COMPRAS
+      };
+    } catch (error) {
+      logger.error('✗ Error enviando confirmación a Compras:', {
+        error: error.message,
+        remito: remito.numero_remito,
+        email: EMAIL_COMPRAS
       });
       throw error;
     }
