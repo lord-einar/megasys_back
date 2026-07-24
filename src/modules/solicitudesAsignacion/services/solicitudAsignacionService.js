@@ -24,7 +24,8 @@ import {
   debeCrearBorradorCompras
 } from './solicitudAsignacionPolicy.js';
 
-const ESTADOS_TERMINALES = ['finalizada', 'rechazada', 'cancelada'];
+// remito_generado es terminal: la solicitud queda fija al vincular el remito.
+const ESTADOS_TERMINALES = ['remito_generado', 'finalizada', 'rechazada', 'cancelada'];
 const MOTIVOS_REPOSICION = ['reposicion_robo', 'reposicion_perdida', 'reposicion_rotura'];
 
 const includeRelaciones = (full = true) => {
@@ -729,7 +730,13 @@ class SolicitudAsignacionService {
     });
 
     const completa = await this.obtener(solicitud.id);
-    solicitudAsignacionNotificationService.notificarAprobadaRrhh(completa).catch(() => {});
+    // Si se generó el borrador automáticamente (equipo ya asignado por Compras),
+    // la solicitud queda en remito_generado; si no, sigue el flujo normal.
+    if (solicitud.estado === 'remito_generado') {
+      solicitudAsignacionNotificationService.notificarBorradorGenerado(completa).catch(() => {});
+    } else {
+      solicitudAsignacionNotificationService.notificarAprobadaRrhh(completa).catch(() => {});
+    }
     return solicitud;
   }
 
