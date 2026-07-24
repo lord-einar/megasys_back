@@ -24,7 +24,9 @@ const ESTADOS = [
   'cancelada'
 ];
 
-const ESTADOS_TERMINALES = ['finalizada', 'rechazada', 'cancelada'];
+// remito_generado es el estado final del flujo de la solicitud: una vez que se
+// vincula el remito, la evolución posterior se gestiona desde el módulo Remitos.
+const ESTADOS_TERMINALES = ['remito_generado', 'finalizada', 'rechazada', 'cancelada'];
 
 const SOLICITANTE_GRUPOS = ['infraestructura', 'rrhh', 'compras'];
 

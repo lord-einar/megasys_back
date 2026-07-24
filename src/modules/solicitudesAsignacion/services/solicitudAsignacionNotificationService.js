@@ -129,6 +129,20 @@ class SolicitudAsignacionNotificationService {
     );
   }
 
+  async notificarBorradorGenerado(solicitud) {
+    const [compras, infra] = await Promise.all([
+      this.obtenerDestinatarios('compras'),
+      this.obtenerDestinatarios('infraestructura')
+    ]);
+    const destinatarios = [...new Set([...compras, ...infra])];
+    return this.enviarEmails(
+      destinatarios,
+      solicitud,
+      `Solicitud aprobada — borrador de remito listo ${solicitud.getCodigo()}`,
+      'RRHH aprobó la solicitud y, como el equipo ya estaba asignado, se generó un borrador de remito. Infraestructura debe completarlo (técnico y entrega) desde el módulo Remitos.'
+    );
+  }
+
   async notificarRechazada(solicitud) {
     const destinatarios = [solicitud.solicitante?.email].filter(Boolean);
     return this.enviarEmails(
@@ -140,9 +154,9 @@ class SolicitudAsignacionNotificationService {
   }
 
   async reenviarAviso(solicitud) {
-    const ESTADOS_TERMINALES = ['finalizada', 'rechazada', 'cancelada'];
+    const ESTADOS_TERMINALES = ['remito_generado', 'finalizada', 'rechazada', 'cancelada'];
     if (ESTADOS_TERMINALES.includes(solicitud.estado)) {
-      throw new Error('No se puede reenviar aviso en una solicitud finalizada, rechazada o cancelada');
+      throw new Error('No se puede reenviar aviso: la solicitud ya está fijada (remito generado) o cerrada');
     }
 
     if (solicitud.estado === 'pendiente_infra') {
