@@ -741,16 +741,28 @@ class SolicitudAsignacionService {
   }
 
   async lookupSoporte() {
-    return Personal.findAll({
-      where: { activo: true },
-      include: [{
-        model: Rol,
-        as: 'rol',
-        where: { nombre: 'Tecnico sede' },
-        attributes: []
-      }],
-      attributes: ['id', 'nombre', 'apellido', 'email'],
-      order: [['apellido', 'ASC'], ['nombre', 'ASC']]
+    // Para remitos generados desde solicitudes de asignación, además de los
+    // técnicos de sede se incluye al personal de Compras (suele entregar los
+    // celulares). Este lookup es exclusivo de este flujo; "Nuevo remito" usa
+    // otro criterio y no se ve afectado.
+    const attributes = ['id', 'nombre', 'apellido', 'email'];
+    const [tecnicos, compras] = await Promise.all([
+      Personal.findAll({
+        where: { activo: true },
+        include: [{ model: Rol, as: 'rol', where: { nombre: 'Tecnico sede' }, attributes: [] }],
+        attributes
+      }),
+      Personal.findAll({
+        where: { activo: true, privilegio_app: 'compras' },
+        attributes
+      })
+    ]);
+
+    const porId = new Map();
+    [...tecnicos, ...compras].forEach(p => porId.set(p.id, p));
+    return Array.from(porId.values()).sort((a, b) => {
+      const porApellido = (a.apellido || '').localeCompare(b.apellido || '');
+      return porApellido !== 0 ? porApellido : (a.nombre || '').localeCompare(b.nombre || '');
     });
   }
 
