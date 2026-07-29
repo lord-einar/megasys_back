@@ -119,7 +119,7 @@ const PERMISSIONS = {
     aprobar_infra: ['super_admin'],
     aprobar_rrhh: ['super_admin', 'rrhh'],
     generar_remito: ['super_admin'],
-    finalizar: ['super_admin', 'rrhh'],
+    finalizar: ['super_admin', 'rrhh', 'compras'],
     reenviar_aviso: ['super_admin', 'rrhh', 'compras']
   }
 };
