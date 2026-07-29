@@ -6,7 +6,7 @@ import {
 } from '../../../modules/solicitudesAsignacion/services/solicitudAsignacionPolicy.js';
 
 describe('solicitudAsignacionPolicy', () => {
-  it.each(['pendiente_infra', 'pendiente_rrhh'])(
+  it.each(['pendiente_infra', 'pendiente_rrhh', 'aprobada'])(
     'permite a Compras asignar celulares en estado %s sin exigir compra pendiente',
     (estado) => {
       expect(comprasPuedeAsignarEquipo({
@@ -48,15 +48,8 @@ describe('solicitudAsignacionPolicy', () => {
     })).toBe(false);
   });
 
-  it('no permite asignar celulares aprobados, cerrados o ya fijados', () => {
-    expect(comprasPuedeAsignarEquipo({
-      estado: 'aprobada',
-      tipo_equipo: 'celular',
-      compra_pendiente: true,
-      inventario_asignado_id: null,
-      remito_id: null
-    })).toBe(false);
-
+  it('no permite asignar celulares cerrados o ya fijados', () => {
+    // Con equipo ya asignado: no se puede reasignar.
     expect(comprasPuedeAsignarEquipo({
       estado: 'pendiente_infra',
       tipo_equipo: 'celular',
@@ -64,6 +57,15 @@ describe('solicitudAsignacionPolicy', () => {
       remito_id: null
     })).toBe(false);
 
+    // Con remito ya generado: fijada.
+    expect(comprasPuedeAsignarEquipo({
+      estado: 'aprobada',
+      tipo_equipo: 'celular',
+      inventario_asignado_id: null,
+      remito_id: 'remito-1'
+    })).toBe(false);
+
+    // Estado terminal.
     expect(comprasPuedeAsignarEquipo({
       estado: 'cancelada',
       tipo_equipo: 'celular',

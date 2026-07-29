@@ -1,5 +1,7 @@
 const ESTADOS_PRE_REMITO = ['pendiente_infra', 'pendiente_rrhh', 'aprobada'];
-const ESTADOS_ASIGNABLES_COMPRAS = ['pendiente_infra', 'pendiente_rrhh', 'pendiente_compra'];
+// Compras puede asignar celulares mientras la solicitud no esté fijada; incluye
+// 'aprobada' para el caso de compra pendiente (celular que entra tras las aprobaciones).
+const ESTADOS_ASIGNABLES_COMPRAS = ['pendiente_infra', 'pendiente_rrhh', 'pendiente_compra', 'aprobada'];
 
 const esCompraPendiente = (solicitud) =>
   solicitud?.compra_pendiente === true || solicitud?.estado === 'pendiente_compra';
