@@ -24,8 +24,9 @@ import {
   debeCrearBorradorCompras
 } from './solicitudAsignacionPolicy.js';
 
-// remito_generado es terminal: la solicitud queda fija al vincular el remito.
-const ESTADOS_TERMINALES = ['remito_generado', 'finalizada', 'rechazada', 'cancelada'];
+// finalizada (equipo entregado) es terminal. En remito_generado, editar/cancelar
+// siguen bloqueados por tener equipo/remito asignado.
+const ESTADOS_TERMINALES = ['finalizada', 'rechazada', 'cancelada'];
 const MOTIVOS_REPOSICION = ['reposicion_robo', 'reposicion_perdida', 'reposicion_rotura'];
 
 const includeRelaciones = (full = true) => {
@@ -844,6 +845,11 @@ class SolicitudAsignacionService {
       }
 
       const actor = await this.resolverPersonal(contexto.email);
+      const grupoActor = contexto.roleAnalysis?.hasInfraestructura ? 'infraestructura'
+        : contexto.roleAnalysis?.hasRRHH ? 'rrhh'
+        : contexto.roleAnalysis?.hasCompras ? 'compras'
+        : 'infraestructura';
+
       s.cierre_personal_id = actor.id;
       s.cierre_fecha = new Date();
       s.cierre_observacion = observacion || null;
@@ -854,11 +860,11 @@ class SolicitudAsignacionService {
         solicitud_id: s.id,
         accion: 'finalizada',
         actor_personal_id: actor.id,
-        actor_grupo: 'infraestructura',
-        comentario: observacion || null
+        actor_grupo: grupoActor,
+        comentario: observacion || 'Equipo entregado en mano al beneficiario'
       }, { transaction: t });
 
-      logger.info('Solicitud de asignación finalizada', { id: s.id, numero: s.numero });
+      logger.info('Solicitud de asignación finalizada (equipo entregado)', { id: s.id, numero: s.numero });
       return s;
     });
   }
