@@ -691,9 +691,12 @@ class SolicitudAsignacionService {
     }
 
     const completa = await this.obtener(solicitud.id);
-    // Conserva el aviso existente para asignaciones aprobadas que no generan
-    // un borrador automático.
-    if (solicitud.estado === 'aprobada') {
+    if (solicitud.estado === 'remito_generado') {
+      // Compras asignó el celular sobre una solicitud ya aprobada: se generó el
+      // borrador automáticamente.
+      solicitudAsignacionNotificationService.notificarBorradorGenerado(completa).catch(() => {});
+    } else if (solicitud.estado === 'aprobada') {
+      // Asignación aprobada que no genera borrador automático.
       solicitudAsignacionNotificationService.notificarAprobadaRrhh(completa).catch(() => {});
     }
 
