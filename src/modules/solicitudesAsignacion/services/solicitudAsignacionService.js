@@ -20,12 +20,14 @@ import solicitudAsignacionNotificationService from './solicitudAsignacionNotific
 import { TIPO_EQUIPO_TO_TIPO_ARTICULO, tipoArticuloCoincide, etiquetaTipoEquipo } from '../../../shared/constants/tipoEquipo.js';
 import {
   ESTADOS_PRE_REMITO,
+  ESTADOS_GENERAR_REMITO,
   comprasPuedeAsignarEquipo,
   debeCrearBorradorCompras
 } from './solicitudAsignacionPolicy.js';
 
-// finalizada (equipo entregado) es terminal. En remito_generado, editar/cancelar
-// siguen bloqueados por tener equipo/remito asignado.
+// finalizada (equipo entregado) es terminal; el remito puede generarse después
+// sin sacarla de ese estado. En remito_generado, editar/cancelar siguen
+// bloqueados por tener equipo/remito asignado.
 const ESTADOS_TERMINALES = ['finalizada', 'rechazada', 'cancelada'];
 const MOTIVOS_REPOSICION = ['reposicion_robo', 'reposicion_perdida', 'reposicion_rotura'];
 
@@ -784,7 +786,10 @@ class SolicitudAsignacionService {
         transaction: t
       });
       if (!s) throw new Error('Solicitud no encontrada');
-      if (s.estado !== 'aprobada') throw new Error(`No se puede generar remito desde el estado ${s.estado}`);
+      if (!ESTADOS_GENERAR_REMITO.includes(s.estado)) {
+        throw new Error(`No se puede generar remito desde el estado ${s.estado}`);
+      }
+      if (s.remito_id) throw new Error('La solicitud ya tiene un remito generado');
       if (!s.inventarioAsignado) throw new Error('La solicitud no tiene equipo asignado');
       if (!s.inventarioAsignado.sede_id) {
         throw new Error('El equipo asignado no tiene sede definida. Actualizá la sede del equipo en inventario antes de generar el remito.');
@@ -820,7 +825,9 @@ class SolicitudAsignacionService {
       }, { transaction: t });
 
       s.remito_id = remito.id;
-      s.estado = 'remito_generado';
+      // Si el equipo ya se entregó, 'finalizada' es terminal y no se pisa: el
+      // remito queda como respaldo documental de una entrega ya hecha.
+      if (s.estado === 'aprobada') s.estado = 'remito_generado';
       await s.save({ transaction: t });
 
       await SolicitudAsignacionHistorial.create({
@@ -828,6 +835,7 @@ class SolicitudAsignacionService {
         accion: 'remito_generado',
         actor_personal_id: actor.id,
         actor_grupo: 'infraestructura',
+        comentario: s.estado === 'finalizada' ? 'Remito generado sobre una entrega ya realizada' : null,
         diff: { remito_id: remito.id, numero_remito }
       }, { transaction: t });
 
@@ -840,8 +848,13 @@ class SolicitudAsignacionService {
     return sequelize.transaction(async (t) => {
       const s = await SolicitudAsignacion.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
       if (!s) throw new Error('Solicitud no encontrada');
-      if (s.estado !== 'remito_generado') {
-        throw new Error(`No se puede finalizar desde el estado ${s.estado}. El remito debe estar generado.`);
+      // La entrega puede marcarse con la solicitud aprobada (equipo asignado),
+      // con o sin remito generado.
+      if (!['aprobada', 'remito_generado'].includes(s.estado)) {
+        throw new Error(`No se puede marcar como entregado desde el estado ${s.estado}. La solicitud debe estar aprobada y con el equipo asignado.`);
+      }
+      if (!s.inventario_asignado_id) {
+        throw new Error('No hay un equipo asignado para entregar.');
       }
 
       const actor = await this.resolverPersonal(contexto.email);

@@ -2,7 +2,9 @@ import { describe, expect, it } from '@jest/globals';
 import {
   comprasPuedeAsignarEquipo,
   debeCrearBorradorCompras,
-  esCompraPendiente
+  esCompraPendiente,
+  pendienteDeEntrega,
+  puedeGenerarRemito
 } from '../../../modules/solicitudesAsignacion/services/solicitudAsignacionPolicy.js';
 
 describe('solicitudAsignacionPolicy', () => {
@@ -102,6 +104,34 @@ describe('solicitudAsignacionPolicy', () => {
     expect(debeCrearBorradorCompras(solicitud)).toBe(false);
     solicitud.estado = 'aprobada';
     expect(debeCrearBorradorCompras(solicitud)).toBe(true);
+  });
+
+  it('marca pendiente de entrega con la solicitud aprobada y el equipo asignado', () => {
+    const base = { estado: 'aprobada', inventario_asignado_id: 'inventario-1' };
+
+    expect(pendienteDeEntrega(base)).toBe(true);
+    // El borrador automático de Compras tampoco está entregado todavía.
+    expect(pendienteDeEntrega({ ...base, estado: 'remito_generado' })).toBe(true);
+    // Sin equipo asignado no hay nada que entregar.
+    expect(pendienteDeEntrega({ ...base, inventario_asignado_id: null })).toBe(false);
+    // Aprobaciones incompletas o ya entregada.
+    expect(pendienteDeEntrega({ ...base, estado: 'pendiente_rrhh' })).toBe(false);
+    expect(pendienteDeEntrega({ ...base, estado: 'finalizada' })).toBe(false);
+  });
+
+  it('permite generar el remito antes o después de la entrega, y solo una vez', () => {
+    const base = { estado: 'aprobada', inventario_asignado_id: 'inventario-1', remito_id: null };
+
+    expect(puedeGenerarRemito(base)).toBe(true);
+    // La entrega va primero: con la solicitud finalizada el remito sigue pendiente.
+    expect(puedeGenerarRemito({ ...base, estado: 'finalizada' })).toBe(true);
+    // Ya tiene remito.
+    expect(puedeGenerarRemito({ ...base, remito_id: 'remito-1' })).toBe(false);
+    expect(puedeGenerarRemito({ ...base, estado: 'remito_generado', remito_id: 'remito-1' })).toBe(false);
+    // Sin equipo asignado o sin aprobar.
+    expect(puedeGenerarRemito({ ...base, inventario_asignado_id: null })).toBe(false);
+    expect(puedeGenerarRemito({ ...base, estado: 'pendiente_rrhh' })).toBe(false);
+    expect(puedeGenerarRemito({ ...base, estado: 'cancelada' })).toBe(false);
   });
 
 });

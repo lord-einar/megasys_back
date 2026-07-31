@@ -24,9 +24,11 @@ const ESTADOS = [
   'cancelada'
 ];
 
-// finalizada = equipo entregado en mano; es el estado terminal. remito_generado
-// queda como "remito hecho, pendiente de entrega" (no editable ni cancelable por
-// tener equipo/remito, pero se puede marcar como entregado).
+// finalizada = equipo entregado en mano; es el estado terminal. La entrega va
+// antes que el remito: se habilita con la solicitud aprobada y el equipo
+// asignado, y el remito se genera después (sin cambiar el estado terminal).
+// remito_generado sigue existiendo para el borrador automático de Compras, que
+// tampoco fue entregado todavía.
 const ESTADOS_TERMINALES = ['finalizada', 'rechazada', 'cancelada'];
 
 const SOLICITANTE_GRUPOS = ['infraestructura', 'rrhh', 'compras'];
