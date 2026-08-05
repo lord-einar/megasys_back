@@ -1,8 +1,10 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../shared/utils/database.js';
 import { randomUUID as uuidv4 } from 'node:crypto';
+import { CATEGORIA_TIPOS } from '../shared/constants/tipoEquipo.js';
 
-const TIPOS = ['notebook', 'celular', 'pc', 'ambos'];
+// 'ambos' = aplica a los tres tipos (nombre heredado de cuando eran sólo dos).
+const TIPOS = CATEGORIA_TIPOS;
 
 const CategoriaEquipo = sequelize.define('CategoriaEquipo', {
   id: {
