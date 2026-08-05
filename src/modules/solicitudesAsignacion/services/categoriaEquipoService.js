@@ -1,9 +1,19 @@
+import { Op } from 'sequelize';
 import { CategoriaEquipo, Inventario, SolicitudAsignacion } from '../../../models/index.js';
+import { CATEGORIA_TIPO_TODOS, normalizarTipoCategoria } from '../../../shared/constants/tipoEquipo.js';
 
 class CategoriaEquipoService {
   async listar({ tipo, activo } = {}) {
     const where = {};
-    if (tipo) where.tipo = tipo;
+    if (tipo) {
+      // Acepta 'pc_escritorio' además de 'pc' (ver normalizarTipoCategoria).
+      const tipoCategoria = normalizarTipoCategoria(tipo) || tipo;
+      // Al filtrar por un tipo concreto también se devuelven las categorías
+      // marcadas como "todos los tipos"; si no, quedarían inalcanzables.
+      where.tipo = tipoCategoria === CATEGORIA_TIPO_TODOS
+        ? CATEGORIA_TIPO_TODOS
+        : { [Op.in]: [tipoCategoria, CATEGORIA_TIPO_TODOS] };
+    }
     if (activo !== undefined && activo !== null) where.activo = activo;
     return CategoriaEquipo.findAll({
       where,
