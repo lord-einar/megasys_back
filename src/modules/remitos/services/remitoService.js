@@ -513,7 +513,7 @@ class RemitoService {
 
     // Filtros específicos
     if (estado) {
-      whereClause.estado = estado;
+      whereClause.estado = Array.isArray(estado) ? { [Op.in]: estado } : estado;
     }
 
     if (solicitante_id) {

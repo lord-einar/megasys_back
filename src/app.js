@@ -2,6 +2,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import morgan from 'morgan';
 import fs from 'fs';
 import path from 'path';
@@ -75,6 +76,9 @@ app.use(helmet({
   crossOriginResourcePolicy: false
 }));
 app.use(cors(corsOptions));
+// Compresión gzip de las respuestas (> 1 KB). Los listados JSON pesan entre
+// 70% y 90% menos; en producción el ahorro es mayor por la latencia a Railway.
+app.use(compression({ threshold: 1024 }));
 app.use(morgan('combined', {
   stream: {
     write: (message) => logger.info(message.trim())
