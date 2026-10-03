@@ -150,6 +150,43 @@ class SolicitudAsignacionService {
     return { rows, count, page, limit };
   }
 
+  // Resumen para el panel: conteos por estado calculados en la base (no sobre
+  // una página de resultados) y solo las solicitudes que requieren acción.
+  async resumen({ limitePendientes = 8 } = {}) {
+    const filasPorEstado = await SolicitudAsignacion.findAll({
+      attributes: ['estado', [Sequelize.fn('COUNT', Sequelize.col('id')), 'cantidad']],
+      group: ['estado'],
+      raw: true
+    });
+    const porEstado = Object.fromEntries(filasPorEstado.map(f => [f.estado, Number(f.cantidad)]));
+
+    // remito_generado sigue requiriendo acción (marcar "Equipo entregado") y una
+    // entrega sin remito queda pendiente del remito de respaldo.
+    const requiereAccion = {
+      [Op.or]: [
+        { estado: { [Op.in]: ['pendiente_infra', 'pendiente_rrhh', 'aprobada', 'remito_generado'] } },
+        { estado: 'finalizada', remito_id: null }
+      ]
+    };
+
+    const [requierenAccion, pendientes] = await Promise.all([
+      SolicitudAsignacion.count({ where: requiereAccion }),
+      SolicitudAsignacion.findAll({
+        where: requiereAccion,
+        include: includeRelaciones(false),
+        order: [['created_at', 'DESC']],
+        limit: limitePendientes
+      })
+    ]);
+
+    return {
+      total: Object.values(porEstado).reduce((a, b) => a + b, 0),
+      porEstado,
+      requierenAccion,
+      pendientes
+    };
+  }
+
   async obtener(id) {
     return SolicitudAsignacion.findByPk(id, {
       include: includeRelaciones(true),

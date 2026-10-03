@@ -60,6 +60,16 @@ class SolicitudAsignacionController {
     }
   };
 
+  resumen = async (req, res) => {
+    try {
+      const data = await solicitudAsignacionService.resumen();
+      return success(res, data);
+    } catch (err) {
+      logger.error('Error obteniendo resumen de solicitudes de asignación:', err);
+      return error(res, err.message || 'Error al obtener el resumen', 500);
+    }
+  };
+
   obtener = async (req, res) => {
     try {
       const solicitud = await solicitudAsignacionService.obtener(req.params.id);

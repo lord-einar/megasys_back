@@ -68,10 +68,23 @@ class RemitoController {
    */
   async listar(req, res) {
     try {
+      // estado acepta uno o varios valores (?estado=a&estado=b). Se validan contra
+      // el enum del modelo para responder 400 en vez de un error de Postgres.
+      let estado = req.query.estado || null;
+      if (estado) {
+        const estados = (Array.isArray(estado) ? estado : [estado]).map(String);
+        const validos = Remito.rawAttributes.estado.values;
+        const invalidos = estados.filter(e => !validos.includes(e));
+        if (invalidos.length) {
+          return error(res, `Estado de remito inválido: ${invalidos.join(', ')}`, 400);
+        }
+        estado = estados.length === 1 ? estados[0] : estados;
+      }
+
       const filters = {
         page: req.query.page || 1,
         limit: req.query.limit || 10,
-        estado: req.query.estado || null,
+        estado,
         es_prestamo: req.query.es_prestamo || null,
         solicitante_id: req.query.solicitante_id || null,
         tecnico_id: req.query.tecnico_id || null,

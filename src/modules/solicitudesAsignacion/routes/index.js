@@ -72,6 +72,12 @@ router.get('/',
   solicitudAsignacionController.listar
 );
 
+// Antes de '/:id' para que "resumen" no se interprete como id
+router.get('/resumen',
+  requirePermission('solicitudes_asignacion', 'dashboard'),
+  solicitudAsignacionController.resumen
+);
+
 router.get('/:id',
   requirePermission('solicitudes_asignacion', 'read'),
   validarId, validate,
