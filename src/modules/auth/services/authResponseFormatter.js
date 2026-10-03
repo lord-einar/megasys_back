@@ -1,6 +1,14 @@
 // src/modules/auth/services/authResponseFormatter.js
 import logger from '../../../shared/utils/logger.js';
 
+// Todo lo que llega de la URL (error, descripción) se escapa antes de entrar al HTML
+const escapeHtml = (valor) => String(valor ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
 class AuthResponseFormatter {
   /**
    * Constructor
@@ -21,12 +29,13 @@ class AuthResponseFormatter {
    */
   formatAuthErrorRedirect(error, description) {
     const errorMsg = encodeURIComponent(description || error);
-    const redirectUrl = `${this.frontendLoginUrl}?error=${error}&error_description=${errorMsg}`;
+    const redirectUrl = `${this.frontendLoginUrl}?error=${encodeURIComponent(error)}&error_description=${errorMsg}`;
 
+    // El detalle del error lo muestra el login; acá solo se redirige
     return this.generateRedirectHtml(
-      'Error de autenticación',
+      'Volviendo al Portal IT',
       redirectUrl,
-      `Error de autenticación: ${error}`
+      'Volviendo al portal…'
     );
   }
 
@@ -38,9 +47,9 @@ class AuthResponseFormatter {
     const redirectUrl = `${this.frontendLoginUrl}?error=missing_code`;
 
     return this.generateRedirectHtml(
-      'Error de autenticación',
+      'Volviendo al Portal IT',
       redirectUrl,
-      'Código de autenticación faltante'
+      'Volviendo al portal…'
     );
   }
 
@@ -56,9 +65,9 @@ class AuthResponseFormatter {
       const redirectUrl = `${this.frontendLoginUrl}?auth_data=${encodedData}`;
 
       return this.generateRedirectHtml(
-        'Autenticación en progreso...',
+        'Ingresando al Portal IT',
         redirectUrl,
-        'Redirigiendo...'
+        'Verificando tu acceso…'
       );
     } catch (error) {
       logger.error('Error formateando redirección de éxito:', error);
@@ -75,62 +84,44 @@ class AuthResponseFormatter {
    * @returns {string} HTML
    */
   generateRedirectHtml(title, redirectUrl, message) {
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${title}</title>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <meta http-equiv="refresh" content="0; url=${redirectUrl}">
-          <style>
-            *, *::before, *::after { box-sizing: border-box; }
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-              display: flex;
-              flex-direction: column;
-              justify-content: center;
-              align-items: center;
-              min-height: 100vh;
-              margin: 0;
-              background-color: #020617;
-              background-image: linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
-                                linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px);
-              background-size: 56px 56px;
-              color: #94a3b8;
-            }
-            .spinner {
-              width: 32px;
-              height: 32px;
-              border: 2px solid rgba(255,255,255,0.15);
-              border-top-color: rgba(255,255,255,0.8);
-              border-radius: 50%;
-              animation: spin 0.8s linear infinite;
-              margin-bottom: 16px;
-            }
-            @keyframes spin { to { transform: rotate(360deg); } }
-            p {
-              font-size: 13px;
-              font-weight: 500;
-              margin: 0;
-              color: #475569;
-            }
-            a {
-              color: #6366f1;
-              text-decoration: none;
-              font-size: 12px;
-              margin-top: 12px;
-              display: inline-block;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="spinner"></div>
-          <p>${message}</p>
-          <a href="${redirectUrl}">Continuar manualmente</a>
-        </body>
-      </html>
-    `;
+    // Misma estética que la pantalla de espera del frontend (fondo petróleo), para
+    // que el paso por el backend no se vea como una pantalla distinta. Redirige al
+    // instante por script; el meta refresh y el enlace quedan como respaldo.
+    const urlHtml = escapeHtml(redirectUrl);
+    const urlJs = JSON.stringify(redirectUrl).replace(/</g, '\\u003c');
+    return `<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>${escapeHtml(title)}</title>
+    <meta http-equiv="refresh" content="0; url=${urlHtml}">
+    <script>window.location.replace(${urlJs});</script>
+    <style>
+      html, body { height: 100%; margin: 0; }
+      body {
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;
+        background: #0e2a2e; color: #a9c3c5;
+        font-family: 'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif;
+      }
+      .spinner {
+        width: 32px; height: 32px; border-radius: 50%;
+        border: 3px solid rgba(255,255,255,0.2); border-top-color: #6fd0c9;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+      p { margin: 0; font-size: 16px; }
+      a { color: #6fd0c9; font-size: 15px; }
+    </style>
+  </head>
+  <body>
+    <div class="spinner" aria-hidden="true"></div>
+    <p role="status">${escapeHtml(message)}</p>
+    <noscript><a href="${urlHtml}">Continuar al portal</a></noscript>
+  </body>
+</html>`;
   }
 
   /**
