@@ -4,6 +4,11 @@ import { success, error } from '../../../shared/utils/response.js';
 import logger from '../../../shared/utils/logger.js';
 import Sede from '../../../models/Sede.js';
 
+// Autor de las escrituras en Dynamics: sale del token de sesión, no del navegador
+const autorDe = (req) => ({ nombre: req.user?.name || null, email: req.user?.email || null });
+
+const ACCIONES_TAREA = ['completar', 'cancelar', 'postergar'];
+
 class CrmController {
 
     /**
@@ -21,7 +26,7 @@ class CrmController {
             return success(res, resultado);
         } catch (err) {
             logger.error('[CRM] Error listarCasos:', err);
-            return error(res, err.message || 'Error consultando casos de CRM', 500);
+            return error(res, err.message || 'Error consultando casos de CRM', err.statusCode || 500);
         }
     }
 
@@ -35,8 +40,7 @@ class CrmController {
             return success(res, caso);
         } catch (err) {
             logger.error('[CRM] Error obtenerCaso:', err);
-            const statusCode = err.message?.includes('404') ? 404 : 500;
-            return error(res, err.message || 'Error obteniendo caso', statusCode);
+            return error(res, err.message || 'Error obteniendo caso', err.statusCode || 500);
         }
     }
 
@@ -55,7 +59,7 @@ class CrmController {
             return success(res, resultado);
         } catch (err) {
             logger.error('[CRM] Error listarCasosPorSede:', err);
-            return error(res, err.message || 'Error consultando casos de la sede', 500);
+            return error(res, err.message || 'Error consultando casos de la sede', err.statusCode || 500);
         }
     }
 
@@ -84,7 +88,7 @@ class CrmController {
             return success(res, accounts);
         } catch (err) {
             logger.error('[CRM] Error listarAccounts:', err);
-            return error(res, err.message || 'Error consultando cuentas de CRM', 500);
+            return error(res, err.message || 'Error consultando cuentas de CRM', err.statusCode || 500);
         }
     }
 
@@ -100,6 +104,9 @@ class CrmController {
 
             if (!accountId) {
                 return error(res, 'El accountId es requerido', 400);
+            }
+            if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(accountId)) {
+                return error(res, 'accountId inválido', 400);
             }
 
             const sede = await Sede.findByPk(sedeId);
@@ -151,7 +158,7 @@ class CrmController {
             return success(res, { mensaje: 'Tarea completada exitosamente' });
         } catch (err) {
             logger.error('[CRM] Error completarTarea:', err);
-            return error(res, err.message || 'Error completando tarea en CRM', 500);
+            return error(res, err.message || 'Error completando tarea en CRM', err.statusCode || 500);
         }
     }
 
@@ -165,7 +172,7 @@ class CrmController {
             return success(res, { mensaje: 'Tarea cancelada exitosamente' });
         } catch (err) {
             logger.error('[CRM] Error cancelarTarea:', err);
-            return error(res, err.message || 'Error cancelando tarea en CRM', 500);
+            return error(res, err.message || 'Error cancelando tarea en CRM', err.statusCode || 500);
         }
     }
 
@@ -176,15 +183,36 @@ class CrmController {
     async agregarNotaTarea(req, res) {
         try {
             const { tareaId } = req.params;
-            const { texto, asunto } = req.body;
+            const { texto } = req.body;
             if (!texto || !texto.trim()) {
                 return error(res, 'El texto de la nota es requerido', 400);
             }
-            await crmService.agregarNotaTarea(tareaId, texto.trim(), asunto);
+            const autor = autorDe(req);
+            await crmService.agregarNotaTarea(tareaId, texto.trim(), autor, `Observación - Portal IT${autor.nombre ? ` - ${autor.nombre}` : ''}`);
             return success(res, { mensaje: 'Nota agregada exitosamente' });
         } catch (err) {
             logger.error('[CRM] Error agregarNotaTarea:', err);
-            return error(res, err.message || 'Error agregando nota en CRM', 500);
+            return error(res, err.message || 'Error agregando nota en CRM', err.statusCode || 500);
+        }
+    }
+
+    /**
+     * Resuelve una tarea desde el informe de visita: escribe el comentario (con
+     * el autor de la sesión) y después completa o cancela la tarea.
+     */
+    async resolverTarea(req, res) {
+        try {
+            const { tareaId } = req.params;
+            const { accion, observacion } = req.body;
+            if (!ACCIONES_TAREA.includes(accion)) {
+                return error(res, `Acción inválida. Use: ${ACCIONES_TAREA.join(', ')}`, 400);
+            }
+            const resultado = await crmService.resolverTarea(tareaId, accion, observacion, autorDe(req));
+            logger.info('[CRM] Tarea resuelta desde informe', { tareaId, accion, ...resultado, usuario: req.user?.email });
+            return success(res, resultado);
+        } catch (err) {
+            logger.error('[CRM] Error resolverTarea:', err);
+            return error(res, err.message || 'Error actualizando la tarea en CRM', err.statusCode || 500);
         }
     }
 }

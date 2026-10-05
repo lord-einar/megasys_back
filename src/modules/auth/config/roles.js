@@ -79,7 +79,10 @@ const PERMISSIONS = {
 
   // Permisos para CRM (Dynamics 365)
   crm: {
-    read: ['super_admin', 'helpdesk', 'support']
+    read: ['super_admin', 'helpdesk', 'support'],
+    // Completar/cancelar tareas, agregar notas en Dynamics y vincular sedes.
+    // Mismos roles que lectura por ahora; separado para poder restringirlo.
+    write: ['super_admin', 'helpdesk', 'support']
   },
 
   // Permisos para Solicitudes de Compra de equipos (celulares y notebooks)

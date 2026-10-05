@@ -16,6 +16,20 @@ const API_VERSION = 'v9.2';
 // ─── Helper: petición a Dataverse ────────────────────────────────────────────
 
 /**
+ * Error de Dataverse con un mensaje apto para mostrar al usuario. El cuerpo
+ * completo de la respuesta queda solo en el log.
+ */
+const dataverseError = async (res) => {
+    const body = await res.text();
+    let detalle = '';
+    try { detalle = JSON.parse(body)?.error?.message || ''; } catch { /* cuerpo no JSON */ }
+    logger.error(`[CRM] Dataverse ${res.status}: ${body.slice(0, 2000)}`);
+    const err = new Error(detalle ? `Dynamics 365: ${detalle}` : `Dynamics 365 rechazó la operación (${res.status})`);
+    err.statusCode = res.status === 404 ? 404 : 502;
+    return err;
+};
+
+/**
  * Ejecuta una petición GET a la Dataverse API.
  * Maneja renovación de token en caso de 401.
  * @param {string} path - Ruta relativa, ej: '/incidents?$select=title'
@@ -42,10 +56,7 @@ const dataverseGet = async (path) => {
             return null; // señal para reintentar
         }
 
-        if (!res.ok) {
-            const body = await res.text();
-            throw new Error(`Dataverse API error ${res.status}: ${body}`);
-        }
+        if (!res.ok) throw await dataverseError(res);
 
         return res.json();
     };
@@ -88,10 +99,7 @@ const dataversePatch = async (path, body) => {
             return null;
         }
 
-        if (!res.ok) {
-            const text = await res.text();
-            throw new Error(`Dataverse API error ${res.status}: ${text}`);
-        }
+        if (!res.ok) throw await dataverseError(res);
 
         return true;
     };
@@ -321,34 +329,6 @@ const listarCasosConTareasAbiertas = async (incidentFilters, limit) => {
 };
 
 /**
- * DEBUG: Busca tareas de un caso probando distintas formas.
- */
-const debugTareasPorCaso = async (incidentId) => {
-    // 1. Buscar tareas con regardingobjectid
-    const path1 = `/tasks?$select=activityid,subject,_regardingobjectid_value&$filter=_regardingobjectid_value eq '${incidentId}'&$top=5`;
-    const r1 = await dataverseGet(path1);
-
-    // 2. Buscar CUALQUIER tarea reciente para ver la estructura
-    const path2 = `/tasks?$select=activityid,subject,_regardingobjectid_value&$top=3&$orderby=createdon desc`;
-    const r2 = await dataverseGet(path2);
-
-    // 3. Buscar actividades del caso vía navigation property
-    let r3 = null;
-    try {
-        const path3 = `/incidents(${incidentId})/Incident_Tasks?$select=activityid,subject&$top=5`;
-        r3 = await dataverseGet(path3);
-    } catch (e) {
-        r3 = { error: e.message };
-    }
-
-    return {
-        filtroRegarding: { count: (r1.value ?? []).length, data: r1.value ?? [] },
-        tareasRecientes: { count: (r2.value ?? []).length, data: r2.value ?? [] },
-        navigationProperty: r3?.value ?? r3,
-    };
-};
-
-/**
  * Lista los casos de una account/sede específica.
  */
 const listarCasosPorSede = async (accountId, filtros = {}, paginacion = {}) => {
@@ -435,10 +415,7 @@ const dataversePost = async (path, body) => {
             return null;
         }
 
-        if (!res.ok) {
-            const text = await res.text();
-            throw new Error(`Dataverse API error ${res.status}: ${text}`);
-        }
+        if (!res.ok) throw await dataverseError(res);
 
         if (res.status === 204) return {};
         return res.json();
@@ -485,13 +462,62 @@ const cancelarTarea = async (tareaId) => {
  * @param {string} [asunto] - Asunto de la nota
  * @returns {Promise<void>}
  */
-const agregarNotaTarea = async (tareaId, texto, asunto = 'Observación - MegaSys') => {
+const agregarNotaTarea = async (tareaId, texto, autor, asunto = 'Observación - Portal IT') => {
     logger.info(`[CRM] agregarNotaTarea → ${tareaId}: ${asunto}`);
     await dataversePost('/annotations', {
         subject: asunto,
-        notetext: texto,
+        notetext: conAutor(texto, autor),
         'objectid_task@odata.bind': `/tasks(${tareaId})`,
     });
+};
+
+/**
+ * Agrega al final del comentario quién lo registró. El autor sale del token de
+ * sesión (lo arma el backend), nunca de datos enviados por el navegador: la
+ * escritura en Dynamics la hace la cuenta de servicio, así que esta línea es el
+ * único registro de la persona.
+ */
+const conAutor = (texto, autor) => {
+    if (!autor?.nombre && !autor?.email) return texto;
+    const quien = autor.nombre ? `${autor.nombre}${autor.email ? ` (${autor.email})` : ''}` : autor.email;
+    const cuando = new Date().toLocaleString('es-AR', {
+        timeZone: 'America/Argentina/Buenos_Aires',
+        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    });
+    return `${texto}\n\n— Registrado por ${quien} desde Portal IT, ${cuando}`;
+};
+
+const ASUNTO_POR_ACCION = {
+    completar: 'Tarea completada',
+    cancelar: 'Tarea cancelada',
+    postergar: 'Tarea postergada',
+};
+
+/**
+ * Resuelve una tarea desde el informe de visita. El comentario se escribe ANTES
+ * de cambiar el estado: una tarea completada o cancelada queda de solo lectura
+ * en Dynamics y puede rechazar notas nuevas.
+ * @param {string} tareaId
+ * @param {'completar'|'cancelar'|'postergar'} accion
+ * @param {string} observacion
+ * @param {{nombre?: string, email?: string}} autor
+ * @returns {Promise<{nota: boolean, estado: boolean}>}
+ */
+const resolverTarea = async (tareaId, accion, observacion, autor) => {
+    const resultado = { nota: false, estado: false };
+    const texto = (observacion || '').trim();
+
+    if (texto) {
+        const asunto = `${ASUNTO_POR_ACCION[accion]} - Portal IT${autor?.nombre ? ` - ${autor.nombre}` : ''}`;
+        await agregarNotaTarea(tareaId, texto, autor, asunto);
+        resultado.nota = true;
+    }
+
+    if (accion === 'completar') await completarTarea(tareaId);
+    if (accion === 'cancelar') await cancelarTarea(tareaId);
+    resultado.estado = accion !== 'postergar';
+
+    return resultado;
 };
 
 export default {
@@ -503,5 +529,5 @@ export default {
     completarTarea,
     cancelarTarea,
     agregarNotaTarea,
-    debugTareasPorCaso,
+    resolverTarea,
 };

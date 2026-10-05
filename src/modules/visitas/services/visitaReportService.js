@@ -101,23 +101,10 @@ class VisitaReportService {
                 }]
             });
 
-            // Total de casos cerrados
-            const casosResult = await sequelize.query(`
-                SELECT COUNT(*) as total
-                FROM visita_informes vi
-                INNER JOIN visitas v ON vi.visita_id = v.id
-                WHERE jsonb_array_length(vi.casos_resueltos) > 0
-                ${filtros.fecha_desde ? `AND v.fecha >= :fecha_desde` : ''}
-                ${filtros.fecha_hasta ? `AND v.fecha <= :fecha_hasta` : ''}
-            `, {
-                replacements: {
-                    fecha_desde: filtros.fecha_desde,
-                    fecha_hasta: filtros.fecha_hasta
-                },
-                type: sequelize.QueryTypes.SELECT
-            });
-
-            const totalCasos = casosResult[0]?.total || 0;
+            // Total de casos cerrados: misma fuente y filtros que la lista detallada
+            // (antes contaba informes con al menos un caso escrito a mano, sin
+            // filtros de técnico/sede y sin los casos cerrados desde el CRM).
+            const totalCasos = (await this.obtenerListaCasosCerrados(filtros)).length;
 
             // Promedio de problemas por visita
             const promedioProblemas = visitasRealizadas > 0
@@ -542,10 +529,10 @@ class VisitaReportService {
                         model: VisitaInforme,
                         as: 'informe',
                         required: true,
-                        where: sequelize.where(
-                            sequelize.fn('jsonb_array_length', sequelize.col('informe.casos_resueltos')),
-                            Op.gt,
-                            0
+                        // Casos escritos a mano o tareas del CRM marcadas como realizadas
+                        where: sequelize.literal(
+                            `(jsonb_array_length(COALESCE("informe"."casos_resueltos", '[]'::jsonb)) > 0
+                              OR COALESCE("informe"."casos_crm_estado", '[]'::jsonb) @> '[{"estado": "realizado"}]'::jsonb)`
                         )
                     },
                     {
@@ -564,13 +551,28 @@ class VisitaReportService {
                 order: [['fecha', 'DESC']]
             });
 
-            // Aplanar los casos de cada visita
+            // Aplanar los casos de cada visita. Un caso cuenta una vez por visita
+            // aunque esté escrito a mano y también cerrado desde el CRM, o tenga
+            // varias tareas realizadas.
             const casos = [];
             visitas.forEach(visita => {
-                const casosResueltos = visita.informe?.casos_resueltos || [];
-                casosResueltos.forEach(caso => {
+                const porCaso = new Map();
+                for (const caso of visita.informe?.casos_resueltos || []) {
+                    const clave = String(caso).trim().toUpperCase();
+                    if (clave && !porCaso.has(clave)) porCaso.set(clave, { caso: String(caso).trim(), origen: 'manual' });
+                }
+                for (const tarea of visita.informe?.casos_crm_estado || []) {
+                    if (tarea?.estado !== 'realizado' || !tarea.numeroCaso) continue;
+                    const clave = String(tarea.numeroCaso).trim().toUpperCase();
+                    const previo = porCaso.get(clave);
+                    if (previo) previo.origen = 'crm';
+                    else porCaso.set(clave, { caso: String(tarea.numeroCaso).trim(), origen: 'crm', titulo: tarea.titulo || null });
+                }
+                porCaso.forEach(({ caso, origen, titulo }) => {
                     casos.push({
-                        caso: caso,
+                        caso,
+                        origen,
+                        titulo: titulo || null,
                         fecha_visita: visita.fecha,
                         tecnico: visita.tecnicoAsignado ?
                             `${visita.tecnicoAsignado.nombre} ${visita.tecnicoAsignado.apellido}` :
