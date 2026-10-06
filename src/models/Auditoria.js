@@ -33,13 +33,14 @@ const Auditoria = sequelize.define('Auditoria', {
     comment: 'Módulo afectado (inventario, sedes, personal, etc.)'
   },
   accion: {
-    type: DataTypes.ENUM('crear', 'leer', 'actualizar', 'eliminar', 'cambiar_estado', 'exportar', 'importar', 'otro'),
+    // Texto libre: cada módulo registra sus propias acciones (crear, update,
+    // procesar_devolucion, asignar_equipo, ...)
+    type: DataTypes.STRING(50),
     allowNull: false,
     index: true,
     validate: {
-      isIn: {
-        args: [['crear', 'leer', 'actualizar', 'eliminar', 'cambiar_estado', 'exportar', 'importar', 'otro']],
-        msg: 'Acción no válida'
+      notEmpty: {
+        msg: 'La acción es requerida'
       }
     },
     comment: 'Tipo de acción realizada'

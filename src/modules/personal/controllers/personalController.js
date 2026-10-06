@@ -5,6 +5,7 @@ import asyncHandler from '../../../shared/utils/asyncHandler.js';
 import logger from '../../../shared/utils/logger.js';
 import entraSyncService from '../services/entraSyncService.js';
 import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
+import { fechaArgentina } from '../../../shared/utils/fechas.js';
 
 class PersonalController {
   /**
@@ -149,6 +150,9 @@ class PersonalController {
       success(res, resultado.data, 'Persona actualizada correctamente');
     } catch (err) {
       logger.error('Error actualizando persona:', err);
+      if (err.statusCode) {
+        return error(res, err.message, err.statusCode);
+      }
       if (err.message.includes('no encontrada')) {
         return error(res, err.message, 404);
       }
@@ -198,7 +202,7 @@ class PersonalController {
       if (err.message.includes('no encontrada')) {
         return error(res, err.message, 404);
       }
-      if (err.message.includes('remito')) {
+      if (err.message.includes('remito') || err.message.includes('equipo(s) asignado(s)')) {
         return error(res, err.message, 409);
       }
       error(res, err.message || 'Error al eliminar la persona', 500);
@@ -296,7 +300,7 @@ class PersonalController {
 
       // Configurar headers para descarga
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="personal_${new Date().toISOString().split('T')[0]}.csv"`);
+      res.setHeader('Content-Disposition', `attachment; filename="personal_${fechaArgentina()}.csv"`);
 
       // Agregar BOM para UTF-8 (ayuda con caracteres especiales en Excel)
       res.send('\ufeff' + csv);

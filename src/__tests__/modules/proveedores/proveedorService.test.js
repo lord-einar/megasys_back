@@ -1,5 +1,6 @@
 // src/__tests__/modules/proveedores/proveedorService.test.js
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
+import { conTodosLosModelos } from '../../setup/modelsMock.js';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 
@@ -22,7 +23,7 @@ const mockSequelize = {
 
 // Mock de modelos
 const modelsPath = resolve(__dirname, '../../../models/index.js');
-await jest.unstable_mockModule(modelsPath, () => ({
+await jest.unstable_mockModule(modelsPath, () => conTodosLosModelos({
   Proveedor: {
     create: jest.fn(),
     findByPk: jest.fn(),

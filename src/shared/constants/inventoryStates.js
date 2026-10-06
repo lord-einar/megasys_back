@@ -26,13 +26,14 @@ export const STATE_DESCRIPTIONS = {
   [INVENTORY_STATES.PRODUCTO_PROVEEDOR]: 'Producto perteneciente a un proveedor'
 };
 
-// Transiciones permitidas entre estados (validación de lógica de negocio)
+// Transiciones permitidas al cambiar el estado a mano (PATCH /inventario/:id/estado).
+// "en_prestamo" no figura como destino: solo lo asigna un remito de préstamo.
 export const STATE_TRANSITIONS = {
   [INVENTORY_STATES.DISPONIBLE]: [
     INVENTORY_STATES.EN_USO,
-    INVENTORY_STATES.EN_PRESTAMO,
     INVENTORY_STATES.MANTENIMIENTO,
-    INVENTORY_STATES.DADO_DE_BAJA
+    INVENTORY_STATES.DADO_DE_BAJA,
+    INVENTORY_STATES.PRODUCTO_PROVEEDOR
   ],
   [INVENTORY_STATES.EN_USO]: [
     INVENTORY_STATES.DISPONIBLE,
@@ -46,6 +47,7 @@ export const STATE_TRANSITIONS = {
   ],
   [INVENTORY_STATES.MANTENIMIENTO]: [
     INVENTORY_STATES.DISPONIBLE,
+    INVENTORY_STATES.EN_USO,
     INVENTORY_STATES.DADO_DE_BAJA
   ],
   [INVENTORY_STATES.DADO_DE_BAJA]: [], // No se puede salir de este estado
@@ -55,3 +57,27 @@ export const STATE_TRANSITIONS = {
     INVENTORY_STATES.DADO_DE_BAJA
   ]
 };
+
+// Estados con los que se puede dar de alta un artículo. "en_prestamo" solo lo
+// asigna un remito (los celulares/notebooks tampoco nacen "en_uso": lo pone la asignación).
+export const CREATION_STATES = VALID_STATES.filter(e => e !== INVENTORY_STATES.EN_PRESTAMO);
+
+/**
+ * Valida un cambio manual de estado.
+ * @returns {string|null} motivo del rechazo, o null si la transición es válida
+ */
+export function validarTransicionManual(estadoActual, nuevoEstado) {
+  if (!VALID_STATES.includes(nuevoEstado)) return `Estado "${nuevoEstado}" no es válido`;
+  if (nuevoEstado === estadoActual) return 'El nuevo estado es igual al actual';
+  if (nuevoEstado === INVENTORY_STATES.EN_PRESTAMO) {
+    return 'El estado "en préstamo" se asigna creando un remito de préstamo';
+  }
+  if (estadoActual === INVENTORY_STATES.DADO_DE_BAJA) {
+    return 'Un artículo dado de baja no puede cambiar de estado';
+  }
+  const permitidos = STATE_TRANSITIONS[estadoActual] || [];
+  if (!permitidos.includes(nuevoEstado)) {
+    return `No se puede pasar de "${estadoActual}" a "${nuevoEstado}". Permitidos: ${permitidos.join(', ')}`;
+  }
+  return null;
+}

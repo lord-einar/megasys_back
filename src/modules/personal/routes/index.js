@@ -328,8 +328,8 @@ router.get('/:id/remitos',
 
     query('estado')
       .optional({ checkFalsy: true })
-      .isIn(['preparado', 'en_transito', 'entregado', 'completado', 'devuelto', 'cancelado'])
-      .withMessage('Estado debe ser: preparado, en_transito, entregado, completado, devuelto o cancelado'),
+      .isIn(['borrador', 'preparado', 'en_transito', 'entregado', 'completado', 'devuelto_parcial', 'devuelto', 'cancelado'])
+      .withMessage('Estado debe ser: borrador, preparado, en_transito, entregado, completado, devuelto_parcial, devuelto o cancelado'),
 
     query('limite')
       .optional()

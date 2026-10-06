@@ -182,6 +182,9 @@ const initializeRoutes = async () => {
   // Rutas de asignaciones de inventario a personal
   await loadRoutes('./modules/asignaciones/routes/index.js', '/api/asignaciones');
 
+  // Novedades de movimiento de personal (sync Entra ID) - solo super_admin
+  await loadRoutes('./modules/novedadesPersonal/routes/index.js', '/api/novedades-personal');
+
   // Rutas de solicitudes de compra de equipos
   await loadRoutes('./modules/solicitudesCompra/routes/catalogoEquipoRoutes.js', '/api/catalogo-equipos');
   await loadRoutes('./modules/solicitudesCompra/routes/index.js', '/api/solicitudes-compra');

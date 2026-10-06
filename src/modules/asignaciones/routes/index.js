@@ -39,7 +39,13 @@ const validarListar = [
   query('tipo_articulo').optional().isString()
 ];
 
+const validarPreviewTraslado = [
+  query('personal_id').isUUID().withMessage('personal_id debe ser un UUID válido'),
+  query('sede_id').isUUID().withMessage('sede_id debe ser un UUID válido')
+];
+
 router.get('/', validarListar, validate, asignacionInventarioController.listar);
+router.get('/traslado-preview', validarPreviewTraslado, validate, asignacionInventarioController.previsualizarTraslado);
 router.get('/:id', validarId, validate, asignacionInventarioController.obtener);
 router.post('/', validarCrear, validate, asignacionInventarioController.crear);
 router.patch('/:id/cerrar', [...validarId, ...validarCerrar], validate, asignacionInventarioController.cerrar);

@@ -1,5 +1,6 @@
 // src/__tests__/modules/inventario/inventarioService.test.js
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { conTodosLosModelos } from '../../setup/modelsMock.js';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 
@@ -22,7 +23,7 @@ const mockSequelize = {
 
 // Mock de modelos - usando ruta absoluta
 const modelsPath = resolve(__dirname, '../../../models/index.js');
-await jest.unstable_mockModule(modelsPath, () => ({
+await jest.unstable_mockModule(modelsPath, () => conTodosLosModelos({
   Inventario: {
     create: jest.fn(),
     findByPk: jest.fn(),
@@ -46,7 +47,14 @@ await jest.unstable_mockModule(modelsPath, () => ({
     findAll: jest.fn()
   },
   RemitoDetalle: {
-    findOne: jest.fn()
+    findOne: jest.fn(),
+    // Sin remitos ni préstamos: el cambio manual de estado no se bloquea
+    findAll: jest.fn(() => Promise.resolve([]))
+  },
+  // Sin asignaciones a personas
+  AsignacionInventario: {
+    findOne: jest.fn(() => Promise.resolve(null)),
+    findAll: jest.fn(() => Promise.resolve([]))
   },
   Remito: {
     findOne: jest.fn()
@@ -103,6 +111,12 @@ await jest.unstable_mockModule(loggerPath, () => ({
 const databasePath = resolve(__dirname, '../../../shared/utils/database.js');
 await jest.unstable_mockModule(databasePath, () => ({
   sequelize: mockSequelize
+}));
+
+// Mock de garantías (consulta externa fire-and-forget al crear)
+const garantiaServicePath = resolve(__dirname, '../../../modules/inventario/services/garantiaService.js');
+await jest.unstable_mockModule(garantiaServicePath, () => ({
+  default: { consultarYGuardar: jest.fn(() => Promise.resolve()) }
 }));
 
 // Importar módulos mockeados - usando rutas absolutas

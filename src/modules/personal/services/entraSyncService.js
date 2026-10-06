@@ -7,6 +7,7 @@ import Sede from '../../../models/Sede.js';
 import Rol from '../../../models/Rol.js';
 import Empresa from '../../../models/Empresa.js';
 import logger from '../../../shared/utils/logger.js';
+import novedadMovimientoService from '../../novedadesPersonal/services/novedadMovimientoService.js';
 
 class EntraSyncService {
     constructor() {
@@ -251,8 +252,24 @@ class EntraSyncService {
                     if (!personalData.apellido) personalData.apellido = 'EntraID';
 
                     if (personal) {
+                        const sedeAnteriorId = personal.sede_id;
                         await personal.update(personalData);
                         stats.updated++;
+
+                        // El cambio de sede NO mueve equipos: queda como novedad
+                        // para que un super_admin la confirme.
+                        if (sedeAnteriorId !== personalData.sede_id) {
+                            try {
+                                await novedadMovimientoService.registrar({
+                                    personalId: personal.id,
+                                    sedeAnteriorId,
+                                    sedeNuevaId: personalData.sede_id
+                                });
+                                stats.novedades = (stats.novedades || 0) + 1;
+                            } catch (novedadError) {
+                                logger.error(`Error registrando novedad de movimiento para ${email}:`, novedadError);
+                            }
+                        }
                     } else {
                         const [newPersonal, created] = await Personal.findOrCreate({
                             where: { email },

@@ -43,6 +43,7 @@ import CategoriaEquipo from './CategoriaEquipo.js';
 import SolicitudAsignacion from './SolicitudAsignacion.js';
 import SolicitudAsignacionHistorial from './SolicitudAsignacionHistorial.js';
 import SolicitudAsignacionAdjunto from './SolicitudAsignacionAdjunto.js';
+import NovedadMovimientoPersonal from './NovedadMovimientoPersonal.js';
 
 // =====================================================
 // DEFINICIÓN DE RELACIONES
@@ -739,6 +740,26 @@ AsignacionInventario.belongsTo(Inventario, {
 });
 
 // =====================================================
+// NOVEDADES DE MOVIMIENTO DE PERSONAL (sync Entra ID)
+// =====================================================
+NovedadMovimientoPersonal.belongsTo(Personal, {
+  foreignKey: 'personal_id',
+  as: 'personal'
+});
+NovedadMovimientoPersonal.belongsTo(Sede, {
+  foreignKey: 'sede_anterior_id',
+  as: 'sedeAnterior'
+});
+NovedadMovimientoPersonal.belongsTo(Sede, {
+  foreignKey: 'sede_nueva_id',
+  as: 'sedeNueva'
+});
+NovedadMovimientoPersonal.belongsTo(Personal, {
+  foreignKey: 'resuelto_por_id',
+  as: 'resueltoPor'
+});
+
+// =====================================================
 // RELACIONES SOLICITUDES DE COMPRA DE EQUIPOS
 // =====================================================
 
@@ -932,7 +953,8 @@ const models = {
   CategoriaEquipo,
   SolicitudAsignacion,
   SolicitudAsignacionHistorial,
-  SolicitudAsignacionAdjunto
+  SolicitudAsignacionAdjunto,
+  NovedadMovimientoPersonal
 };
 
 // Agregar métodos de asociación globales
@@ -991,5 +1013,6 @@ export {
   CategoriaEquipo,
   SolicitudAsignacion,
   SolicitudAsignacionHistorial,
-  SolicitudAsignacionAdjunto
+  SolicitudAsignacionAdjunto,
+  NovedadMovimientoPersonal
 };

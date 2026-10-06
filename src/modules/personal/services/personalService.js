@@ -6,6 +6,8 @@ import { randomUUID as uuidv4 } from 'node:crypto';
 import { assignSistemasRoleIfAuthorized } from '../../../shared/utils/sistemasRoleAssignment.js';
 import CommonValidators from '../../../shared/validators/commonValidators.js';
 import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
+import asignacionInventarioService from '../../asignaciones/services/asignacionInventarioService.js';
+import novedadMovimientoService from '../../novedadesPersonal/services/novedadMovimientoService.js';
 
 class PersonalService {
   /**
@@ -206,9 +208,10 @@ class PersonalService {
     const {
       tipo = 'todos', // 'solicitados', 'asignados' o 'todos'
       estado = null,
-      limit = 10,
+      limite, // nombre que valida la ruta
       page = 1
     } = filters;
+    const limit = filters.limit || limite || 10;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
     const whereClause = {};
@@ -234,7 +237,7 @@ class PersonalService {
 
     query.limit = parseInt(limit);
     query.offset = offset;
-    query.order = [['fecha_creacion', 'DESC']];
+    query.order = [['created_at', 'DESC']];
 
     const { count, rows } = await Remito.findAndCountAll(query);
 
@@ -384,6 +387,16 @@ class PersonalService {
       await CommonValidators.validarSedesActivas(sedesParaActualizar);
     }
 
+    // Sede principal resultante: la primera de 'sedes' o 'sede_id' explícito
+    let sedePrincipalNueva = persona.sede_id;
+    if (Array.isArray(sedesParaActualizar) && sedesParaActualizar.length > 0) {
+      sedePrincipalNueva = sedesParaActualizar[0];
+    } else if (datosActualizacion.sede_id !== undefined) {
+      sedePrincipalNueva = datosActualizacion.sede_id || null;
+    }
+    const cambiaSedePrincipal = sedePrincipalNueva !== persona.sede_id;
+    let equiposTrasladados = [];
+
     await TransactionWrapper.execute({
       operation: async (transaction) => {
         // Preparar datos (excluir 'sedes' de la actualización de Personal)
@@ -436,6 +449,16 @@ class PersonalService {
           await persona.update({ sede_id: sedesParaActualizar[0] }, { transaction });
         }
 
+        // Los celulares/notebooks asignados acompañan a la persona a su sede nueva
+        if (cambiaSedePrincipal) {
+          equiposTrasladados = await asignacionInventarioService.trasladarEquipos(persona, sedePrincipalNueva, {
+            transaction,
+            usuarioEmail,
+            origen: 'edicion_personal'
+          });
+          await novedadMovimientoService.cerrarPorCambioManual(personalId, { transaction, usuarioEmail });
+        }
+
         return persona;
       },
       usuarioEmail: usuarioEmail || 'sistema@megatlon.com.ar',
@@ -455,27 +478,39 @@ class PersonalService {
       personalId: persona.id,
       cambios: Object.keys(datosActualizacion),
       sedesActualizadas: sedesParaActualizar?.length || 0,
+      equiposTrasladados: equiposTrasladados.length,
       actualizadoPor: usuarioEmail
     });
 
-    return await this.obtenerConDetalles(personalId);
+    const actualizada = await this.obtenerConDetalles(personalId);
+    return {
+      ...(typeof actualizada?.toJSON === 'function' ? actualizada.toJSON() : actualizada),
+      equiposTrasladados
+    };
   }
 
   /**
    * Verificar si tiene remitos pendientes antes de eliminar
    */
   async verificarRemitosPendientes(personalId) {
+    // Completado, devuelto y cancelado son estados finales: no bloquean la baja
+    const estadoPendiente = { [Op.notIn]: ['completado', 'devuelto', 'cancelado'] };
     const remitosPendientes = await Remito.count({
       where: {
         [Op.or]: [
-          { solicitante_id: personalId, estado: { [Op.ne]: 'completado' } },
-          { tecnico_asignado_id: personalId, estado: { [Op.ne]: 'completado' } }
+          { solicitante_id: personalId, estado: estadoPendiente },
+          { tecnico_asignado_id: personalId, estado: estadoPendiente }
         ]
       }
     });
 
     if (remitosPendientes > 0) {
       throw new Error(`No se puede eliminar el personal. Existen ${remitosPendientes} remito(s) pendiente(s) asociado(s) a esta persona. Por favor completa o reasigna todos los remitos pendientes.`);
+    }
+
+    const equipos = await asignacionInventarioService.asignacionesPersonalesActivas(personalId);
+    if (equipos.length > 0) {
+      throw new Error(`No se puede eliminar el personal. Tiene ${equipos.length} equipo(s) asignado(s) (celular/notebook). Registrá la devolución antes de darlo de baja.`);
     }
   }
 

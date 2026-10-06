@@ -5,6 +5,11 @@ import { Op } from 'sequelize';
 import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
 import CommonValidators from '../../../shared/validators/commonValidators.js';
 import garantiaService from './garantiaService.js';
+import asignacionInventarioService from '../../asignaciones/services/asignacionInventarioService.js';
+import { CREATION_STATES, validarTransicionManual } from '../../../shared/constants/inventoryStates.js';
+import { tipoEquipoPersonalDeArticulo } from '../../../shared/constants/tipoEquipo.js';
+
+const errorValidacion = (mensaje) => Object.assign(new Error(mensaje), { statusCode: 400 });
 
 class InventarioService {
   /**
@@ -35,6 +40,38 @@ class InventarioService {
     const itemExistente = await Inventario.findOne({ where: whereClause });
     if (itemExistente) {
       throw new Error(`Ya existe un equipo con el IMEI \"${imei}\" en el sistema.`);
+    }
+  }
+
+  /**
+   * Valida un cambio de estado hecho a mano (no por remitos ni asignaciones).
+   */
+  async validarCambioManualEstado(item, nuevoEstado) {
+    const motivo = validarTransicionManual(item.estado, nuevoEstado);
+    if (motivo) throw errorValidacion(motivo);
+
+    if (await asignacionInventarioService.tieneAsignacionPersonalActiva(item.id)) {
+      throw errorValidacion('Este equipo está asignado a una persona. Registrá la devolución desde Equipos asignados antes de cambiar su estado.');
+    }
+
+    const tipoArticulo = await TipoArticulo.findByPk(item.tipo_articulo_id, { attributes: ['nombre'] });
+    if (nuevoEstado === 'en_uso' && tipoEquipoPersonalDeArticulo(tipoArticulo?.nombre)) {
+      throw errorValidacion('Los celulares y notebooks pasan a "en uso" al asignarlos a una persona desde Equipos asignados.');
+    }
+
+    const detalles = await RemitoDetalle.findAll({
+      where: { inventario_id: item.id },
+      include: [{ model: Remito, as: 'remito', required: true, where: { estado: { [Op.ne]: 'cancelado' } }, attributes: ['numero_remito', 'estado'] }]
+    });
+
+    const remitoActivo = detalles.find(d => ['borrador', 'preparado', 'en_transito'].includes(d.remito.estado));
+    if (remitoActivo) {
+      throw errorValidacion(`El artículo está en el remito ${remitoActivo.remito.numero_remito} (${remitoActivo.remito.estado}). Cambiá el estado desde el remito.`);
+    }
+
+    const prestamoPendiente = detalles.find(d => d.es_prestamo && !d.devuelto && d.remito.estado !== 'devuelto');
+    if (prestamoPendiente) {
+      throw errorValidacion(`El artículo tiene un préstamo pendiente en el remito ${prestamoPendiente.remito.numero_remito}. Usá "Procesar devolución" en ese remito.`);
     }
   }
 
@@ -280,7 +317,16 @@ class InventarioService {
     } = datosNuevo;
 
     // Validaciones previas (fuera de la transacción)
+    if (!CREATION_STATES.includes(estado)) {
+      throw errorValidacion(`No se puede dar de alta un artículo en estado "${estado}"`);
+    }
     await CommonValidators.validarTipoArticuloActivo(tipo_articulo_id);
+    if (estado === 'en_uso') {
+      const tipoArticulo = await TipoArticulo.findByPk(tipo_articulo_id, { attributes: ['nombre'] });
+      if (tipoEquipoPersonalDeArticulo(tipoArticulo?.nombre)) {
+        throw errorValidacion('Los celulares y notebooks se dan de alta como disponibles y pasan a "en uso" al asignarlos.');
+      }
+    }
     await CommonValidators.validarSedeActiva(sede_id);
     await this.validarNumeroSerieUnico(numero_serie);
     await this.validarImeiUnico(imei);
@@ -428,8 +474,18 @@ class InventarioService {
       await this.validarImeiUnico(datosActualizacion.imei, inventarioId);
     }
 
+    if (datosActualizacion.estado && datosActualizacion.estado !== item.estado) {
+      await this.validarCambioManualEstado(item, datosActualizacion.estado);
+    }
+
     let sedeAnterior = null;
     if (datosActualizacion.sede_id && datosActualizacion.sede_id !== item.sede_id) {
+      if (await asignacionInventarioService.tieneAsignacionPersonalActiva(inventarioId)) {
+        throw Object.assign(
+          new Error('Este equipo está asignado a una persona y se ubica en su sede. Para moverlo, cambiá la sede de la persona o cerrá la asignación.'),
+          { statusCode: 400 }
+        );
+      }
       await CommonValidators.validarSedeActiva(datosActualizacion.sede_id);
       sedeAnterior = item.sede_id;
     }
@@ -499,9 +555,7 @@ class InventarioService {
     }
 
     const estadoAnterior = item.estado;
-    if (nuevoEstado === estadoAnterior) {
-      throw new Error('El nuevo estado es igual al actual');
-    }
+    await this.validarCambioManualEstado(item, nuevoEstado);
 
     // Guardar valores para auditoría
     const valoresAnteriores = { estado: estadoAnterior };
@@ -510,8 +564,11 @@ class InventarioService {
     // Ejecutar dentro de transacción con auditoría
     const resultado = await TransactionWrapper.execute({
       operation: async (transaction) => {
-        // Cambiar estado
-        await item.update({ estado: nuevoEstado }, { transaction });
+        // Cambiar estado (dar de baja también desactiva, igual que eliminar)
+        await item.update(
+          nuevoEstado === 'dado_de_baja' ? { estado: nuevoEstado, activo: false } : { estado: nuevoEstado },
+          { transaction }
+        );
 
         // Crear registro en historial si hay cambio significativo
         if (['mantenimiento', 'dado_de_baja'].includes(nuevoEstado)) {
@@ -562,6 +619,10 @@ class InventarioService {
 
     if (!item) {
       throw new Error('Item de inventario no encontrado');
+    }
+
+    if (item.estado !== 'dado_de_baja') {
+      await this.validarCambioManualEstado(item, 'dado_de_baja');
     }
 
     // Guardar valores para auditoría

@@ -1,5 +1,6 @@
 // src/__tests__/modules/visitas/visitaService.test.js
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { conTodosLosModelos } from '../../setup/modelsMock.js';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 
@@ -20,7 +21,12 @@ const mockSequelize = {
 
 // Mock de modelos
 const modelsPath = resolve(__dirname, '../../../models/index.js');
-await jest.unstable_mockModule(modelsPath, () => ({
+// TransactionWrapper toma sequelize de database.js: mismo mock que models/index.js
+await jest.unstable_mockModule(resolve(__dirname, '../../../shared/utils/database.js'), () => ({
+  sequelize: mockSequelize
+}));
+
+await jest.unstable_mockModule(modelsPath, () => conTodosLosModelos({
   Visita: {
     create: jest.fn(),
     findByPk: jest.fn(),
@@ -184,6 +190,8 @@ describe('VisitaService', () => {
         sedePrincipal: { nombre_sede: 'Sede A' },
         tecnicoAsignado: { nombre: 'Juan' }
       };
+      // El servicio trabaja sobre la versión plana (toJSON) para firmar URLs de imágenes
+      mockVisita.toJSON = () => mockVisita;
 
       Visita.findByPk = jest.fn().mockResolvedValue(mockVisita);
 
@@ -300,7 +308,8 @@ describe('VisitaService', () => {
         visitaService.actualizar('uuid-inexistente', {}, 'uuid-usuario')
       ).rejects.toThrow('Visita no encontrada');
 
-      expect(mockTransaction.rollback).toHaveBeenCalled();
+      // La existencia se valida antes de abrir la transacción
+      expect(mockSequelize.transaction).not.toHaveBeenCalled();
     });
   });
 
@@ -340,19 +349,28 @@ describe('VisitaService', () => {
       expect(mockTransaction.commit).toHaveBeenCalled();
     });
 
-    it('debe lanzar error si la visita ya fue realizada', async () => {
+    // Desde el commit 9e7e7e62 una visita realizada puede editar su informe;
+    // si quedó realizada sin informe, se le crea uno en lugar de rechazarla.
+    it('debe crear el informe de una visita realizada que no lo tiene', async () => {
       const mockVisita = {
         id: 'uuid-visita',
-        estado: 'realizada'
+        sede_id: 'uuid-sede',
+        estado: 'realizada',
+        informe: null,
+        sedePrincipal: { nombre_sede: 'Sede A' },
+        tecnicoAsignado: { nombre: 'Juan' },
+        solicitudesPrevias: [],
+        update: jest.fn().mockResolvedValue(true)
       };
 
       Visita.findByPk = jest.fn().mockResolvedValue(mockVisita);
+      VisitaInforme.create = jest.fn().mockResolvedValue({ id: 'uuid-informe', setDataValue: jest.fn() });
+      Personal.findAll = jest.fn().mockResolvedValue([]);
 
-      await expect(
-        visitaService.marcarRealizada('uuid-visita', {}, 'uuid-usuario')
-      ).rejects.toThrow('La visita ya fue realizada');
+      await visitaService.marcarRealizada('uuid-visita', { observaciones: 'Informe tardío' }, 'uuid-usuario');
 
-      expect(mockTransaction.rollback).toHaveBeenCalled();
+      expect(VisitaInforme.create).toHaveBeenCalled();
+      expect(mockTransaction.commit).toHaveBeenCalled();
     });
   });
 

@@ -4,16 +4,21 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { sequelize } from '../../shared/utils/database.js';
+import { fechaArgentina } from '../../shared/utils/fechas.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const router = express.Router();
 
-const SEED_SECRET = process.env.SEED_SECRET || 'staging-seed-2026';
+// Sin SEED_SECRET configurado el endpoint queda deshabilitado (no hay clave por defecto)
+const SEED_SECRET = process.env.SEED_SECRET;
 
 router.post('/seed-staging', async (req, res) => {
   if (process.env.NODE_ENV === 'production') {
     return res.status(403).json({ error: 'Not available in production' });
+  }
+  if (!SEED_SECRET) {
+    return res.status(404).json({ error: 'Not found' });
   }
   if (req.headers['x-seed-secret'] !== SEED_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -49,7 +54,7 @@ router.post('/seed-staging', async (req, res) => {
     // 1. Datos maestros
     await upsert('empresas', empresas.map(e => ({ id: e.id, nombre_empresa: e.nombre_empresa, cuit: e.cuit, rason_social: e.rason_social, email: e.email, telefono: e.telefono, direccion: e.direccion, activo: true, created_at: new Date(), updated_at: new Date() })));
     await upsert('sedes', sedes.map(s => ({ id: s.id, nombre_sede: s.nombre_sede, direccion: s.direccion, localidad: s.localidad, provincia: s.provincia, empresa_id: s.empresa_id, activo: true, created_at: new Date(), updated_at: new Date() })));
-    await upsert('personal', personal.map(p => ({ id: p.id, nombre: p.nombre, apellido: p.apellido, email: p.email, telefono: p.telefono ?? null, sede_id: p.sede_id ?? null, privilegio_app: p.privilegio_app ?? 'user', activo: true, fecha_ingreso: p.fecha_ingreso ?? new Date().toISOString().slice(0, 10), created_at: new Date(), updated_at: new Date() })));
+    await upsert('personal', personal.map(p => ({ id: p.id, nombre: p.nombre, apellido: p.apellido, email: p.email, telefono: p.telefono ?? null, sede_id: p.sede_id ?? null, privilegio_app: p.privilegio_app ?? 'user', activo: true, fecha_ingreso: p.fecha_ingreso ?? fechaArgentina(), created_at: new Date(), updated_at: new Date() })));
 
     // 2. Tipos articulo
     for (const t of tipos_all) {

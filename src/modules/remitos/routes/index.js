@@ -164,18 +164,6 @@ router.post(
 );
 
 /**
- * POST /remitos/:id/devolver
- * Generar remito de devolución automático
- * Requiere: Grupo "Infraestructura" (Super_admin) O ser el técnico asignado al remito
- * Mínimo: rol "support" — la validación fina (super_admin o tecnico asignado) ocurre en el controller
- */
-router.post(
-  '/:id/devolver',
-  requireRole('support'),
-  remitoController.generarDevolucion.bind(remitoController)
-);
-
-/**
  * POST /remitos/:id/procesar-devolucion
  * Procesar devolución granular de préstamos
  * Para cada artículo se puede elegir: devolver o extender préstamo
