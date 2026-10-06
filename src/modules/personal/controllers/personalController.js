@@ -201,7 +201,7 @@ class PersonalController {
       if (err.message.includes('no encontrada')) {
         return error(res, err.message, 404);
       }
-      if (err.message.includes('remito')) {
+      if (err.message.includes('remito') || err.message.includes('equipo(s) asignado(s)')) {
         return error(res, err.message, 409);
       }
       error(res, err.message || 'Error al eliminar la persona', 500);

@@ -208,9 +208,10 @@ class PersonalService {
     const {
       tipo = 'todos', // 'solicitados', 'asignados' o 'todos'
       estado = null,
-      limit = 10,
+      limite, // nombre que valida la ruta
       page = 1
     } = filters;
+    const limit = filters.limit || limite || 10;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
     const whereClause = {};
@@ -236,7 +237,7 @@ class PersonalService {
 
     query.limit = parseInt(limit);
     query.offset = offset;
-    query.order = [['fecha_creacion', 'DESC']];
+    query.order = [['created_at', 'DESC']];
 
     const { count, rows } = await Remito.findAndCountAll(query);
 
@@ -490,17 +491,24 @@ class PersonalService {
    * Verificar si tiene remitos pendientes antes de eliminar
    */
   async verificarRemitosPendientes(personalId) {
+    // Completado, devuelto y cancelado son estados finales: no bloquean la baja
+    const estadoPendiente = { [Op.notIn]: ['completado', 'devuelto', 'cancelado'] };
     const remitosPendientes = await Remito.count({
       where: {
         [Op.or]: [
-          { solicitante_id: personalId, estado: { [Op.ne]: 'completado' } },
-          { tecnico_asignado_id: personalId, estado: { [Op.ne]: 'completado' } }
+          { solicitante_id: personalId, estado: estadoPendiente },
+          { tecnico_asignado_id: personalId, estado: estadoPendiente }
         ]
       }
     });
 
     if (remitosPendientes > 0) {
       throw new Error(`No se puede eliminar el personal. Existen ${remitosPendientes} remito(s) pendiente(s) asociado(s) a esta persona. Por favor completa o reasigna todos los remitos pendientes.`);
+    }
+
+    const equipos = await asignacionInventarioService.asignacionesPersonalesActivas(personalId);
+    if (equipos.length > 0) {
+      throw new Error(`No se puede eliminar el personal. Tiene ${equipos.length} equipo(s) asignado(s) (celular/notebook). Registrá la devolución antes de darlo de baja.`);
     }
   }
 
