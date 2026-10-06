@@ -112,35 +112,4 @@ const RemitoDetalle = sequelize.define('RemitoDetalle', {
   }
 });
 
-// Métodos de instancia
-RemitoDetalle.prototype.estaVencido = function() {
-  return this.es_prestamo &&
-         !this.devuelto &&
-         this.fecha_devolucion &&
-         new Date(this.fecha_devolucion) <= new Date();
-};
-
-RemitoDetalle.prototype.estaProximoAVencer = function(dias = 7) {
-  if (!this.es_prestamo || !this.fecha_devolucion || this.devuelto) {
-    return false;
-  }
-
-  const hoy = new Date();
-  const fechaDevolucion = new Date(this.fecha_devolucion);
-  const diferenciaDias = Math.floor((fechaDevolucion - hoy) / (1000 * 60 * 60 * 24));
-
-  return diferenciaDias >= 0 && diferenciaDias <= dias;
-};
-
-RemitoDetalle.prototype.marcarDevuelto = async function() {
-  if (!this.es_prestamo) {
-    throw new Error('Solo los préstamos pueden ser marcados como devueltos');
-  }
-
-  this.devuelto = true;
-  await this.save();
-
-  return this;
-};
-
 export default RemitoDetalle;
