@@ -4,15 +4,8 @@ module.exports = {
   up: async (queryInterface, Sequelize) => {
     const { v4: uuidv4 } = require('uuid');
 
+    // "Notebook" lo crea la migración 20260428120100-seed-tipo-articulo-notebook
     const tiposArticulo = [
-      {
-        id: uuidv4(),
-        nombre: 'Notebooks',
-        descripcion: 'Computadoras portátiles',
-        activo: true,
-        created_at: new Date(),
-        updated_at: new Date()
-      },
       {
         id: uuidv4(),
         nombre: 'PC',
