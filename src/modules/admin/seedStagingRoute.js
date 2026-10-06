@@ -9,11 +9,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const router = express.Router();
 
-const SEED_SECRET = process.env.SEED_SECRET || 'staging-seed-2026';
+// Sin SEED_SECRET configurado el endpoint queda deshabilitado (no hay clave por defecto)
+const SEED_SECRET = process.env.SEED_SECRET;
 
 router.post('/seed-staging', async (req, res) => {
   if (process.env.NODE_ENV === 'production') {
     return res.status(403).json({ error: 'Not available in production' });
+  }
+  if (!SEED_SECRET) {
+    return res.status(404).json({ error: 'Not found' });
   }
   if (req.headers['x-seed-secret'] !== SEED_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
