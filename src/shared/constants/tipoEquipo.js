@@ -55,6 +55,17 @@ export function tipoArticuloCoincide(tipoEquipo, nombreTipoArticulo) {
   }
 }
 
+// Equipos personales: se asignan a una persona y la acompañan cuando cambia de sede.
+export const TIPOS_EQUIPO_PERSONAL = ['celular', 'notebook'];
+
+/**
+ * Tipo de equipo personal ('celular' | 'notebook') a partir del nombre del
+ * TipoArticulo, o null si el artículo no viaja con la persona.
+ */
+export function tipoEquipoPersonalDeArticulo(nombreTipoArticulo) {
+  return TIPOS_EQUIPO_PERSONAL.find(tipo => tipoArticuloCoincide(tipo, nombreTipoArticulo)) || null;
+}
+
 /** Etiqueta legible del tipo de equipo. */
 export function etiquetaTipoEquipo(tipoEquipo) {
   switch (tipoEquipo) {

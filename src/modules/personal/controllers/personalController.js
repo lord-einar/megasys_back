@@ -149,6 +149,9 @@ class PersonalController {
       success(res, resultado.data, 'Persona actualizada correctamente');
     } catch (err) {
       logger.error('Error actualizando persona:', err);
+      if (err.statusCode) {
+        return error(res, err.message, err.statusCode);
+      }
       if (err.message.includes('no encontrada')) {
         return error(res, err.message, 404);
       }

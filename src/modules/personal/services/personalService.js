@@ -6,6 +6,8 @@ import { randomUUID as uuidv4 } from 'node:crypto';
 import { assignSistemasRoleIfAuthorized } from '../../../shared/utils/sistemasRoleAssignment.js';
 import CommonValidators from '../../../shared/validators/commonValidators.js';
 import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
+import asignacionInventarioService from '../../asignaciones/services/asignacionInventarioService.js';
+import novedadMovimientoService from '../../novedadesPersonal/services/novedadMovimientoService.js';
 
 class PersonalService {
   /**
@@ -384,6 +386,16 @@ class PersonalService {
       await CommonValidators.validarSedesActivas(sedesParaActualizar);
     }
 
+    // Sede principal resultante: la primera de 'sedes' o 'sede_id' explícito
+    let sedePrincipalNueva = persona.sede_id;
+    if (Array.isArray(sedesParaActualizar) && sedesParaActualizar.length > 0) {
+      sedePrincipalNueva = sedesParaActualizar[0];
+    } else if (datosActualizacion.sede_id !== undefined) {
+      sedePrincipalNueva = datosActualizacion.sede_id || null;
+    }
+    const cambiaSedePrincipal = sedePrincipalNueva !== persona.sede_id;
+    let equiposTrasladados = [];
+
     await TransactionWrapper.execute({
       operation: async (transaction) => {
         // Preparar datos (excluir 'sedes' de la actualización de Personal)
@@ -436,6 +448,16 @@ class PersonalService {
           await persona.update({ sede_id: sedesParaActualizar[0] }, { transaction });
         }
 
+        // Los celulares/notebooks asignados acompañan a la persona a su sede nueva
+        if (cambiaSedePrincipal) {
+          equiposTrasladados = await asignacionInventarioService.trasladarEquipos(persona, sedePrincipalNueva, {
+            transaction,
+            usuarioEmail,
+            origen: 'edicion_personal'
+          });
+          await novedadMovimientoService.cerrarPorCambioManual(personalId, { transaction, usuarioEmail });
+        }
+
         return persona;
       },
       usuarioEmail: usuarioEmail || 'sistema@megatlon.com.ar',
@@ -455,10 +477,13 @@ class PersonalService {
       personalId: persona.id,
       cambios: Object.keys(datosActualizacion),
       sedesActualizadas: sedesParaActualizar?.length || 0,
+      equiposTrasladados: equiposTrasladados.length,
       actualizadoPor: usuarioEmail
     });
 
-    return await this.obtenerConDetalles(personalId);
+    const actualizada = (await this.obtenerConDetalles(personalId)).toJSON();
+    actualizada.equiposTrasladados = equiposTrasladados;
+    return actualizada;
   }
 
   /**

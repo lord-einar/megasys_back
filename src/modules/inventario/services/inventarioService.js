@@ -5,6 +5,7 @@ import { Op } from 'sequelize';
 import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
 import CommonValidators from '../../../shared/validators/commonValidators.js';
 import garantiaService from './garantiaService.js';
+import asignacionInventarioService from '../../asignaciones/services/asignacionInventarioService.js';
 
 class InventarioService {
   /**
@@ -430,6 +431,12 @@ class InventarioService {
 
     let sedeAnterior = null;
     if (datosActualizacion.sede_id && datosActualizacion.sede_id !== item.sede_id) {
+      if (await asignacionInventarioService.tieneAsignacionPersonalActiva(inventarioId)) {
+        throw Object.assign(
+          new Error('Este equipo está asignado a una persona y se ubica en su sede. Para moverlo, cambiá la sede de la persona o cerrá la asignación.'),
+          { statusCode: 400 }
+        );
+      }
       await CommonValidators.validarSedeActiva(datosActualizacion.sede_id);
       sedeAnterior = item.sede_id;
     }

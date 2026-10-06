@@ -42,11 +42,22 @@ class AsignacionInventarioController {
         personal_id,
         fecha_asignacion,
         motivo
-      });
+      }, { usuarioEmail: req.user?.email });
       return success(res, nueva, 'Asignación creada correctamente', 201);
     } catch (err) {
       logger.error('Error creando asignación:', err);
-      return error(res, err.message || 'Error al crear asignación', 400);
+      return error(res, err.message || 'Error al crear asignación', err.statusCode || 400);
+    }
+  };
+
+  previsualizarTraslado = async (req, res) => {
+    try {
+      const { personal_id, sede_id } = req.query;
+      const preview = await asignacionInventarioService.previsualizarTraslado(personal_id, sede_id);
+      return success(res, preview);
+    } catch (err) {
+      logger.error('Error calculando traslado de equipos:', err);
+      return error(res, err.message, 500);
     }
   };
 
