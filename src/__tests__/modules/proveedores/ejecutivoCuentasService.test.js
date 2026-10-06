@@ -180,7 +180,8 @@ describe('EjecutivoCuentasService', () => {
     const datosNuevo = {
       proveedor_id: 'uuid-prov',
       tipo_servicio_id: 'uuid-tipo',
-      nombre: 'Juan Pérez',
+      nombre: 'Juan',
+      apellido: 'Pérez',
       email: 'juan@test.com',
       telefono: '123456789'
     };
@@ -222,7 +223,8 @@ describe('EjecutivoCuentasService', () => {
     it('debe normalizar strings (trim)', async () => {
       const datosConEspacios = {
         ...datosNuevo,
-        nombre: '  Juan Pérez  ',
+        nombre: '  Juan  ',
+        apellido: '  Pérez  ',
         email: '  juan@test.com  '
       };
 
@@ -230,7 +232,8 @@ describe('EjecutivoCuentasService', () => {
 
       expect(EjecutivoCuentas.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          nombre: 'Juan Pérez',
+          nombre: 'Juan',
+          apellido: 'Pérez',
           email: 'juan@test.com'
         }),
         expect.any(Object)
@@ -240,7 +243,8 @@ describe('EjecutivoCuentasService', () => {
     it('debe permitir crear sin tipo_servicio_id', async () => {
       const datosSinTipo = {
         proveedor_id: 'uuid-prov',
-        nombre: 'Juan Pérez',
+        nombre: 'Juan',
+        apellido: 'Pérez',
         email: 'juan@test.com',
         telefono: '123456789'
       };
@@ -249,7 +253,7 @@ describe('EjecutivoCuentasService', () => {
 
       expect(EjecutivoCuentas.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          nombre: 'Juan Pérez',
+          nombre: 'Juan',
           tipo_servicio_id: undefined
         }),
         expect.any(Object)

@@ -174,7 +174,8 @@ describe('ReclamoService', () => {
     beforeEach(() => {
       Servicio.findByPk = jest.fn().mockResolvedValue({ id: 'uuid-servicio', activo: true });
       Sede.findByPk = jest.fn().mockResolvedValue({ id: 'uuid-sede', activo: true });
-      Reclamo.count = jest.fn().mockResolvedValue(5);
+      // El número se calcula con MAX(numero_reclamo) + 1 en una consulta SQL
+      mockSequelize.query = jest.fn().mockResolvedValue([{ next_num: 6 }]);
 
       Reclamo.create = jest.fn().mockResolvedValue({
         id: 'uuid-nuevo',
@@ -199,7 +200,7 @@ describe('ReclamoService', () => {
     it('debe generar número de reclamo automáticamente', async () => {
       await reclamoService.crear(datosNuevo);
 
-      expect(Reclamo.count).toHaveBeenCalled();
+      expect(mockSequelize.query).toHaveBeenCalled();
       expect(Reclamo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           numero_reclamo: 'REC-000006'

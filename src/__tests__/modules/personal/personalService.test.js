@@ -1,5 +1,6 @@
 // src/__tests__/modules/personal/personalService.test.js
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { conTodosLosModelos } from '../../setup/modelsMock.js';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 
@@ -35,7 +36,12 @@ const commonValidatorsPath = resolve(__dirname, '../../../shared/validators/comm
 const servicePath = resolve(__dirname, '../../../modules/personal/services/personalService.js');
 
 // Mock de modelos
-await jest.unstable_mockModule(modelsPath, () => ({
+// TransactionWrapper toma sequelize de database.js: mismo mock que models/index.js
+await jest.unstable_mockModule(resolve(__dirname, '../../../shared/utils/database.js'), () => ({
+  sequelize: mockSequelize
+}));
+
+await jest.unstable_mockModule(modelsPath, () => conTodosLosModelos({
   Personal: {
     create: jest.fn(),
     findByPk: jest.fn(),

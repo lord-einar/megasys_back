@@ -482,9 +482,11 @@ class PersonalService {
       actualizadoPor: usuarioEmail
     });
 
-    const actualizada = (await this.obtenerConDetalles(personalId)).toJSON();
-    actualizada.equiposTrasladados = equiposTrasladados;
-    return actualizada;
+    const actualizada = await this.obtenerConDetalles(personalId);
+    return {
+      ...(typeof actualizada?.toJSON === 'function' ? actualizada.toJSON() : actualizada),
+      equiposTrasladados
+    };
   }
 
   /**

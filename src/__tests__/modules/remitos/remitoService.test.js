@@ -1,5 +1,6 @@
 // src/__tests__/modules/remitos/remitoService.test.js
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { conTodosLosModelos } from '../../setup/modelsMock.js';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 
@@ -29,7 +30,12 @@ const commonValidatorsPath = resolve(__dirname, '../../../shared/validators/comm
 const servicePath = resolve(__dirname, '../../../modules/remitos/services/remitoService.js');
 
 // Mock de modelos
-await jest.unstable_mockModule(modelsPath, () => ({
+// TransactionWrapper toma sequelize de database.js: mismo mock que models/index.js
+await jest.unstable_mockModule(resolve(__dirname, '../../../shared/utils/database.js'), () => ({
+  sequelize: mockSequelize
+}));
+
+await jest.unstable_mockModule(modelsPath, () => conTodosLosModelos({
   Remito: {
     create: jest.fn(),
     findByPk: jest.fn(),
@@ -439,7 +445,12 @@ describe('RemitoService', () => {
     });
 
     it('debe hacer rollback si ocurre un error', async () => {
-      Remito.findByPk.mockRejectedValueOnce(new Error('DB Error'));
+      // La primera lectura (validaciones) es fuera de la transacción;
+      // el error se provoca en la lectura dentro de la transacción.
+      const remitoValido = await Remito.findByPk(remitoId);
+      Remito.findByPk
+        .mockResolvedValueOnce(remitoValido)
+        .mockRejectedValueOnce(new Error('DB Error'));
 
       await expect(
         remitoService.cambiarEstado(remitoId, 'en_transito', usuarioId, options)

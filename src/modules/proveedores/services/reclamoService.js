@@ -1,7 +1,7 @@
 // src/modules/proveedores/services/reclamoService.js
 import { Reclamo, Servicio, Sede, EquipoServicio, Personal, sequelize } from '../../../models/index.js';
 import logger from '../../../shared/utils/logger.js';
-import { Op } from 'sequelize';
+import { Op, QueryTypes } from 'sequelize';
 
 class ReclamoService {
   async listar(filters = {}) {
@@ -147,7 +147,7 @@ class ReclamoService {
     // Generar número de reclamo único (dentro de la transacción para evitar race conditions)
     const [maxResult] = await sequelize.query(
       `SELECT COALESCE(MAX(CAST(SUBSTRING(numero_reclamo FROM 5) AS INTEGER)), 0) + 1 AS next_num FROM reclamos`,
-      { type: sequelize.constructor.QueryTypes.SELECT, ...options }
+      { type: QueryTypes.SELECT, ...options }
     );
     const numero_reclamo = `REC-${String(maxResult.next_num).padStart(6, '0')}`;
 
