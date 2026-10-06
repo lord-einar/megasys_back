@@ -16,7 +16,9 @@ import AuditService from '../../../shared/services/auditService.js';
 import { tipoEquipoPersonalDeArticulo, etiquetaTipoEquipo } from '../../../shared/constants/tipoEquipo.js';
 import { ESTADOS_REMITO_ACTIVOS, planificarTraslado } from './trasladoEquiposPolicy.js';
 
-const hoyISO = () => new Date().toISOString().slice(0, 10);
+// Fecha de hoy (YYYY-MM-DD) en Argentina: el servidor corre en UTC y después de
+// las 21 h toISOString() ya devuelve el día siguiente.
+const hoyISO = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
 
 const conStatus = (mensaje, statusCode) => Object.assign(new Error(mensaje), { statusCode });
 
