@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { sequelize } from '../../shared/utils/database.js';
+import { fechaArgentina } from '../../shared/utils/fechas.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -53,7 +54,7 @@ router.post('/seed-staging', async (req, res) => {
     // 1. Datos maestros
     await upsert('empresas', empresas.map(e => ({ id: e.id, nombre_empresa: e.nombre_empresa, cuit: e.cuit, rason_social: e.rason_social, email: e.email, telefono: e.telefono, direccion: e.direccion, activo: true, created_at: new Date(), updated_at: new Date() })));
     await upsert('sedes', sedes.map(s => ({ id: s.id, nombre_sede: s.nombre_sede, direccion: s.direccion, localidad: s.localidad, provincia: s.provincia, empresa_id: s.empresa_id, activo: true, created_at: new Date(), updated_at: new Date() })));
-    await upsert('personal', personal.map(p => ({ id: p.id, nombre: p.nombre, apellido: p.apellido, email: p.email, telefono: p.telefono ?? null, sede_id: p.sede_id ?? null, privilegio_app: p.privilegio_app ?? 'user', activo: true, fecha_ingreso: p.fecha_ingreso ?? new Date().toISOString().slice(0, 10), created_at: new Date(), updated_at: new Date() })));
+    await upsert('personal', personal.map(p => ({ id: p.id, nombre: p.nombre, apellido: p.apellido, email: p.email, telefono: p.telefono ?? null, sede_id: p.sede_id ?? null, privilegio_app: p.privilegio_app ?? 'user', activo: true, fecha_ingreso: p.fecha_ingreso ?? fechaArgentina(), created_at: new Date(), updated_at: new Date() })));
 
     // 2. Tipos articulo
     for (const t of tipos_all) {

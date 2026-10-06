@@ -18,6 +18,7 @@ import logger from '../../../shared/utils/logger.js';
 import stockAlertService from './stockAlertService.js';
 import solicitudAsignacionNotificationService from './solicitudAsignacionNotificationService.js';
 import { TIPO_EQUIPO_TO_TIPO_ARTICULO, tipoArticuloCoincide, etiquetaTipoEquipo } from '../../../shared/constants/tipoEquipo.js';
+import { fechaArgentina } from '../../../shared/utils/fechas.js';
 import {
   ESTADOS_PRE_REMITO,
   ESTADOS_GENERAR_REMITO,
@@ -525,7 +526,7 @@ class SolicitudAsignacionService {
     });
     if (asig) {
       asig.activo = false;
-      asig.fecha_devolucion = new Date().toISOString().slice(0, 10);
+      asig.fecha_devolucion = fechaArgentina();
       await asig.save({ transaction: t });
     }
 
@@ -662,7 +663,7 @@ class SolicitudAsignacionService {
         });
         if (asigAnterior) {
           asigAnterior.activo = false;
-          asigAnterior.fecha_devolucion = new Date().toISOString().slice(0, 10);
+          asigAnterior.fecha_devolucion = fechaArgentina();
           await asigAnterior.save({ transaction: t });
         }
       }
@@ -670,7 +671,7 @@ class SolicitudAsignacionService {
       inventario.estado = 'en_uso';
       await inventario.save({ transaction: t });
 
-      const hoy = new Date().toISOString().slice(0, 10);
+      const hoy = fechaArgentina();
       await AsignacionInventario.create({
         inventario_id,
         personal_id: s.beneficiario_personal_id,

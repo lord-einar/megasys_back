@@ -8,6 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import logger from '../utils/logger.js';
 import storageService from './storageService.js';
+import { fechaArgentina } from '../utils/fechas.js';
 
 // Obtener __dirname en ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -20,8 +21,7 @@ class PDFService {
   }
 
   generarNombreArchivo(numeroRemito, confirmado = false) {
-    const fecha = new Date();
-    const yyyymmdd = fecha.toISOString().split('T')[0].replace(/-/g, '');
+    const yyyymmdd = fechaArgentina().replace(/-/g, '');
     const sufijo = confirmado ? '_CONFIRMADO' : '';
     return `${yyyymmdd}_${numeroRemito}${sufijo}.pdf`;
   }

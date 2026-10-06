@@ -5,6 +5,7 @@ import asyncHandler from '../../../shared/utils/asyncHandler.js';
 import logger from '../../../shared/utils/logger.js';
 import entraSyncService from '../services/entraSyncService.js';
 import TransactionWrapper from '../../../shared/utils/transactionWrapper.js';
+import { fechaArgentina } from '../../../shared/utils/fechas.js';
 
 class PersonalController {
   /**
@@ -299,7 +300,7 @@ class PersonalController {
 
       // Configurar headers para descarga
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="personal_${new Date().toISOString().split('T')[0]}.csv"`);
+      res.setHeader('Content-Disposition', `attachment; filename="personal_${fechaArgentina()}.csv"`);
 
       // Agregar BOM para UTF-8 (ayuda con caracteres especiales en Excel)
       res.send('\ufeff' + csv);

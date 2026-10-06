@@ -16,6 +16,7 @@ import {
 import logger from '../../../shared/utils/logger.js';
 import solicitudCompraNotificationService from './solicitudCompraNotificationService.js';
 import { TIPO_EQUIPO_TO_TIPO_ARTICULO, tipoArticuloCoincide } from '../../../shared/constants/tipoEquipo.js';
+import { fechaArgentina } from '../../../shared/utils/fechas.js';
 
 // Estados terminales — no se pueden editar ni transicionar.
 const ESTADOS_TERMINALES = ['finalizada', 'comprada', 'rechazada', 'cancelada'];
@@ -676,7 +677,7 @@ class SolicitudCompraService {
       const beneficiario = await Personal.findByPk(solicitud.beneficiario_personal_id, { transaction });
       if (!beneficiario) throw new Error('Beneficiario no encontrado');
 
-      const hoy = new Date().toISOString().slice(0, 10);
+      const hoy = fechaArgentina();
 
       if (solicitud.esReposicion() && solicitud.inventario_actual_id) {
         const previo = await Inventario.findByPk(solicitud.inventario_actual_id, { transaction });

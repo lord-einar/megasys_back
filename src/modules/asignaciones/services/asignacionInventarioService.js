@@ -12,13 +12,12 @@ import {
   sequelize
 } from '../../../models/index.js';
 import logger from '../../../shared/utils/logger.js';
+import { fechaArgentina } from '../../../shared/utils/fechas.js';
 import AuditService from '../../../shared/services/auditService.js';
 import { tipoEquipoPersonalDeArticulo, etiquetaTipoEquipo } from '../../../shared/constants/tipoEquipo.js';
 import { ESTADOS_REMITO_ACTIVOS, planificarTraslado } from './trasladoEquiposPolicy.js';
 
-// Fecha de hoy (YYYY-MM-DD) en Argentina: el servidor corre en UTC y después de
-// las 21 h toISOString() ya devuelve el día siguiente.
-const hoyISO = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+const hoyISO = () => fechaArgentina();
 
 const conStatus = (mensaje, statusCode) => Object.assign(new Error(mensaje), { statusCode });
 
