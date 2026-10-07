@@ -612,7 +612,7 @@ class SolicitudAsignacionService {
       const actorTieneInfra = !!contexto.roleAnalysis?.hasInfraestructura;
       const actorEsCompras = actorTieneCompras && comprasPuedeAsignarEquipo(s);
       if (actorTieneCompras && !actorTieneInfra && !actorEsCompras) {
-        throw new Error('Compras solo puede asignar celulares mientras la solicitud espera aprobación de Infra o RRHH');
+        throw new Error('Compras solo puede asignar celulares en solicitudes pendientes de Infra o RRHH, o ya aprobadas, que todavía no tengan equipo ni remito');
       }
       if (actorEsCompras) {
         if (s.estado === 'pendiente_compra') {
