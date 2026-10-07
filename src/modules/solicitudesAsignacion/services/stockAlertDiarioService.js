@@ -3,6 +3,21 @@ import { Op, Sequelize } from 'sequelize';
 import { Personal, Inventario, CategoriaEquipo, TipoArticulo, sequelize } from '../../../models/index.js';
 import emailService from '../../../shared/services/emailService.js';
 import logger from '../../../shared/utils/logger.js';
+import { tipoArticuloCoincide } from '../../../shared/constants/tipoEquipo.js';
+
+// Tipo de equipo (lógico) -> tipo de categoría, para cada TipoArticulo alertable
+const TIPOS_ALERTABLES = [
+  { tipoEquipo: 'celular', tipoCategoria: 'celular' },
+  { tipoEquipo: 'notebook', tipoCategoria: 'notebook' },
+  { tipoEquipo: 'pc_escritorio', tipoCategoria: 'pc' }
+];
+
+const ETIQUETA_TIPO_CATEGORIA = {
+  celular: 'Celular',
+  notebook: 'Notebook',
+  pc: 'PC de escritorio',
+  ambos: 'Todos los tipos'
+};
 
 const UMBRAL = 3;
 const TOKEN_TTL = '48h';
@@ -26,18 +41,16 @@ class StockAlertDiarioService {
 
   // ── Consulta stock disponible agrupado por categoría ─────────────────────
   async stockPorCategoria() {
-    // Obtener IDs de tipos notebook y celular
-    const tipos = await TipoArticulo.findAll({
-      where: {
-        nombre: { [Op.or]: [{ [Op.iLike]: '%notebook%' }, { [Op.iLike]: '%celular%' }] },
-        activo: true
-      },
-      attributes: ['id', 'nombre']
-    });
-    if (!tipos.length) return [];
-
-    const tipoIds = tipos.map(t => t.id);
-    const tipoMap = Object.fromEntries(tipos.map(t => [t.id, t.nombre.toLowerCase().includes('celular') ? 'celular' : 'notebook']));
+    // Tipos de artículo alertables: celular, notebook y PC (mismo criterio que
+    // las solicitudes de asignación; antes las PCs quedaban afuera)
+    const tiposActivos = await TipoArticulo.findAll({ where: { activo: true }, attributes: ['id', 'nombre'] });
+    const tipoMap = {};
+    for (const t of tiposActivos) {
+      const alertable = TIPOS_ALERTABLES.find(a => tipoArticuloCoincide(a.tipoEquipo, t.nombre));
+      if (alertable) tipoMap[t.id] = alertable.tipoCategoria;
+    }
+    const tipoIds = Object.keys(tipoMap);
+    if (!tipoIds.length) return [];
 
     // Contar disponibles por categoría
     const rows = await Inventario.findAll({
@@ -56,28 +69,33 @@ class StockAlertDiarioService {
       raw: true
     });
 
-    const categoriasMap = {};
+    const disponiblesPorCategoria = {};
     for (const row of rows) {
-      const key = row.categoria_id;
-      if (!categoriasMap[key]) {
-        categoriasMap[key] = { categoria_id: key, count: 0, tipo: tipoMap[row.tipo_articulo_id] || 'notebook' };
-      }
-      categoriasMap[key].count += parseInt(row.count, 10);
+      disponiblesPorCategoria[row.categoria_id] = (disponiblesPorCategoria[row.categoria_id] || 0) + parseInt(row.count, 10);
     }
 
-    // Enriquecer con nombre de categoría
-    const categoriaIds = Object.keys(categoriasMap);
+    // Se parte de las categorías activas que alguna vez tuvieron equipos de
+    // estos tipos (no solo de las que hoy tienen stock): así una categoría que
+    // llegó a 0 disponibles también alerta. Antes quedaba afuera justo ese caso.
+    const usadas = await Inventario.findAll({
+      where: { tipo_articulo_id: { [Op.in]: tipoIds }, categoria_id: { [Op.ne]: null } },
+      attributes: [[Sequelize.fn('DISTINCT', Sequelize.col('categoria_id')), 'categoria_id']],
+      raw: true
+    });
+    const categoriaIds = usadas.map(u => u.categoria_id);
     if (!categoriaIds.length) return [];
 
     const categorias = await CategoriaEquipo.findAll({
-      where: { id: { [Op.in]: categoriaIds } },
+      where: { id: { [Op.in]: categoriaIds }, activo: true },
       attributes: ['id', 'nombre', 'tipo']
     });
 
     return categorias.map(cat => ({
-      ...categoriasMap[cat.id],
+      categoria_id: cat.id,
+      count: disponiblesPorCategoria[cat.id] || 0,
       categoria_nombre: cat.nombre,
-      tipo: cat.tipo
+      // Solo se muestra (mails y página de alerta): va la etiqueta legible
+      tipo: ETIQUETA_TIPO_CATEGORIA[cat.tipo] || cat.tipo
     })).filter(c => c.count < UMBRAL);
   }
 
